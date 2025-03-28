@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "zero_infra_mod_registry"
+version = "0.1.0"
+description = ""
+authors = ["Jacob Barber <jacoby6000@gmail.com>"]
+readme = "README.md"
+packages = [{include = "zero_infra_mod_registry", from="src/"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+PyGithub = "^2.5.0"
+requests = "^2.31.0"
+types-requests = "^2.31.0.2"
+argparse = "^1.4.0"
+types-urllib3 = "^1.26.25.14"
+urllib3 = "^2.0.4"
+semantic-version = "^2.10.0"
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.4.1"
+pytest = "^7.4.0"
+pytest-cov = "^4.1.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["zero_infra_mod_registry"]
+omit = ["tests/*"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

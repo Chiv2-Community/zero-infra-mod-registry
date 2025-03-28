@@ -1,0 +1,75 @@
+name: 'Zero Infra Mod Registry'
+description: 'Manage mod repositories, dependencies, and releases'
+author: 'Jacob Barber'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  command:
+    description: 'Command to execute (init, process-registry-updates, add, remove)'
+    required: true
+  repo_url:
+    description: 'Repository URL (required for init, add, and remove commands)'
+    required: false
+    default: ''
+  release_tag:
+    description: 'Release tag (required for add command)'
+    required: false
+    default: ''
+  dry_run:
+    description: 'Run in dry-run mode without making changes'
+    required: false
+    default: 'false'
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  log_level:
+    description: 'Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)'
+    required: false
+    default: 'INFO'
+  registry_path:
+    description: 'Path to the registry directory'
+    required: false
+    default: './registry'
+  package_db_path:
+    description: 'Path to the package database directory'
+    required: false
+    default: './package_db'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install Poetry
+      uses: abatilo/actions-poetry@v2
+      
+    - name: Setup Local Virtual Environment
+      shell: bash
+      run: |
+        poetry config virtualenvs.create true --local
+        poetry config virtualenvs.in-project true --local
+        
+    - name: Install Dependencies
+      shell: bash
+      run: poetry install
+      
+    - name: Make entrypoint script executable
+      shell: bash
+      run: chmod +x ${{ github.action_path }}/docker-entrypoint.sh
+      
+    - name: Run Command
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        LOG_LEVEL: ${{ inputs.log_level }}
+        REGISTRY_PATH: ${{ inputs.registry_path }}
+        PACKAGE_DB_PATH: ${{ inputs.package_db_path }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: |
+        ${{ github.action_path }}/docker-entrypoint.sh "${{ inputs.command }}" "${{ inputs.repo_url }}" "${{ inputs.release_tag }}"
