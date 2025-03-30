@@ -244,6 +244,24 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         logging.info("Successfully initialized all repos.")
 
+    def _is_package_in_index(self, repo: Repo) -> bool:
+        """
+        Check if a package exists in the mod list index.
+        
+        Args:
+            repo: Repository to check
+            
+        Returns:
+            True if the package exists in the index, False otherwise
+        """
+        try:
+            index_entries = self._load_package_list(self.mod_list_index_path)
+            index_entry = f"{repo.org}/{repo.name}"
+            return index_entry in index_entries
+        except Exception as e:
+            logging.error(f"Failed to check if package {repo} is in index: {e}")
+            return False
+
     def add_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> None:
         """
         Add a release to a repository.
@@ -252,7 +270,16 @@ class FilesystemPackageRegistry(PackageRegistry):
             repo: Repository to add the release to
             release_tag: Tag of the release to add
             dry_run: If True, don't make any actual changes
+            
+        Raises:
+            ValueError: If the package is not in the package list
         """
+        # First check if the package exists in the package list
+        if not self._is_package_in_index(repo):
+            error_msg = f"Package {repo} is not in the package list. Add it first using the 'init' command."
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+            
         logging.info(f"Loading mod metadata for {repo}...")
         mod = self.load_mod(repo)
 

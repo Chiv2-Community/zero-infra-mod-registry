@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from zero_infra_mod_registry.registry.filesystem_package_registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
-from zero_infra_mod_registry.models import Repo, Mod, Release
+from zero_infra_mod_registry.models import Repo, Mod, Release, Manifest
 
 
 class TestFilesystemPackageRegistry(unittest.TestCase):
@@ -134,6 +134,104 @@ class TestFilesystemPackageRegistry(unittest.TestCase):
         self.assertEqual(repo_to_index_entry("org1/repo1"), "org1/repo1")
         self.assertEqual(repo_to_index_entry("https://github.com/org1/repo1/"), "org1/repo1")
         self.assertEqual(repo_to_index_entry(" https://github.com/org1/repo1 "), "org1/repo1")
+
+
+class TestAddRelease(unittest.TestCase):
+    """Tests for the FilesystemPackageRegistry.add_release method."""
+
+    def setUp(self):
+        # Create a temporary directory for testing
+        self.test_dir = tempfile.mkdtemp()
+        self.registry_path = os.path.join(self.test_dir, "registry")
+        os.makedirs(self.registry_path, exist_ok=True)
+        self.package_db_path = os.path.join(self.test_dir, "package_db")
+        os.makedirs(os.path.join(self.package_db_path, "packages"), exist_ok=True)
+        
+        # Create the mod_list_index.txt file
+        self.mod_list_index_path = os.path.join(self.package_db_path, "mod_list_index.txt")
+        with open(self.mod_list_index_path, "w") as f:
+            f.write("testorg/testrepo\n")
+        
+        # Create a mock mod_retriever
+        self.mock_retriever = MagicMock()
+        
+        # Create the registry
+        self.registry = FilesystemPackageRegistry(
+            mod_retriever=self.mock_retriever,
+            registry_path=self.registry_path,
+            package_db_path=self.package_db_path
+        )
+        
+        # Test repo
+        self.test_repo = Repo("testorg", "testrepo")
+        self.nonexistent_repo = Repo("nonexistent", "repo")
+    
+    def tearDown(self):
+        # Clean up the temporary directory
+        shutil.rmtree(self.test_dir)
+    
+    def test_add_release_fails_if_package_not_in_index(self):
+        """Test that add_release fails if the package is not in the package list."""
+        with self.assertRaises(ValueError) as context:
+            self.registry.add_release(self.nonexistent_repo, "v1.0.0")
+        
+        self.assertIn("not in the package list", str(context.exception))
+    
+    @patch('zero_infra_mod_registry.registry.filesystem_package_registry.logging')
+    def test_add_release_succeeds_if_package_in_index(self, mock_logging):
+        """Test that add_release succeeds if the package is in the package list."""
+        # Mock the load_mod method to return None so we trigger the init call
+        self.registry.load_mod = MagicMock(return_value=None)
+        self.registry.init = MagicMock()
+        
+        # Call add_release
+        self.registry.add_release(self.test_repo, "v1.0.0")
+        
+        # Verify that init was called
+        self.registry.init.assert_called_once_with([self.test_repo], False)
+    
+    @patch('zero_infra_mod_registry.registry.filesystem_package_registry.logging')
+    def test_add_release_initializes_if_mod_not_found(self, mock_logging):
+        """Test that add_release initializes the repo if the mod is not found."""
+        # Mock the load_mod method to return None
+        self.registry.load_mod = MagicMock(return_value=None)
+        self.registry.init = MagicMock()
+        
+        # Call add_release
+        self.registry.add_release(self.test_repo, "v1.0.0")
+        
+        # Verify that the correct methods were called
+        self.registry.load_mod.assert_called_once_with(self.test_repo)
+        self.registry.init.assert_called_once_with([self.test_repo], False)
+    
+    @patch('zero_infra_mod_registry.registry.filesystem_package_registry.logging')
+    def test_add_release_fetches_release_metadata(self, mock_logging):
+        """Test that add_release fetches release metadata for new releases."""
+        # Create a mock mod
+        mock_mod = MagicMock(spec=Mod)
+        mock_mod.releases = []
+        
+        # Mock the load_mod method to return our mock mod
+        self.registry.load_mod = MagicMock(return_value=mock_mod)
+        
+        # Mock the fetch_release_metadata method
+        mock_release = MagicMock(spec=Release)
+        self.mock_retriever.fetch_release_metadata = MagicMock(return_value=mock_release)
+        
+        # Mock update_mod_with_release
+        updated_mod = MagicMock(spec=Mod)
+        self.mock_retriever.update_mod_with_release = MagicMock(return_value=updated_mod)
+        
+        # Mock validate_package_db
+        self.registry.validate_package_db = MagicMock()
+        
+        # Call add_release
+        self.registry.add_release(self.test_repo, "v1.0.0", dry_run=True)
+        
+        # Verify that the correct methods were called
+        self.mock_retriever.fetch_release_metadata.assert_called_once_with(mock_mod, "v1.0.0")
+        self.mock_retriever.update_mod_with_release.assert_called_once_with(mock_mod, mock_release)
+        self.registry.validate_package_db.assert_called_once_with([updated_mod])
 
 
 if __name__ == "__main__":
