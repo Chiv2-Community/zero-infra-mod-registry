@@ -4,9 +4,9 @@ from os import environ
 from typing import Any, List, Optional
 
 import requests
-from github import Auth, Github
+from github import Auth, Github, GitReleaseAsset
 from github.GitRelease import GitRelease
-from semantic_version import SimpleSpec, Version
+from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Manifest, Mod, Release, Repo
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import (
@@ -197,11 +197,11 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             or dependency_errors
             or tag_name_error
         ):
-            all_errors = filter(
+            all_errors: list[str] = list(filter(
                 lambda x: x is not None,
                 [pak_error, tag_error, mod_type_error, tag_name_error]
                 + dependency_errors,
-            )
+            ))
             error_string = "\n\t" + "\n\t".join(all_errors)
             raise Exception(
                 f"Mod manifest {repo} {release.tag_name} failed validation: {error_string}"
@@ -219,7 +219,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             manifest=manifest,
         )
 
-    def find_pak_file(self, release: GitRelease) -> Any | str:
+    def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset.GitReleaseAsset:
         """
         Find a .pak file in the release assets.
 
@@ -257,7 +257,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             tag_name = tag_name[1:]
 
         try:
-            Version(tag_name)
+            Version.parse(tag_name)
             return None
         except ValueError as e:
             return f"Version Tag '{tag_name}' Does not conform to the semver spec: {e}"
@@ -278,8 +278,21 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 input_version_range = dependency.version
                 if input_version_range.startswith("v"):
                     input_version_range = input_version_range[1:]
-
-                SimpleSpec(input_version_range)
+                
+                # Handle caret notation like "^1.0.0" - transform to semver format
+                if input_version_range.startswith("^"):
+                    input_version_range = ">=" + input_version_range[1:]
+                
+                # Handle comma-separated version ranges like ">=1.0.0,<2.0.0"
+                # Transform to semver format by checking each range separately
+                if "," in input_version_range:
+                    parts = input_version_range.split(",")
+                    for part in parts:
+                        test_version = Version.parse("1.0.0")
+                        test_version.match(part.strip())
+                else:
+                    test_version = Version.parse("1.0.0")
+                    test_version.match(input_version_range)
             except ValueError as e:
                 dependency_name = "/".join(dependency.repo_url.split("/")[-2:])
                 errors.append(

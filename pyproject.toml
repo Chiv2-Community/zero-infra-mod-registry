@@ -17,7 +17,8 @@ types-requests = "^2.31.0.2"
 argparse = "^1.4.0"
 types-urllib3 = "^1.26.25.14"
 urllib3 = "^2.0.4"
-semantic-version = "^2.10.0"
+semver = "^3.0.4"
+types-setuptools = "^65.3.0.5"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.4.1"

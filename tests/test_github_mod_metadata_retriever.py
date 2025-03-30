@@ -67,7 +67,6 @@ class TestGithubModMetadataRetriever(unittest.TestCase):
             Dependency(repo_url="https://github.com/org/repo", version="1.0.0"),
             Dependency(repo_url="https://github.com/org/repo", version="v1.0.0"),
             Dependency(repo_url="https://github.com/org/repo", version="^1.0.0"),
-            # Note: Using comma-separated ranges instead of space-separated
             Dependency(
                 repo_url="https://github.com/org/repo", version=">=1.0.0,<2.0.0"
             ),
