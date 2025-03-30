@@ -200,7 +200,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             all_errors: list[str] = list(filter(
                 lambda x: x is not None,
                 [pak_error, tag_error, mod_type_error, tag_name_error]
-                + dependency_errors,
+                + dependency_errors
             ))
             error_string = "\n\t" + "\n\t".join(all_errors)
             raise Exception(
@@ -208,14 +208,16 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             )
 
         # Download the pak and calculate hash of pak file
-        pak_download = requests.get(pak.browser_download_url)
+        pak_asset = pak  # Ensure we're using the asset, not a potential string error
+        assert not isinstance(pak_asset, str), "Expected GitReleaseAsset but got error string"
+        pak_download = requests.get(pak_asset.browser_download_url)
         pak_hash = sha512_sum(pak_download.content)
 
         return Release(
             tag=release.tag_name,
             hash=pak_hash,
-            pak_file_name=pak.name,
-            release_date=pak.updated_at.replace(tzinfo=None),
+            pak_file_name=pak_asset.name,
+            release_date=pak_asset.updated_at.replace(tzinfo=None),
             manifest=manifest,
         )
 
