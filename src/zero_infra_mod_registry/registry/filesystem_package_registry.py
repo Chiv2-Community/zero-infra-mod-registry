@@ -93,7 +93,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         Returns:
             List of text lines
         """
-        all_lines = []
+        all_lines: List[str] = []
 
         # Make sure directory exists
         if not os.path.exists(directory):
