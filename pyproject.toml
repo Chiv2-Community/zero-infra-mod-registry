@@ -6,6 +6,9 @@ authors = ["Jacob Barber <jacoby6000@gmail.com>"]
 readme = "README.md"
 packages = [{include = "zero_infra_mod_registry", from="src/"}]
 
+[tool.poetry.scripts]
+zero-infra-mod-registry = 'zero_infra_mod_registry.main:main'
+
 [tool.poetry.dependencies]
 python = "^3.9"
 PyGithub = "^2.5.0"
