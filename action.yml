@@ -38,6 +38,14 @@ inputs:
     required: false
     default: './package_db'
 
+outputs:
+  result:
+    description: 'Output log from the command execution'
+    value: ${{ steps.run-command.outputs.result }}
+  failed:
+    description: 'Whether the command failed or not'
+    value: ${{ steps.run-command.outputs.failed }}
+
 runs:
   using: 'composite'
   steps:
@@ -64,6 +72,7 @@ runs:
       run: chmod +x ${{ github.action_path }}/docker-entrypoint.sh
       
     - name: Run Command
+      id: run-command
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
@@ -72,4 +81,37 @@ runs:
         PACKAGE_DB_PATH: ${{ inputs.package_db_path }}
         DRY_RUN: ${{ inputs.dry_run }}
       run: |
-        ${{ github.action_path }}/docker-entrypoint.sh "${{ inputs.command }}" "${{ inputs.repo_url }}" "${{ inputs.release_tag }}"
+        # Run the command and capture output to a file
+        ${{ github.action_path }}/docker-entrypoint.sh "${{ inputs.command }}" "${{ inputs.repo_url }}" "${{ inputs.release_tag }}" > result.txt 2>&1
+        
+        # Store the exit code
+        EXIT_CODE=$?
+        
+        # Read the result
+        RESULT=$(cat result.txt)
+        
+        # Set up GitHub step output with delimiter for multiline output
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+        echo "result<<$EOF" >> $GITHUB_OUTPUT
+        echo "$RESULT" >> $GITHUB_OUTPUT
+        echo "$EOF" >> $GITHUB_OUTPUT
+        
+        # Set failed status based on exit code
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "failed=true" >> $GITHUB_OUTPUT
+          # Add to GitHub step summary
+          echo ":x: Failed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat result.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $EXIT_CODE
+        else
+          echo "failed=false" >> $GITHUB_OUTPUT
+          # Add to GitHub step summary
+          echo ":white_check_mark: All checks passed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat result.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
