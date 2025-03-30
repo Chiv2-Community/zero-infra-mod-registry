@@ -206,9 +206,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 f"Mod manifest {repo} {release.tag_name} failed validation: {error_string}"
             )
 
-        # Download the pak and calculate hash of pak file
-        pak_asset = pak  # Ensure we're using the asset, not a potential string error
-        assert not isinstance(pak_asset, str), "Expected GitReleaseAsset but got error string"
+        assert not isinstance(pak, str), "Expected GitReleaseAsset but got error string"
+        pak_asset: GitReleaseAsset.GitReleaseAsset = pak 
         pak_download = requests.get(pak_asset.browser_download_url)
         pak_hash = sha512_sum(pak_download.content)
 
@@ -220,7 +219,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             manifest=manifest,
         )
 
-    def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset:
+    def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset.GitReleaseAsset:
         """
         Find a .pak file in the release assets.
 
