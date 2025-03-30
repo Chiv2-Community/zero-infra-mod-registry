@@ -82,3 +82,14 @@ class PackageRegistry(ABC):
             mod_path_filter: Function to filter mod paths
         """
         pass
+        
+    @abstractmethod
+    def add_package_to_index(self, repo_url: str, dry_run: bool = False) -> None:
+        """
+        Add a new package to the registry index by repo URL.
+        
+        Args:
+            repo_url: The repository URL to add to the index
+            dry_run: If True, don't make any actual changes
+        """
+        pass

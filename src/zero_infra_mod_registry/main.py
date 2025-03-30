@@ -56,7 +56,7 @@ def main() -> None:
 
     subparsers = argparser.add_subparsers(dest="command", required=True)
 
-    init_subparser = subparsers.add_parser("init", help="Initialize a mod repo.")
+    init_subparser = subparsers.add_parser("init", help="Add to package list and initialize a mod repo.")
     init_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
     )
@@ -78,7 +78,6 @@ def main() -> None:
     remove_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
     )
-
     args = argparser.parse_args()
 
     # Create GitHub client and mod retriever
@@ -88,15 +87,18 @@ def main() -> None:
 
     # Initialize the registry with the mod retriever
     registry: PackageRegistry = FilesystemPackageRegistry(
+        mod_retriever=mod_retriever,
         registry_path=args.registry_path,
         package_db_path=args.package_db_path,
-        mod_retriever=mod_retriever,
     )
 
     if args.command == "process-registry-updates":
         registry.process_registry_updates(args.dry_run)
     elif args.command == "init":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
+        # Add the package to the index first
+        registry.add_package_to_index(args.repo_url, args.dry_run)
+        # Then initialize the repository
         registry.init([Repo(org, repoName)], args.dry_run)
     elif args.command == "add":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]

@@ -43,6 +43,7 @@ jobs:
         
       # Example: Initialize a mod repository
       - name: Initialize mod repository
+        id: init-mod
         uses: yourusername/zero-infra-mod-registry@main
         with:
           command: init
@@ -51,6 +52,7 @@ jobs:
           
       # Example: Process registry updates with custom paths
       - name: Process registry updates
+        id: process-updates
         uses: yourusername/zero-infra-mod-registry@main
         with:
           command: process-registry-updates
@@ -60,12 +62,22 @@ jobs:
           
       # Example: Add a release
       - name: Add a release
+        id: add-release
         uses: yourusername/zero-infra-mod-registry@main
         with:
           command: add
           repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
           release_tag: v1.0.0
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          
+
+          
+      # Example: Use the action outputs
+      - name: Display output logs
+        if: always()
+        run: |
+          echo "Process result: ${{ steps.process-updates.outputs.result }}"
+          echo "Process status: ${{ steps.process-updates.outputs.failed == 'true' && 'Failed' || 'Success' }}"
 ```
 
 ### Action Inputs
@@ -80,6 +92,15 @@ jobs:
 | `log_level` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | No | 'INFO' |
 | `registry_path` | Path to the registry directory | No | './registry' |
 | `package_db_path` | Path to the package database directory | No | './package_db' |
+
+### Action Outputs
+
+| Output | Description |
+|--------|-------------|
+| `result` | The complete output log from the command execution |
+| `failed` | Whether the command failed or not ('true' or 'false') |
+
+These outputs can be used in subsequent steps to capture logs, make decisions based on command success/failure, or display results in comments or summaries.
 
 ## Included GitHub Workflows
 
@@ -143,11 +164,13 @@ The tool provides several CLI commands to manage the mod registry:
 
 ### Initialize a Mod Repository
 
-Add a new mod repository to the registry:
+Add a new mod repository to the registry and package list:
 
 ```
 poetry run python -m zero_infra_mod_registry.main init <repo_url>
 ```
+
+This command both adds the repository to the package list and initializes it by fetching its metadata.
 
 Example with custom paths:
 ```
@@ -204,6 +227,8 @@ poetry run python -m zero_infra_mod_registry.main \
   --package-db-path ./custom-package-db \
   remove https://github.com/Chiv2-Community/Chiv2Turbo
 ```
+
+
 
 ### Dry Run Mode
 

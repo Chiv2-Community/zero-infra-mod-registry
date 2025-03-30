@@ -27,9 +27,9 @@ class TestFilesystemPackageRegistry(unittest.TestCase):
         
         # Create the registry instance
         self.registry = FilesystemPackageRegistry(
+            mod_retriever=self.mock_retriever,
             registry_path=self.registry_dir,
             package_db_path=self.package_db_dir,
-            mod_retriever=self.mock_retriever
         )
         
         # Create test files
@@ -42,15 +42,6 @@ class TestFilesystemPackageRegistry(unittest.TestCase):
     def tearDown(self):
         # Remove the temporary directory and its contents
         shutil.rmtree(self.test_dir)
-
-    def test_init_requires_mod_retriever(self):
-        """Test that initialization requires a mod_retriever."""
-        with self.assertRaises(ValueError):
-            FilesystemPackageRegistry(
-                registry_path=self.registry_dir,
-                package_db_path=self.package_db_dir,
-                mod_retriever=None
-            )
 
     def test_load_package_list(self):
         """Test loading a package list from a file."""
@@ -113,7 +104,6 @@ class TestFilesystemPackageRegistry(unittest.TestCase):
     @patch('builtins.open')
     def test_load_mod(self, mock_open):
         """Test load_mod method."""
-        # Setup mock
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
         mock_file.read.return_value = '{"name": "test-mod", "releases": []}'
@@ -125,22 +115,17 @@ class TestFilesystemPackageRegistry(unittest.TestCase):
             mock_mod = MagicMock()
             mock_from_dict.return_value = mock_mod
             
-            # Call the method
             repo = Repo("org1", "repo1")
             result = self.registry.load_mod(repo)
             
-            # Verify the result
             self.assertEqual(result, mock_mod)
             mock_loads.assert_called_once()
             mock_from_dict.assert_called_once()
 
     def test_load_mod_file_not_found(self):
         """Test load_mod when file is not found."""
-        # Use a repo that doesn't exist
         repo = Repo("non_existent", "repo")
         result = self.registry.load_mod(repo)
-        
-        # Should return None when file is not found
         self.assertIsNone(result)
         
     def test_repo_to_index_entry(self):

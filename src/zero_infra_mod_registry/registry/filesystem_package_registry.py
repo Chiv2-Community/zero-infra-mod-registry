@@ -33,9 +33,9 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def __init__(
         self,
+        mod_retriever: ModMetadataRetriever,
         registry_path: str = os.environ.get("REGISTRY_PATH", "./registry"),
-        package_db_path: str = os.environ.get("PACKAGE_DB_PATH", "./package_db"),
-        mod_retriever: Optional[ModMetadataRetriever] = None,
+        package_db_path: str = os.environ.get("PACKAGE_DB_PATH", "./package_db")
     ):
         """
         Initialize the FilesystemPackageRegistry.
@@ -62,9 +62,6 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Setup JSON encoder
         self.json_encoder = PackageManagerJsonEncoder()
         
-        # Setup mod retriever
-        if mod_retriever is None:
-            raise ValueError("A mod_retriever must be provided")
         self.mod_retriever = mod_retriever
         
         # Load redirect manager
@@ -437,3 +434,62 @@ class FilesystemPackageRegistry(PackageRegistry):
                     return release
 
         return None
+        
+    def add_package_to_index(self, repo_url: str, dry_run: bool = False) -> None:
+        """
+        Add a new package to the registry index by repo URL.
+        
+        Args:
+            repo_url: The repository URL to add to the index
+            dry_run: If True, don't make any actual changes
+        """
+        # Extract org and repo name from URL
+        index_entry = repo_to_index_entry(repo_url)
+        [org, repo_name] = index_entry.split("/")
+        
+        # Ensure the registry path exists
+        if not os.path.exists(self.registry_path):
+            os.makedirs(self.registry_path, exist_ok=True)
+            logging.info(f"Created registry directory: {self.registry_path}")
+        
+        # Create a file with the repository information
+        repo_file_path = os.path.join(self.registry_path, f"{index_entry}.txt")
+        
+        # Check if the entry already exists in any file in the registry
+        found = False
+        for root, _, files in os.walk(self.registry_path):
+            for file in files:
+                if file.endswith(".txt"):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(file_path, "r") as f:
+                            content = f.read()
+                            if repo_url in content or index_entry in content:
+                                found = True
+                                logging.info(f"Package {index_entry} already exists in {file_path}")
+                                break
+                    except Exception as e:
+                        logging.warning(f"Error reading file {file_path}: {e}")
+            if found:
+                break
+        
+        if found:
+            logging.info(f"Package {index_entry} is already in the registry. No changes made.")
+            return
+            
+        if dry_run:
+            logging.info(f"Dry run: Would add {repo_url} to registry at {repo_file_path}")
+            return
+            
+        # Write the repository URL to the file
+        try:
+            # Create any parent directories if needed
+            os.makedirs(os.path.dirname(repo_file_path), exist_ok=True)
+            
+            with open(repo_file_path, "w") as f:
+                f.write(f"{repo_url}\n")
+                
+            logging.info(f"Successfully added {index_entry} to the registry at {repo_file_path}")
+        except Exception as e:
+            logging.error(f"Failed to add {index_entry} to registry: {e}")
+            raise
