@@ -1,7 +1,7 @@
 import logging
 import traceback
 from os import environ
-from typing import Any, List, Optional
+from typing import Any, List, Optional, TypeGuard, cast
 
 import requests
 from github import Auth, Github, GitReleaseAsset
@@ -197,11 +197,10 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             or dependency_errors
             or tag_name_error
         ):
-            all_errors: list[str] = list(filter(
-                lambda x: x is not None,
-                [pak_error, tag_error, mod_type_error, tag_name_error]
-                + dependency_errors
-            ))
+            # Collect all errors and filter out None values
+            error_list: List[Optional[str]] = [pak_error, tag_error, mod_type_error, tag_name_error]
+            all_errors: List[str] = [x for x in error_list if x is not None]
+            all_errors.extend(dependency_errors)
             error_string = "\n\t" + "\n\t".join(all_errors)
             raise Exception(
                 f"Mod manifest {repo} {release.tag_name} failed validation: {error_string}"
@@ -221,7 +220,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             manifest=manifest,
         )
 
-    def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset.GitReleaseAsset:
+    def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset:
         """
         Find a .pak file in the release assets.
 
