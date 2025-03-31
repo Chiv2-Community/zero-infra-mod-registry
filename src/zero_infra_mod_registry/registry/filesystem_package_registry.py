@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Tuple
 
-from semver import Version
+from semantic_version import SimpleSpec, Version
 
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
@@ -452,26 +452,12 @@ class FilesystemPackageRegistry(PackageRegistry):
                 dep_version = dep.version
                 if dep_version.startswith("v"):
                     dep_version = dep_version[1:]
-                    
-                # Handle caret notation (^1.0.0)
-                if dep_version.startswith("^"):
-                    dep_version = ">=" + dep_version[1:]
 
                 resolved_manifest_url = self.redirect_manager.resolve(release.manifest.repo_url)
                 resolved_dep_url = self.redirect_manager.resolve(dep.repo_url)
-                
-                matches = False
-                version_obj = Version.parse(release_tag)
-                
-                # Handle comma-separated ranges
-                if "," in dep_version:
-                    parts = dep_version.split(",")
-                    # All parts must match for the version to be valid
-                    matches = all(version_obj.match(part.strip()) for part in parts)
-                else:
-                    matches = version_obj.match(dep_version)
-                
-                if resolved_manifest_url == resolved_dep_url and matches:
+                if resolved_manifest_url == resolved_dep_url and Version(
+                    release_tag
+                ) in SimpleSpec(dep_version):
                     return release
 
         return None
