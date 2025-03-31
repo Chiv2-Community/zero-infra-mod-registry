@@ -1,5 +1,5 @@
 name: 'Zero Infra Mod Registry'
-description: 'Manage mod repositories, dependencies, and releases'
+description: 'Manage mod repositories, dependencies, and releases using Docker (no dependencies required)'
 author: 'Jacob Barber'
 branding:
   icon: 'package'
@@ -47,71 +47,15 @@ outputs:
     value: ${{ steps.run-command.outputs.failed }}
 
 runs:
-  using: 'composite'
-  steps:
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        
-    - name: Install Poetry
-      uses: abatilo/actions-poetry@v2
-      
-    - name: Setup Local Virtual Environment
-      shell: bash
-      run: |
-        poetry config virtualenvs.create true --local
-        poetry config virtualenvs.in-project true --local
-        
-    - name: Install Dependencies
-      shell: bash
-      run: poetry install
-      
-    - name: Make entrypoint script executable
-      shell: bash
-      run: chmod +x ${{ github.action_path }}/docker-entrypoint.sh
-      
-    - name: Run Command
-      id: run-command
-      shell: bash
-      env:
-        GITHUB_TOKEN: ${{ inputs.github_token }}
-        LOG_LEVEL: ${{ inputs.log_level }}
-        REGISTRY_PATH: ${{ inputs.registry_path }}
-        PACKAGE_DB_PATH: ${{ inputs.package_db_path }}
-        DRY_RUN: ${{ inputs.dry_run }}
-      run: |
-        # Run the command and capture output to a file
-        ${{ github.action_path }}/docker-entrypoint.sh "${{ inputs.command }}" "${{ inputs.repo_url }}" "${{ inputs.release_tag }}" > result.txt 2>&1
-        
-        # Store the exit code
-        EXIT_CODE=$?
-        
-        # Read the result
-        RESULT=$(cat result.txt)
-        
-        # Set up GitHub step output with delimiter for multiline output
-        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-        echo "result<<$EOF" >> $GITHUB_OUTPUT
-        echo "$RESULT" >> $GITHUB_OUTPUT
-        echo "$EOF" >> $GITHUB_OUTPUT
-        
-        # Set failed status based on exit code
-        if [ $EXIT_CODE -ne 0 ]; then
-          echo "failed=true" >> $GITHUB_OUTPUT
-          # Add to GitHub step summary
-          echo ":x: Failed." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat result.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $EXIT_CODE
-        else
-          echo "failed=false" >> $GITHUB_OUTPUT
-          # Add to GitHub step summary
-          echo ":white_check_mark: All checks passed." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat result.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-        fi
+  using: 'docker'
+  image: 'Dockerfile'
+  args:
+    - ${{ inputs.command }}
+    - ${{ inputs.repo_url }}
+    - ${{ inputs.release_tag }}
+  env:
+    GITHUB_TOKEN: ${{ inputs.github_token }}
+    LOG_LEVEL: ${{ inputs.log_level }}
+    REGISTRY_PATH: ${{ inputs.registry_path }}
+    PACKAGE_DB_PATH: ${{ inputs.package_db_path }}
+    DRY_RUN: ${{ inputs.dry_run }}

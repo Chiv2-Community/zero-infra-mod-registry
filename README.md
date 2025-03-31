@@ -31,7 +31,7 @@ This project uses Poetry for dependency management. To set up the project:
 
 ## Using as a GitHub Action
 
-You can use this project as a GitHub Action in your workflows:
+You can use this project as a GitHub Action in your workflows. The action is implemented as a Docker container, so you don't need to install any dependencies to use it.
 
 ```yaml
 jobs:

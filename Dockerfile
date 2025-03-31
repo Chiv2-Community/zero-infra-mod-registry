@@ -1,7 +1,11 @@
 FROM python:3.10-slim
 
-# Install Poetry
-RUN pip install poetry==1.5.1
+# Install Poetry and other dependencies
+RUN pip install poetry==1.5.1 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends git curl jq && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -19,8 +23,12 @@ RUN poetry config virtualenvs.create false \
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
+# Copy GitHub Action specific entrypoint
+COPY github-action-entrypoint.sh /github-action-entrypoint.sh
+RUN chmod +x /github-action-entrypoint.sh
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV LOG_LEVEL=INFO
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["/github-action-entrypoint.sh"]
