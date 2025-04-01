@@ -6,9 +6,9 @@ import os
 
 from github import Auth, Github
 
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry, PackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
-from zero_infra_mod_registry.models import Repo
 
 # Configure logging
 level = os.environ.get("LOG_LEVEL", "WARNING")
@@ -51,12 +51,14 @@ def main() -> None:
         "--github-token",
         type=str,
         default=None,
-        help="GitHub token to use for authentication. Defaults to GITHUB_TOKEN environment variable."
+        help="GitHub token to use for authentication. Defaults to GITHUB_TOKEN environment variable.",
     )
 
     subparsers = argparser.add_subparsers(dest="command", required=True)
 
-    init_subparser = subparsers.add_parser("init", help="Add to package list and initialize a mod repo.")
+    init_subparser = subparsers.add_parser(
+        "init", help="Add to package list and initialize a mod repo."
+    )
     init_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
     )
@@ -117,3 +119,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

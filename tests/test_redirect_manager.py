@@ -17,20 +17,12 @@ class TestSimpleRedirectManager(unittest.TestCase):
         with open(self.redirects_path, "w") as f:
             f.write(
                 "https://github.com/old-org/repo1 -> https://github.com/new-org/repo1\n"
+                + "https://github.com/old-org/repo2 -> https://github.com/new-org/repo2\n"
+                + "https://github.com/temp-org/repo1 -> https://github.com/final-org/repo1\n"
+                + "https://github.com/initial-org/repo1 -> https://github.com/temp-org/repo1\n"
+                + "This is not a valid redirect\n"
+                + "https://github.com/no-arrow-org/repo1\n"
             )
-            f.write(
-                "https://github.com/old-org/repo2 -> https://github.com/new-org/repo2\n"
-            )
-            f.write(
-                "https://github.com/temp-org/repo1 -> https://github.com/final-org/repo1\n"
-            )
-            # Add a chained redirect
-            f.write(
-                "https://github.com/initial-org/repo1 -> https://github.com/temp-org/repo1\n"
-            )
-            # Add some invalid lines
-            f.write("This is not a valid redirect\n")
-            f.write("https://github.com/no-arrow-org/repo1\n")
 
     def tearDown(self):
         # Remove the temporary directory and its contents

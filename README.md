@@ -170,7 +170,7 @@ Add a new mod repository to the registry and package list:
 poetry run python -m zero_infra_mod_registry.main init <repo_url>
 ```
 
-This command both adds the repository to the package list and initializes it by fetching its metadata.
+This command both fetches the repository metadata and adds it to the registry index in a single step.
 
 Example with custom paths:
 ```
