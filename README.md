@@ -60,6 +60,14 @@ jobs:
           registry_path: "./custom-registry"
           package_db_path: "./custom-package-db"
           
+      # Example: Validate package registry
+      - name: Validate registry
+        id: validate-registry
+        uses: yourusername/zero-infra-mod-registry@main
+        with:
+          command: validate
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          
       # Example: Add a release
       - name: Add a release
         id: add-release
@@ -84,7 +92,7 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `command` | Command to execute (init, process-registry-updates, add, remove) | Yes | |
+| `command` | Command to execute (init, process-registry-updates, add, remove, validate) | Yes | |
 | `repo_url` | Repository URL (required for init, add, and remove commands) | For some commands | '' |
 | `release_tag` | Release tag (required for add command) | For add command | '' |
 | `dry_run` | Run in dry-run mode without making changes | No | 'false' |
@@ -143,6 +151,9 @@ docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add
 
 # Remove a mod
 docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry remove https://github.com/Username/ExampleMod
+
+# Validate the package registry database
+docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry validate
 
 # Run in dry-run mode
 docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token -e DRY_RUN=true zero-infra-mod-registry process-registry-updates
@@ -226,6 +237,22 @@ poetry run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
   remove https://github.com/Chiv2-Community/Chiv2Turbo
+```
+
+### Validate Package Registry
+
+Validate the package registry database to ensure all dependencies are satisfied:
+
+```
+poetry run python -m zero_infra_mod_registry.main validate
+```
+
+Example with custom paths:
+```
+poetry run python -m zero_infra_mod_registry.main \
+  --registry-path ./custom-registry \
+  --package-db-path ./custom-package-db \
+  validate
 ```
 
 

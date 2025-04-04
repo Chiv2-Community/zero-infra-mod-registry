@@ -7,7 +7,7 @@ branding:
 
 inputs:
   command:
-    description: 'Command to execute (init, process-registry-updates, add, remove)'
+    description: 'Command to execute (init, process-registry-updates, add, remove, validate)'
     required: true
   repo_url:
     description: 'Repository URL (required for init, add, and remove commands)'

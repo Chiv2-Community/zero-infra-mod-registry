@@ -29,7 +29,7 @@ case "$COMMAND" in
       echo "Error: Repository URL is required for init command"
       exit 1
     fi
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" init "$REPO_URL"
+    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package "$REPO_URL"
     ;;
     
   process-registry-updates)
@@ -45,7 +45,7 @@ case "$COMMAND" in
       echo "Error: Release tag is required for add command"
       exit 1
     fi
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add "$REPO_URL" "$RELEASE_TAG"
+    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package_release "$REPO_URL" "$RELEASE_TAG"
     ;;
     
   remove)
@@ -56,9 +56,13 @@ case "$COMMAND" in
     poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" remove "$REPO_URL"
     ;;
     
+  validate)
+    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" validate
+    ;;
+    
   *)
     echo "Error: Unknown command '$COMMAND'"
-    echo "Available commands: init, process-registry-updates, add, remove"
+    echo "Available commands: init, process-registry-updates, add, remove, validate"
     exit 1
     ;;
 esac

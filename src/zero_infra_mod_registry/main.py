@@ -57,7 +57,7 @@ def main() -> None:
     subparsers = argparser.add_subparsers(dest="command", required=True)
 
     init_subparser = subparsers.add_parser(
-        "init", help="Add to package list and initialize a mod repo."
+        "add_package", help="Add to package list and initialize a mod repo."
     )
     init_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
@@ -68,7 +68,9 @@ def main() -> None:
         help="Find any new package list entries and load all of their releases.",
     )
 
-    add_subparser = subparsers.add_parser("add", help="Add a release to a mod repo.")
+    add_subparser = subparsers.add_parser(
+        "add_package_release", help="Add a release to a mod repo."
+    )
     add_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
     )
@@ -79,6 +81,10 @@ def main() -> None:
     remove_subparser = subparsers.add_parser("remove", help="Remove mod from the repo.")
     remove_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
+    )
+
+    validate_subparser = subparsers.add_parser(
+        "validate", help="Validate the package registry database."
     )
     args = argparser.parse_args()
 
@@ -96,15 +102,12 @@ def main() -> None:
 
     if args.command == "process-registry-updates":
         registry.process_registry_updates(args.dry_run)
-    elif args.command == "init":
+    elif args.command == "add_package":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        # Add the package to the index first
-        registry.add_package_to_index(args.repo_url, args.dry_run)
-        # Then initialize the repository
-        registry.init([Repo(org, repoName)], args.dry_run)
-    elif args.command == "add":
+        registry.add_package([Repo(org, repoName)], args.dry_run)
+    elif args.command == "add_package_release":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        registry.add_release(
+        registry.add_package_release(
             Repo(org, repoName),
             args.release_tag.strip(),
             args.dry_run,
@@ -112,6 +115,9 @@ def main() -> None:
     elif args.command == "remove":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
         registry.remove_mods([Repo(org, repoName)], args.dry_run)
+    elif args.command == "validate":
+        registry.validate_package_db([])
+        logging.info("Validation complete!")
     else:
         logging.error("Unknown command.")
         exit(1)
@@ -119,4 +125,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

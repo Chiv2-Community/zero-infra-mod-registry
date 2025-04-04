@@ -185,7 +185,7 @@ class TestPackageRegistryUpdates(TestFilesystemPackageRegistryBase):
     def test_process_registry_updates_with_dry_run(self):
         """Test process_registry_updates with dry_run=True."""
         # Prepare mock and setup
-        with patch.object(self.registry, "init") as mock_init, patch.object(
+        with patch.object(self.registry, "add_package") as mock_init, patch.object(
             self.registry, "remove_mods"
         ) as mock_remove_mods:
             # Configure return values for the mocked methods
@@ -231,7 +231,7 @@ class TestPackageRegistryUpdates(TestFilesystemPackageRegistryBase):
 
 
 class TestAddRelease(TestFilesystemPackageRegistryBase):
-    """Tests for the add_release functionality."""
+    """Tests for the add_package_release functionality."""
 
     def setUp(self):
         """Set up test environment for add_release tests."""
@@ -251,32 +251,32 @@ class TestAddRelease(TestFilesystemPackageRegistryBase):
         self.nonexistent_repo = Repo("nonexistent", "repo")
 
     def test_add_release_fails_if_package_not_in_index(self):
-        """Test that add_release fails if the package is not in the package list."""
+        """Test that add_package_release fails if the package is not in the package list."""
         with self.assertRaises(ValueError) as context:
-            self.registry.add_release(self.nonexistent_repo, "v1.0.0")
+            self.registry.add_package_release(self.nonexistent_repo, "v1.0.0")
 
         self.assertIn("not in the package list", str(context.exception))
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_add_release_initializes_if_mod_not_found(self, mock_logging):
-        """Test that add_release initializes the repo if the mod is not found."""
+        """Test that add_package_release initializes the repo if the mod is not found."""
         # Mock the load_mod method to return None
         self.registry.load_mod = MagicMock(return_value=None)
-        self.registry.init = MagicMock(return_value=1)
+        self.registry.add_package = MagicMock(return_value=1)
 
-        # Call add_release
-        result = self.registry.add_release(self.test_repo, "v1.0.0")
+        # Call add_package_release
+        result = self.registry.add_package_release(self.test_repo, "v1.0.0")
 
-        # Verify that the method returns the result of init
-        self.assertEqual(result, 1, "add_release should return the result of init when initializing")
+        # Verify that the method returns the result of add_package
+        self.assertEqual(result, 1, "add_package_release should return the result of add_package when initializing")
 
         # Verify that the correct methods were called
         self.registry.load_mod.assert_called_once_with(self.test_repo)
-        self.registry.init.assert_called_once_with([self.test_repo], False)
+        self.registry.add_package.assert_called_once_with([self.test_repo], False)
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_add_release_fetches_release_metadata(self, mock_logging):
-        """Test that add_release fetches release metadata for new releases."""
+        """Test that add_package_release fetches release metadata for new releases."""
         # Create a mock mod
         mock_mod = MagicMock(spec=Mod)
         mock_mod.releases = []
@@ -299,11 +299,11 @@ class TestAddRelease(TestFilesystemPackageRegistryBase):
         # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
 
-        # Call add_release
-        result = self.registry.add_release(self.test_repo, "v1.0.0", dry_run=True)
+        # Call add_package_release
+        result = self.registry.add_package_release(self.test_repo, "v1.0.0", dry_run=True)
         
         # Verify that the method returns 1 (success)
-        self.assertEqual(result, 1, "add_release should return 1 on successful addition")
+        self.assertEqual(result, 1, "add_package_release should return 1 on successful addition")
 
         # Verify that the correct methods were called
         self.mock_retriever.fetch_release_metadata.assert_called_once_with(
@@ -316,7 +316,7 @@ class TestAddRelease(TestFilesystemPackageRegistryBase):
     
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_add_release_skips_existing_tag(self, mock_logging):
-        """Test that add_release skips if the release tag already exists."""
+        """Test that add_package_release skips if the release tag already exists."""
         # Create a mock mod with an existing release
         mock_release = MagicMock(spec=Release)
         mock_release.tag = "v1.0.0"
@@ -327,11 +327,11 @@ class TestAddRelease(TestFilesystemPackageRegistryBase):
         # Mock the load_mod method to return our mock mod
         self.registry.load_mod = MagicMock(return_value=mock_mod)
 
-        # Call add_release with the existing tag
-        result = self.registry.add_release(self.test_repo, "v1.0.0")
+        # Call add_package_release with the existing tag
+        result = self.registry.add_package_release(self.test_repo, "v1.0.0")
 
         # Verify that the method returns 0 (no releases added)
-        self.assertEqual(result, 0, "add_release should return 0 when skipping existing tags")
+        self.assertEqual(result, 0, "add_package_release should return 0 when skipping existing tags")
 
         # Verify that fetch_release_metadata was not called
         self.mock_retriever.fetch_release_metadata.assert_not_called()
@@ -341,7 +341,7 @@ class TestAddRelease(TestFilesystemPackageRegistryBase):
 
 
 class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
-    """Tests for the repository initialization functionality."""
+    """Tests for the add_package functionality."""
 
     def setUp(self):
         """Set up test environment for init tests."""
@@ -364,15 +364,15 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_creates_package_file_and_registry_entry(self, mock_logging):
-        """Test that init creates both a package file and a registry entry."""
+        """Test that add_package creates both a package file and a registry entry."""
         # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
-        # Call init
-        result = self.registry.init([self.test_repo])
+        # Call add_package
+        result = self.registry.add_package([self.test_repo])
         
         # Verify that the method returns the number of successfully initialized repos
-        self.assertEqual(result, 1, "init should return the number of successfully initialized repos")
+        self.assertEqual(result, 1, "add_package should return the number of successfully initialized repos")
         
         # Verify that the package file was created
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
@@ -389,15 +389,15 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
     
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_dry_run(self, mock_logging):
-        """Test that init in dry run mode doesn't create files."""
+        """Test that add_package in dry run mode doesn't create files."""
         # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
-        # Call init in dry run mode
-        result = self.registry.init([self.test_repo], dry_run=True)
+        # Call add_package in dry run mode
+        result = self.registry.add_package([self.test_repo], dry_run=True)
         
         # Verify that the method returns the number of repos that would be initialized
-        self.assertEqual(result, 1, "init should return the number of repos that would be initialized")
+        self.assertEqual(result, 1, "add_package should return the number of repos that would be initialized")
         
         # Verify that no files were created
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
@@ -411,7 +411,7 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
     
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_with_existing_registry_entry(self, mock_logging):
-        """Test that init doesn't create a duplicate registry entry."""
+        """Test that add_package doesn't create a duplicate registry entry."""
         # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
@@ -420,8 +420,8 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         with open(os.path.join(self.registry_path, "testorg/testrepo.txt"), "w") as f:
             f.write(f"{self.repo_url}\n")
         
-        # Call init
-        self.registry.init([self.test_repo])
+        # Call add_package
+        self.registry.add_package([self.test_repo])
         
         # Verify that the package file was created
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
@@ -439,15 +439,15 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_with_failed_repo_metadata_fetch(self, mock_logging):
-        """Test that init handles failed repository metadata fetches."""
+        """Test that add_package handles failed repository metadata fetches."""
         # Mock the fetch_repo_metadata method to return None
         self.mock_retriever.fetch_repo_metadata = MagicMock(return_value=None)
         
-        # Call init
-        result = self.registry.init([self.test_repo])
+        # Call add_package
+        result = self.registry.add_package([self.test_repo])
         
         # Verify that the method returns 0 (no repos initialized)
-        self.assertEqual(result, 0, "init should return 0 when no repos are initialized")
+        self.assertEqual(result, 0, "add_package should return 0 when no repos are initialized")
         
         # Verify that no files were created
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
@@ -461,7 +461,7 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
     
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_multiple_repos(self, mock_logging):
-        """Test that init can initialize multiple repositories at once."""
+        """Test that add_package can initialize multiple repositories at once."""
         # Create test repos
         test_repo1 = Repo("org1", "repo1")
         test_repo2 = Repo("org2", "repo2")
@@ -483,11 +483,11 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
-        # Call init with multiple repos
-        result = self.registry.init([test_repo1, test_repo2])
+        # Call add_package with multiple repos
+        result = self.registry.add_package([test_repo1, test_repo2])
         
         # Verify that the method returns the number of successfully initialized repos
-        self.assertEqual(result, 2, "init should return the number of successfully initialized repos")
+        self.assertEqual(result, 2, "add_package should return the number of successfully initialized repos")
         
         # Verify that both package files were created
         package_file_path1 = os.path.join(self.package_db_path, "packages", "org1", "repo1.json")

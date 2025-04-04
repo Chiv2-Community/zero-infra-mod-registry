@@ -138,7 +138,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         Args:
             dry_run: If True, don't make any actual changes
-            
+
         Returns:
             True if processing was successful, False otherwise
         """
@@ -179,7 +179,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             try:
                 split_entries = [entry.split("/") for entry in new_entries]
                 repo_entries = [Repo(entry[0], entry[1]) for entry in split_entries]
-                self.init(repo_entries, dry_run)
+                self.add_package(repo_entries, dry_run)
             except Exception as e:
                 # If we fail to initialize a repo, remove it from the package list
                 logging.error(f"Failed to initialize repos: {e}\n")
@@ -214,15 +214,14 @@ class FilesystemPackageRegistry(PackageRegistry):
         logging.info("Package list built.")
         return True
 
-    def init(self, repos: List[Repo], dry_run: bool = False) -> int:
+    def add_package(self, repos: List[Repo], dry_run: bool = False) -> int:
         """
         Initialize repositories by fetching their metadata and storing it, then add them to the registry index.
-        This method combines the previous init and add_package_to_index functionality.
 
         Args:
             repos: List of repositories to initialize
             dry_run: If True, don't make any actual changes
-            
+
         Returns:
             The number of repositories successfully initialized
         """
@@ -254,7 +253,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             # Parse and log the URL components
             url_parts = mod.latest_manifest.repo_url.split("/")
             logging.info(f"URL Parts: {url_parts}")
-            
+
             # Extract org and repo name
             org = url_parts[-2]
             repoName = url_parts[-1]
@@ -262,8 +261,10 @@ class FilesystemPackageRegistry(PackageRegistry):
             if repoName == "":
                 repoName = url_parts[-2]
                 org = url_parts[-3]
-                
-            logging.info(f"Extracted org={org}, repoName={repoName} from {mod.latest_manifest.repo_url}")
+
+            logging.info(
+                f"Extracted org={org}, repoName={repoName} from {mod.latest_manifest.repo_url}"
+            )
 
             # Create org directory if it doesn't exist
             org_dir = os.path.join(self.packages_dir, org)
@@ -278,16 +279,16 @@ class FilesystemPackageRegistry(PackageRegistry):
             # Add to registry index
             repo_url = mod.latest_manifest.repo_url
             index_entry = f"{org}/{repoName}"
-            
+
             # Debug URL parsing
             logging.info(f"Adding {index_entry} to registry, URL: {repo_url}")
-            
+
             # Create org directory in registry if it doesn't exist
             registry_org_dir = os.path.join(self.registry_path, org)
             if not os.path.exists(registry_org_dir):
                 os.makedirs(registry_org_dir, exist_ok=True)
                 logging.info(f"Created organization directory: {registry_org_dir}")
-                
+
             repo_file_path = os.path.join(self.registry_path, org, f"{repoName}.txt")
 
             # Check if the entry already exists in any file in the registry
@@ -342,7 +343,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.error(f"Failed to check if package {repo} is in index: {e}")
             return False
 
-    def add_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> int:
+    def add_package_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> int:
         """
         Add a release to a repository.
 
@@ -353,13 +354,13 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         Returns:
             1 if release was added successfully, 0 if skipped or failed, or the result from init if initialization was needed
-            
+
         Raises:
             ValueError: If the package is not in the package list
         """
         # First check if the package exists in the package list
         if not self._is_package_in_index(repo):
-            error_msg = f"Package {repo} is not in the package list. Add it first using the 'init' command."
+            error_msg = f"Package {repo} is not in the package list. Add it first using the 'add_package' command."
             logging.error(error_msg)
             raise ValueError(error_msg)
 
@@ -369,7 +370,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         if mod is None:
             logging.info(f"Mod {repo} not initialized.")
             # Initialize the repo and return the result
-            return self.init([repo], dry_run)
+            return self.add_package([repo], dry_run)
             # No need to continue. Initialization will get all releases.
 
         tags = [release.tag for release in mod.releases]
@@ -411,7 +412,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         Args:
             repo_list: List of repositories to remove
             dry_run: If True, don't make any actual changes
-            
+
         Returns:
             The number of mods successfully removed
         """
@@ -423,9 +424,13 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.warning("Dry run; not writing to mod metadata.")
             # In dry run mode, return the number of repos that would be removed
             # Since we're processing them all without actual removal, we can just count existing files
-            count = sum(1 for repo in repo_list if os.path.exists(
-                os.path.join(self.packages_dir, repo.org, f"{repo.name}.json")
-            ))
+            count = sum(
+                1
+                for repo in repo_list
+                if os.path.exists(
+                    os.path.join(self.packages_dir, repo.org, f"{repo.name}.json")
+                )
+            )
             return count
 
         # Counter for successfully removed mods
@@ -577,3 +582,12 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Check if the package file exists in the package database
         mod_file_path = os.path.join(self.packages_dir, org, f"{repo_name}.json")
         return os.path.exists(mod_file_path)
+        
+    # Preserve backward compatibility by adding alias methods for old method names
+    def init(self, repos: List[Repo], dry_run: bool = False) -> int:
+        """Alias for add_package"""
+        return self.add_package(repos, dry_run)
+
+    def add_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> int:
+        """Alias for add_package_release"""
+        return self.add_package_release(repo, release_tag, dry_run)

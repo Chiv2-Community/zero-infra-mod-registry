@@ -22,8 +22,23 @@ class PackageRegistry(ABC):
         """
         pass
 
+    # Alias methods for backward compatibility
     @abstractmethod
     def init(self, repos: List[Repo], dry_run: bool = False) -> None:
+        """
+        Alias for add_package
+        """
+        pass
+
+    @abstractmethod
+    def add_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> None:
+        """
+        Alias for add_package_release
+        """
+        pass
+    
+    @abstractmethod
+    def add_package(self, repos: List[Repo], dry_run: bool = False) -> None:
         """
         Initialize repositories by fetching their metadata and storing it.
 
@@ -34,7 +49,7 @@ class PackageRegistry(ABC):
         pass
 
     @abstractmethod
-    def add_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> None:
+    def add_package_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> None:
         """
         Add a release to a repository.
 
