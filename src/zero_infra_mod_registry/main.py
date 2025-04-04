@@ -7,7 +7,8 @@ import os
 from github import Auth, Github
 
 from zero_infra_mod_registry.models import Repo
-from zero_infra_mod_registry.registry import FilesystemPackageRegistry, PackageRegistry
+from zero_infra_mod_registry.registry import (FilesystemPackageRegistry,
+                                              PackageRegistry)
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
 
 # Configure logging
@@ -27,12 +28,10 @@ def main() -> None:
     """Main entry point for the CLI."""
     argparser = argparse.ArgumentParser(description="Manage the mod registry.")
 
-    # Add dry-run flag
     argparser.add_argument(
         "--dry-run", action="store_true", help="Don't actually make any changes."
     )
 
-    # Add path configuration options
     argparser.add_argument(
         "--registry-path",
         type=str,
@@ -45,8 +44,6 @@ def main() -> None:
         default=DEFAULT_PACKAGE_DB_DIR,
         help=f"Path to the package database directory. Default: {DEFAULT_PACKAGE_DB_DIR}",
     )
-
-    # Add GitHub token option
     argparser.add_argument(
         "--github-token",
         type=str,

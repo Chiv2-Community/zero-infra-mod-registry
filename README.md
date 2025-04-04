@@ -41,16 +41,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         
-      # Example: Initialize a mod repository
-      - name: Initialize mod repository
-        id: init-mod
+      # Example: Add a new package to the registry
+      - name: Initialize package repository
+        id: add-package
         uses: yourusername/zero-infra-mod-registry@main
         with:
-          command: init
+          command: add_package
           repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
           github_token: ${{ secrets.GITHUB_TOKEN }}
           
-      # Example: Process registry updates with custom paths
+      # Example: Process registry updates (syncing any missing releases)
       - name: Process registry updates
         id: process-updates
         uses: yourusername/zero-infra-mod-registry@main
@@ -73,12 +73,10 @@ jobs:
         id: add-release
         uses: yourusername/zero-infra-mod-registry@main
         with:
-          command: add
+          command: add_package_release
           repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
           release_tag: v1.0.0
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          
-
           
       # Example: Use the action outputs
       - name: Display output logs
@@ -92,7 +90,7 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `command` | Command to execute (init, process-registry-updates, add, remove, validate) | Yes | |
+| `command` | Command to execute (process-registry-updates, add_package, add_package_release, remove, validate) | Yes | |
 | `repo_url` | Repository URL (required for init, add, and remove commands) | For some commands | '' |
 | `release_tag` | Release tag (required for add command) | For add command | '' |
 | `dry_run` | Run in dry-run mode without making changes | No | 'false' |
@@ -110,24 +108,6 @@ jobs:
 
 These outputs can be used in subsequent steps to capture logs, make decisions based on command success/failure, or display results in comments or summaries.
 
-## Included GitHub Workflows
-
-This repository includes several GitHub Workflows to automate common tasks:
-
-### auto-update-registry.yml
-Automatically processes registry updates when changes are pushed to the registry directory.
-
-### add-release-action.yml
-Allows users to add new releases by opening issues with a standardized format. The workflow:
-1. Parses the JSON from the issue body
-2. Adds the release to the registry
-3. Commits the changes to the repository
-4. Comments on the issue with the result
-5. Closes the issue if successful
-
-### action-example.yml
-An example workflow demonstrating how to use the GitHub Action with manual triggers.
-
 ## Using with Docker
 
 You can run the mod registry using Docker:
@@ -137,7 +117,7 @@ You can run the mod registry using Docker:
 docker build -t zero-infra-mod-registry .
 
 # Initialize a repository
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry init https://github.com/Username/ExampleMod
+docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add_package https://github.com/Username/ExampleMod
 
 # Process registry updates with custom paths
 docker run -v $(pwd):/app \
@@ -147,7 +127,7 @@ docker run -v $(pwd):/app \
   zero-infra-mod-registry process-registry-updates
 
 # Add a release
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add https://github.com/Username/ExampleMod v1.0.0
+docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add_package_release https://github.com/Username/ExampleMod v1.0.0
 
 # Remove a mod
 docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry remove https://github.com/Username/ExampleMod
@@ -220,7 +200,7 @@ Example with custom paths:
 poetry run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
-  add https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
+  add_package_release https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
 ```
 
 ### Remove a Mod
@@ -270,38 +250,8 @@ poetry run python -m zero_infra_mod_registry.main --dry-run <command> <args>
 This project uses pytest for testing. To run the tests:
 
 ```bash
-# Run all tests
 poetry run pytest
-
-# Run tests with coverage report
-poetry run pytest --cov
-
-# Run specific test file
-poetry run pytest tests/test_package_list.py
-
-# Run specific test
-poetry run pytest tests/test_redirect_manager.py::TestSimpleRedirectManager::test_resolve
 ```
-
-## Project Structure
-
-- `registry/`: Contains text files listing repositories to track
-- `package_db/`: Contains the processed mod data
-  - `packages/`: Stores JSON files with mod metadata
-  - `mod_list_index.txt`: Index of all mods in the registry
-  - `redirects.txt`: Repository URL redirects
-- `src/zero_infra_mod_registry/`: Source code
-  - `main.py`: CLI implementation
-  - `models.py`: Data models
-  - `package_list.py`: Package list and redirect management
-  - Other utility modules
-- `tests/`: Unit tests
-  - `test_package_list.py`: Tests for TextPackageList
-  - `test_redirect_manager.py`: Tests for SimpleRedirectManager
-- `.github/workflows/`: GitHub Actions workflow definitions
-  - `auto-update-registry.yml`: Automatically updates the registry when changes are pushed
-  - `add-release-action.yml`: Processes new releases submitted via issues
-  - `action-example.yml`: Example workflow using the action
 
 ## Logging
 
