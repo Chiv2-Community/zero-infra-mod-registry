@@ -107,7 +107,8 @@ class FilesystemPackageRegistry(PackageRegistry):
             filepath = os.path.join(directory, filename)
 
             # Ensure it's a file and not another directory or symbolic link
-            if os.path.isfile(filepath):
+            if os.path.isfile(filepath) and filepath.endswith(".txt"):
+                logging.info(f"Reading file: {filepath}")
                 with open(filepath, "r") as file:
                     for line in file:
                         line = line.strip()
@@ -142,12 +143,10 @@ class FilesystemPackageRegistry(PackageRegistry):
         Returns:
             True if processing was successful, False otherwise
         """
-        # Get repo lines from the registry dir
         redirects_dir = os.path.join(self.registry_path, "redirects")
         redirect_lines = self._get_all_text_lines_in_directory(redirects_dir)
         redirect_manager = SimpleRedirectManager.parse_redirects(redirect_lines)
 
-        # Load existing redirects
         existing_redirect_manager = SimpleRedirectManager.from_file(self.redirects_path)
 
         logging.info(f"Loaded {len(redirect_manager.redirects)} new redirect entries.")
@@ -157,6 +156,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         # Write new redirects to file (if not dry run)
         if not dry_run:
+            logging.info("Writing new redirects to file " + self.redirects_path)
             with open(self.redirects_path, "w") as file:
                 file.write("\n".join(redirect_lines))
 
@@ -294,9 +294,9 @@ class FilesystemPackageRegistry(PackageRegistry):
             # Check if the entry already exists in any file in the registry
             found = False
             for root, _, files in os.walk(self.registry_path):
-                for file in files:
-                    if file.endswith(".txt"):
-                        file_path = os.path.join(root, file)
+                for relative_path in files:
+                    if relative_path.endswith(".txt"):
+                        file_path = os.path.join(root, relative_path)
                         try:
                             with open(file_path, "r") as f:
                                 content = f.read()
@@ -343,7 +343,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.error(f"Failed to check if package {repo} is in index: {e}")
             return False
 
-    def add_package_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> int:
+    def add_package_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> bool:
         """
         Add a release to a repository.
 
@@ -370,14 +370,14 @@ class FilesystemPackageRegistry(PackageRegistry):
         if mod is None:
             logging.info(f"Mod {repo} not initialized.")
             # Initialize the repo and return the result
-            return self.add_package([repo], dry_run)
+            return self.add_package([repo], dry_run) > 0
             # No need to continue. Initialization will get all releases.
 
         tags = [release.tag for release in mod.releases]
 
         if release_tag in tags:
             logging.warning(f"Release {release_tag} already exists in repo {repo}.")
-            return 0  # Return 0 for no action taken
+            return False # Return 0 for no action taken
 
         logging.info(f"Adding release {release_tag} to repo {repo}...")
         release = self.mod_retriever.fetch_release_metadata(mod, release_tag)
@@ -386,7 +386,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.error(
                 f"Failed to fetch metadata for release {release_tag} from {repo}."
             )
-            return 0  # Return 0 for failed release metadata fetch
+            return False  # Return 0 for failed release metadata fetch
 
         updated_mod = self.mod_retriever.update_mod_with_release(mod, release)
 
@@ -394,7 +394,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         if dry_run:
             logging.warning("Dry run; not writing to mod metadata.")
-            return 1  # Return 1 to indicate success in dry run mode
+            return True # Return 1 to indicate success in dry run mode
 
         [org, repoName] = repo.github_url().split("/")[-2:]
         mod_file_path = os.path.join(self.packages_dir, org, f"{repoName}.json")
@@ -403,9 +403,9 @@ class FilesystemPackageRegistry(PackageRegistry):
             file.write(self.json_encoder.encode(updated_mod.asdict()))
 
         logging.info(f"Successfully added release {release_tag} to repo {repo}.")
-        return 1  # Return 1 for successful release addition
+        return True # Return 1 for successful release addition
 
-    def remove_mods(self, repo_list: List[Repo], dry_run: bool = False) -> int:
+    def remove_mods(self, repo_list: List[Repo], dry_run: bool = False) -> bool:
         """
         Remove mods from the registry.
 
@@ -431,7 +431,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                     os.path.join(self.packages_dir, repo.org, f"{repo.name}.json")
                 )
             )
-            return count
+            return count > 0
 
         # Counter for successfully removed mods
         removed_count = 0
@@ -454,7 +454,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                 os.rmdir(org_dir)
 
         logging.info(f"Successfully removed {removed_count} mods.")
-        return removed_count
+        return removed_count > 0
 
     def load_mod(self, repo: Repo) -> Optional[Mod]:
         """
@@ -479,7 +479,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         self,
         additional_mods: List[Mod],
         mod_path_filter: Callable[[str], bool] = lambda x: True,
-    ) -> None:
+    ) -> bool:
         """
         Validate the package database by checking for missing dependencies.
 
@@ -506,13 +506,13 @@ class FilesystemPackageRegistry(PackageRegistry):
                             logging.error(
                                 f"Failed to load mod {package} during validation."
                             )
-                            return
+                            return False
 
                         mods.append(mod)
 
                 except FileNotFoundError:
                     logging.error(f"Package {package} not found during validation.")
-                    return
+                    return False
 
         # Check for missing dependencies
         missing_deps: List[Tuple[Release, Dependency]] = []
@@ -532,9 +532,10 @@ class FilesystemPackageRegistry(PackageRegistry):
                 )
 
             logging.error("Package database is invalid.")
-            return
+            return False
 
         logging.info("Package database is valid.")
+        return True
 
     def _find_dependency(self, mods: List[Mod], dep: Dependency) -> Optional[Release]:
         """
