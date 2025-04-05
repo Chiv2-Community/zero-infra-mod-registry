@@ -24,9 +24,9 @@ REPO_URL="$2"
 RELEASE_TAG="$3"
 
 case "$COMMAND" in
-  init)
+  add_package)
     if [ -z "$REPO_URL" ]; then
-      echo "Error: Repository URL is required for init command"
+      echo "Error: Repository URL is required for add_package command"
       exit 1
     fi
     poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package "$REPO_URL"
@@ -36,7 +36,7 @@ case "$COMMAND" in
     poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" process-registry-updates
     ;;
     
-  add)
+  add_package_release)
     if [ -z "$REPO_URL" ]; then
       echo "Error: Repository URL is required for add command"
       exit 1
@@ -62,7 +62,7 @@ case "$COMMAND" in
     
   *)
     echo "Error: Unknown command '$COMMAND'"
-    echo "Available commands: init, process-registry-updates, add, remove, validate"
+    echo "Available commands: process-registry-updates, add_package_release, add_package, remove, validate"
     exit 1
     ;;
 esac

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set +e
 
 # Capture output to a file
 /docker-entrypoint.sh "$1" "$2" "$3" > /tmp/result.txt 2>&1
