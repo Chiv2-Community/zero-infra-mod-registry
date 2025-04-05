@@ -82,7 +82,12 @@ class FilesystemPackageRegistry(PackageRegistry):
         """
         try:
             with open(path, "r") as file:
-                return file.read().splitlines()
+                return list(
+                    filter(
+                        lambda x: x != "",
+                        map(lambda x: x.strip(), file.read().splitlines()),
+                    )
+                )
         except FileNotFoundError:
             return []
 
@@ -309,10 +314,10 @@ class FilesystemPackageRegistry(PackageRegistry):
             if not found:
                 # Write the repository URL to the file
                 with open(registry_org_index, "a") as f:
-                    f.write(f"{repo_url}\n")
+                    f.write(f"{repo_url}")
 
                 with open(self.mod_list_index_path, "a") as f:
-                    f.write(f"{index_entry}\n")
+                    f.write(f"{index_entry}")
 
                 logging.info(
                     f"Added {index_entry} to the registry index at {registry_org_index}"
