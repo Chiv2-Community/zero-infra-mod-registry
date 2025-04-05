@@ -29,11 +29,11 @@ case "$COMMAND" in
       echo "Error: Repository URL is required for add_package command"
       exit 1
     fi
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package "$REPO_URL"
+    zero-infra-mod-registry $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package "$REPO_URL"
     ;;
     
   process-registry-updates)
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" process-registry-updates
+    zero-infra-mod-registry $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" process-registry-updates
     ;;
     
   add_package_release)
@@ -45,7 +45,7 @@ case "$COMMAND" in
       echo "Error: Release tag is required for add command"
       exit 1
     fi
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package_release "$REPO_URL" "$RELEASE_TAG"
+    zero-infra-mod-registry $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" add_package_release "$REPO_URL" "$RELEASE_TAG"
     ;;
     
   remove)
@@ -53,11 +53,11 @@ case "$COMMAND" in
       echo "Error: Repository URL is required for remove command"
       exit 1
     fi
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" remove "$REPO_URL"
+    zero-infra-mod-registry $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" remove "$REPO_URL"
     ;;
     
   validate)
-    poetry run python -m zero_infra_mod_registry.main $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" validate
+    zero-infra-mod-registry $DRY_RUN_FLAG --registry-path "$REGISTRY_PATH" --package-db-path "$PACKAGE_DB_PATH" validate
     ;;
     
   *)
