@@ -284,12 +284,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.info(f"Adding {index_entry} to registry, URL: {repo_url}")
 
             # Create org directory in registry if it doesn't exist
-            registry_org_dir = os.path.join(self.registry_path, org)
-            if not os.path.exists(registry_org_dir):
-                os.makedirs(registry_org_dir, exist_ok=True)
-                logging.info(f"Created organization directory: {registry_org_dir}")
-
-            repo_file_path = os.path.join(self.registry_path, org, f"{repoName}.txt")
+            registry_org_index = os.path.join(self.registry_path, f"{org}.txt")
 
             # Check if the entry already exists in any file in the registry
             found = False
@@ -313,11 +308,14 @@ class FilesystemPackageRegistry(PackageRegistry):
 
             if not found:
                 # Write the repository URL to the file
-                with open(repo_file_path, "w") as f:
+                with open(registry_org_index, "a") as f:
                     f.write(f"{repo_url}\n")
 
+                with open(self.mod_list_index_path, "a") as f:
+                    f.write(f"{index_entry}\n")
+
                 logging.info(
-                    f"Added {index_entry} to the registry index at {repo_file_path}"
+                    f"Added {index_entry} to the registry index at {registry_org_index}"
                 )
 
             logging.info(f"Repo {org}/{repoName} initialized.")
@@ -343,7 +341,9 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.error(f"Failed to check if package {repo} is in index: {e}")
             return False
 
-    def add_package_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> bool:
+    def add_package_release(
+        self, repo: Repo, release_tag: str, dry_run: bool = False
+    ) -> bool:
         """
         Add a release to a repository.
 
@@ -377,7 +377,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         if release_tag in tags:
             logging.warning(f"Release {release_tag} already exists in repo {repo}.")
-            return False # Return 0 for no action taken
+            return False  # Return 0 for no action taken
 
         logging.info(f"Adding release {release_tag} to repo {repo}...")
         release = self.mod_retriever.fetch_release_metadata(mod, release_tag)
@@ -394,7 +394,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         if dry_run:
             logging.warning("Dry run; not writing to mod metadata.")
-            return True # Return 1 to indicate success in dry run mode
+            return True  # Return 1 to indicate success in dry run mode
 
         [org, repoName] = repo.github_url().split("/")[-2:]
         mod_file_path = os.path.join(self.packages_dir, org, f"{repoName}.json")
@@ -403,7 +403,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             file.write(self.json_encoder.encode(updated_mod.asdict()))
 
         logging.info(f"Successfully added release {release_tag} to repo {repo}.")
-        return True # Return 1 for successful release addition
+        return True  # Return 1 for successful release addition
 
     def remove_mods(self, repo_list: List[Repo], dry_run: bool = False) -> bool:
         """
@@ -583,12 +583,3 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Check if the package file exists in the package database
         mod_file_path = os.path.join(self.packages_dir, org, f"{repo_name}.json")
         return os.path.exists(mod_file_path)
-        
-    # Preserve backward compatibility by adding alias methods for old method names
-    def init(self, repos: List[Repo], dry_run: bool = False) -> int:
-        """Alias for add_package"""
-        return self.add_package(repos, dry_run)
-
-    def add_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> int:
-        """Alias for add_package_release"""
-        return self.add_package_release(repo, release_tag, dry_run)
