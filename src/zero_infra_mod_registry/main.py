@@ -101,14 +101,19 @@ def main() -> None:
         registry.process_registry_updates(args.dry_run)
     elif args.command == "add_package":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        registry.add_package([Repo(org, repoName)], args.dry_run)
+        num_added = registry.add_package([Repo(org, repoName)], args.dry_run)
+        if num_added == 0:
+            exit(1)
     elif args.command == "add_package_release":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        registry.add_package_release(
+        result = registry.add_package_release(
             Repo(org, repoName),
             args.release_tag.strip(),
             args.dry_run,
         )
+
+        if not result:
+            exit(1)
     elif args.command == "remove":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
         registry.remove_mods([Repo(org, repoName)], args.dry_run)
