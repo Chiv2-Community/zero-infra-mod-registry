@@ -57,6 +57,7 @@ class Release:
     pak_file_name: str
     release_date: datetime
     manifest: Manifest
+    release_notes_markdown: str
 
     @staticmethod
     def from_dict(data: Dict) -> "Release":
@@ -66,6 +67,7 @@ class Release:
             pak_file_name=data["pak_file_name"],
             release_date=datetime.fromisoformat(data["release_date"]),
             manifest=Manifest.from_dict(data["manifest"]),
+            release_notes_markdown=Manifest.from_dict(data["release_notes_markdown"]),
         )
 
 

@@ -217,6 +217,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             pak_file_name=pak_asset.name,
             release_date=pak_asset.updated_at.replace(tzinfo=None),
             manifest=manifest,
+            release_notes_markdown=release.body or None
         )
 
     def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset.GitReleaseAsset:
