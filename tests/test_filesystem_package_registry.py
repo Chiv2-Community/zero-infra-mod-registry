@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from zero_infra_mod_registry.models import Manifest, Mod, Release, Repo
+from zero_infra_mod_registry.models import ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.registry.filesystem_package_registry import (
     FilesystemPackageRegistry,
 )
@@ -40,7 +40,7 @@ class TestFilesystemPackageRegistryBase(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test environment by removing temporary directories."""
-        shutil.rmtree(self.test_dir)
+        # shutil.rmtree(self.test_dir)
 
 
 class TestFilesystemPackageRegistryCoreFunctions(TestFilesystemPackageRegistryBase):
@@ -355,8 +355,8 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         
         # Create mock mod for testing
         self.mock_mod = MagicMock(spec=Mod)
-        self.mock_mod.latest_manifest = MagicMock(spec=Manifest)
-        self.mock_mod.latest_manifest.repo_url = self.repo_url
+        self.mock_mod.latest_release_info = MagicMock(spec=ModInfo)
+        self.mock_mod.latest_release_info.repo_url = self.repo_url
         self.mock_mod.asdict = MagicMock(return_value={"name": "test-mod", "releases": []})
         
         # Configure mock retriever by default
@@ -379,7 +379,7 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         self.assertTrue(os.path.exists(package_file_path), f"Package file {package_file_path} was not created")
         
         # Verify that the registry entry was created
-        registry_file_path = os.path.join(self.registry_path, "testorg", "testrepo.txt")
+        registry_file_path = os.path.join(self.registry_path, "testorg.txt")
         self.assertTrue(os.path.exists(registry_file_path), f"Registry file {registry_file_path} was not created")
         
         # Check the content of the registry file
@@ -468,13 +468,13 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         
         # Create mock mods
         mock_mod1 = MagicMock(spec=Mod)
-        mock_mod1.latest_manifest = MagicMock(spec=Manifest)
-        mock_mod1.latest_manifest.repo_url = "https://github.com/org1/repo1"
+        mock_mod1.latest_release_info = MagicMock(spec=ModInfo)
+        mock_mod1.latest_release_info.repo_url = "https://github.com/org1/repo1"
         mock_mod1.asdict = MagicMock(return_value={"name": "mod1", "releases": []})
         
         mock_mod2 = MagicMock(spec=Mod)
-        mock_mod2.latest_manifest = MagicMock(spec=Manifest)
-        mock_mod2.latest_manifest.repo_url = "https://github.com/org2/repo2"
+        mock_mod2.latest_release_info = MagicMock(spec=ModInfo)
+        mock_mod2.latest_release_info.repo_url = "https://github.com/org2/repo2"
         mock_mod2.asdict = MagicMock(return_value={"name": "mod2", "releases": []})
         
         # Mock the fetch_repo_metadata method
@@ -496,11 +496,18 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         self.assertTrue(os.path.exists(package_file_path2), f"Package file {package_file_path2} was not created")
         
         # Verify that both registry entries were created
-        registry_file_path1 = os.path.join(self.registry_path, "org1", "repo1.txt")
-        registry_file_path2 = os.path.join(self.registry_path, "org2", "repo2.txt")
-        self.assertTrue(os.path.exists(registry_file_path1), f"Registry file {registry_file_path1} was not created")
-        self.assertTrue(os.path.exists(registry_file_path2), f"Registry file {registry_file_path2} was not created")
-        
+        registry_file_path1 = os.path.join(self.registry_path, "org1.txt")
+        registry_file_path2 = os.path.join(self.registry_path, "org2.txt")
+
+        # Assert registries have added the repos
+        with open(registry_file_path1, "r") as f:
+            self.assertIn(f"https://github.com/org1/repo1", f.read())
+
+        with open(registry_file_path2, "r") as f:
+            self.assertIn(f"https://github.com/org2/repo2", f.read())
+
+
+
         # Verify the success log
         mock_logging.info.assert_any_call("Successfully initialized all repos.")
 

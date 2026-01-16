@@ -57,7 +57,7 @@ class Release:
     pak_file_name: str
     release_date: datetime
     info: ModInfo
-    release_notes_markdown: str
+    release_notes_markdown: str | None
 
     @staticmethod
     def from_dict(data: Dict) -> "Release":

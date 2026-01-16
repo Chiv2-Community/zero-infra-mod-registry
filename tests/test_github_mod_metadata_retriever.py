@@ -170,28 +170,28 @@ class TestGithubModMetadataRetriever(unittest.TestCase):
     def test_update_mod_with_release(self):
         """Test updating a mod with a new release."""
         # Create a mock mod with existing releases
-        mock_manifest1 = MagicMock()
+        mock_info1 = MagicMock()
         mock_release1 = MagicMock()
         mock_release1.tag = "v1.0.0"
         mock_release1.release_date = "2023-01-01T00:00:00"
-        mock_release1.manifest = mock_manifest1
+        mock_release1.info = mock_info1
 
-        mock_manifest2 = MagicMock()
+        mock_info2 = MagicMock()
         mock_release2 = MagicMock()
         mock_release2.tag = "v1.1.0"
         mock_release2.release_date = "2023-02-01T00:00:00"
-        mock_release2.manifest = mock_manifest2
+        mock_release2.info = mock_info2
 
         mock_mod = MagicMock(spec=Mod)
         mock_mod.releases = [mock_release1, mock_release2]
-        mock_mod.latest_manifest = mock_manifest2
+        mock_mod.latest_info = mock_info2
 
         # Create a new release to add
-        mock_manifest3 = MagicMock()
+        mock_info3 = MagicMock()
         mock_release3 = MagicMock(spec=Release)
         mock_release3.tag = "v1.2.0"
         mock_release3.release_date = "2023-03-01T00:00:00"
-        mock_release3.manifest = mock_manifest3
+        mock_release3.info = mock_info3
 
         # Update the mod with the new release
         updated_mod = self.mod_retriever.update_mod_with_release(
@@ -204,17 +204,17 @@ class TestGithubModMetadataRetriever(unittest.TestCase):
         self.assertIn(mock_release2, updated_mod.releases)
         self.assertIn(mock_release3, updated_mod.releases)
 
-        # Verify the latest manifest is from the newest release
-        self.assertEqual(updated_mod.latest_manifest, mock_manifest3)
+        # Verify the latest info is from the newest release
+        self.assertEqual(updated_mod.latest_release_info, mock_info3)
 
     @patch("requests.get")
     def test_fetch_release_metadata(self, mock_requests_get):
         """Test fetching metadata for a specific release."""
         # Create a mock mod
-        mock_manifest = MagicMock()
-        mock_manifest.repo_url = "https://github.com/testorg/testrepo"
+        mock_info = MagicMock()
+        mock_info.repo_url = "https://github.com/testorg/testrepo"
         mock_mod = MagicMock(spec=Mod)
-        mock_mod.latest_manifest = mock_manifest
+        mock_mod.latest_release_info = mock_info
 
         # Mock the GitHub repo and release
         mock_github_repo = MagicMock()
