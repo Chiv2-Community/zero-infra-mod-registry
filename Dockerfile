@@ -1,5 +1,8 @@
 # Build stage
-FROM python:3.10-slim AS builder
+FROM python:3.14-alpine AS builder
+
+# Install build dependencies
+RUN apk add build-base libffi-dev
 
 # Install Poetry
 RUN pip install poetry==1.5.1
@@ -11,18 +14,21 @@ WORKDIR /build
 COPY pyproject.toml poetry.lock ./
 COPY README.md ./
 COPY src/ ./src/
+COPY bin/ ./bin/
 
 # Build wheel package
 RUN poetry build -f wheel
 
 # Runtime stage
-FROM python:3.10-slim
+FROM python:3.14-alpine
 
 # Install dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git curl jq && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    git \
+    curl \
+    jq \
+    dotnet10-runtime \
+    bash
 
 # Set working directory
 WORKDIR /app
