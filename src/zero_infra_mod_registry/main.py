@@ -85,18 +85,28 @@ def main() -> None:
     )
     args = argparser.parse_args()
 
-    token = args.github_token or os.environ.get("GITHUB_TOKEN") or None
+    # Create GitHub client and mod retriever
+    auth = Auth.Token(args.github_token or os.environ.get("GITHUB_TOKEN") or "")
+    github_client = Github(auth=auth)
+    mod_retriever = GithubModMetadataRetriever(github_client)
+
+    # Initialize the registry with the mod retriever
+    registry: PackageRegistry = FilesystemPackageRegistry(
+        mod_retriever=mod_retriever,
+        registry_path=args.registry_path,
+        package_db_path=args.package_db_path,
+    )
 
     if args.command == "process-registry-updates":
-        make_registry(token).process_registry_updates(args.dry_run)
+        registry.process_registry_updates(args.dry_run)
     elif args.command == "add_package":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        num_added = make_registry(token).add_package([Repo(org, repoName)], args.dry_run)
+        num_added = registry.add_package([Repo(org, repoName)], args.dry_run)
         if num_added == 0:
             exit(1)
     elif args.command == "add_package_release":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        result = make_registry(token).add_package_release(
+        result = registry.add_package_release(
             Repo(org, repoName),
             args.release_tag.strip(),
             args.dry_run,
@@ -106,26 +116,14 @@ def main() -> None:
             exit(1)
     elif args.command == "remove":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        make_registry(token).remove_mods([Repo(org, repoName)], args.dry_run)
+        registry.remove_mods([Repo(org, repoName)], args.dry_run)
     elif args.command == "validate":
-        make_registry(token).validate_package_db([])
+        registry.validate_package_db([])
         logging.info("Validation complete!")
     else:
         logging.error("Unknown command.")
         exit(1)
 
-def make_registry(github_token: str | None):
-    if github_token is None:
-        raise ValueError("GITHUB_TOKEN environment variable or --github-token argument must be set.")
-
-    auth = Auth.Token(github_token)
-    github_client = Github(auth=auth)
-    mod_retriever = GithubModMetadataRetriever(github_client)
-    return FilesystemPackageRegistry(
-        mod_retriever=mod_retriever,
-        registry_path=os.environ.get("REGISTRY_PATH") or "./registry",
-        package_db_path=os.environ.get("PACKAGE_DB_PATH") or "./package_db.json",
-    )
 
 if __name__ == "__main__":
     main()
