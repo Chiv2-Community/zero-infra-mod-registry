@@ -65,8 +65,9 @@ case "$COMMAND" in
     ;;
     
   *)
+    zero-infra-mod-registry --help
     echo "Error: Unknown command '$COMMAND'"
     echo "Available commands: process-registry-updates, add_package_release, add_package, remove, validate"
-    exit 1
+    exit 0
     ;;
 esac
