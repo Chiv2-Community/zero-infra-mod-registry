@@ -3,20 +3,6 @@ from typing import List, Optional
 
 from zero_infra_mod_registry.models import Mod, Release, Repo
 
-VALID_TAGS = [
-    "Mutator",
-    "Map",
-    "Cosmetic",
-    "Audio",
-    "Model",
-    "Weapon",
-    "Doodad",
-    "Explicit",
-]
-
-VALID_MOD_TYPES = ["Client", "Server", "Shared"]
-
-
 class ModMetadataRetriever(ABC):
     """
     Interface for retrieving mod metadata from a repository.

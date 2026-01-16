@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import traceback
 import json
-from os import environ
+from os import environ, mkdir
 from typing import Any, List, Optional, TypeGuard, cast
 
 import requests
@@ -15,11 +15,7 @@ from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.models.manifest import Manifest, PakInventory
-from zero_infra_mod_registry.retriever.mod_metadata_retriever import (
-    VALID_MOD_TYPES,
-    VALID_TAGS,
-    ModMetadataRetriever,
-)
+from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
 class GithubModMetadataRetriever(ModMetadataRetriever):
@@ -134,19 +130,14 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 results.append(self.process_release(repo, release))
             except KeyError as e:
                 has_error = True
-                print()
                 logging.error(
                     f"Mod info {repo} {release.tag_name} missing required field: {e}"
                 )
             except Exception as e:
                 has_error = True
-                print()
                 logging.error(
                     f"Failed to process release {repo} {release.tag_name}: {e}"
                 )
-
-        if has_error:
-            print()
 
         results.sort(key=lambda x: x.release_date, reverse=True)
 
@@ -186,22 +177,20 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         response_json = response.json()
 
         response_json["repo_url"] = repo.github_url()
-        manifest = ModInfo.from_dict(response_json)
+        mod_info = ModInfo.from_dict(response_json)
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
-        mod_type_error = self.validate_mod_type(manifest.mod_type)
-        dependency_errors = self.validate_dependency_versions(manifest.dependencies)
+        dependency_errors = self.validate_dependency_versions(mod_info.dependencies)
         tag_name_error = self.validate_version_tag_name(release.tag_name)
 
         if (
             pak_error
-            or mod_type_error
             or dependency_errors
             or tag_name_error
         ):
             # Collect all errors and filter out None values
-            error_list: List[Optional[str]] = [pak_error, mod_type_error, tag_name_error]
+            error_list: List[Optional[str]] = [pak_error, tag_name_error]
             all_errors: List[str] = [x for x in error_list if x is not None]
             all_errors.extend(dependency_errors)
             error_string = "\n\t" + "\n\t".join(all_errors)
@@ -233,6 +222,11 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                     capture_output=True,
                     text=True
                 )
+                manifest_path = os.path.join(temp_dir, "manifest.json")
+                if not os.path.exists(manifest_path):
+                    raise Exception(f"UnchainedScanner output not found at {manifest_path}")
+                logging.info(f"UnchainedScanner output found at {manifest_path}")
+
             except subprocess.CalledProcessError as e:
                 logging.error(f"UnchainedScanner failed with exit code {e.returncode}")
                 logging.error(f"Stdout: {e.stdout}")
@@ -244,19 +238,24 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             with open(scanner_output_path, "r") as f:
                 scanner_data = json.load(f)
 
-            if isinstance(scanner_data, list):
-                pak_inventory_data = scanner_data[0]
-            else:
-                pak_inventory_data = scanner_data
+            paks = scanner_data.get("paks", [])
+            if not paks:
+                raise Exception(f"Pak scanner returned no .pak files for {pak_path}")
 
+            pak_inventory_data = paks[0]
             pak_inventory = PakInventory.from_dict(pak_inventory_data)
+            blueprint_count = len(pak_inventory.inventory.blueprints)
+            replacement_count = len(pak_inventory.inventory.replacements)
+            marker_count = len(pak_inventory.inventory.markers)
+            map_count = len(pak_inventory.inventory.maps)
+            logging.info(f"Pak inventory successfully loaded from scanner output. Found {blueprint_count} blueprints, {replacement_count} replacements, {marker_count} markers, and {map_count} maps.")
 
         return Release(
             tag=release.tag_name,
             hash=pak_inventory.pak_hash or "",
             pak_file_name=pak_asset.name,
             release_date=pak_asset.updated_at.replace(tzinfo=None),
-            info=manifest,
+            info=mod_info,
             release_notes_markdown=release.body or None,
             manifest=pak_inventory.inventory
         )
@@ -342,32 +341,3 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 )
 
         return errors
-
-    def validate_tags(self, tags: List[str]) -> Optional[str]:
-        """
-        Validate mod tags against the list of valid tags.
-
-        Args:
-            tags: List of tags to validate
-
-        Returns:
-            Error message if invalid tags found, None if all tags are valid
-        """
-        invalid_tags = list(filter(lambda tag: tag not in VALID_TAGS, tags))
-        if len(invalid_tags) > 0:
-            return f"Invalid tags: {invalid_tags}. Valid tags are: {VALID_TAGS}"
-        return None
-
-    def validate_mod_type(self, mod_type: str) -> Optional[str]:
-        """
-        Validate mod type against the list of valid mod types.
-
-        Args:
-            mod_type: Mod type to validate
-
-        Returns:
-            Error message if invalid mod type, None if valid
-        """
-        if mod_type not in VALID_MOD_TYPES:
-            return f"Invalid mod type: {mod_type}. Valid types are: {VALID_MOD_TYPES}"
-        return None
