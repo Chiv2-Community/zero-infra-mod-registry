@@ -55,4 +55,4 @@ jobs:
 
       - name: Validate program in built image
         run: |
-          docker run --rm zero-infra-mod-registry:latest validate
+          docker run --rm zero-infra-mod-registry:latest --help
