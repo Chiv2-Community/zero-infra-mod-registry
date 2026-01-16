@@ -80,7 +80,7 @@ class ArbitraryAssetInfo(BaseAsset):
 
 @dataclass(frozen=True)
 class ModMarkerInfo(BaseAsset):
-    associated_blueprints: List[str] = None
+    associated_blueprints: List[str] | None = None
 
     def __post_init__(self):
         if self.associated_blueprints is None:

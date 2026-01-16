@@ -239,19 +239,11 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 logging.error(f"Stderr: {e.stderr}")
                 raise Exception(f"UnchainedScanner failed: {e.stderr}")
 
-            # UnchainedScanner generates files in the output directory.
-            # We expect a JSON file. Let's find it.
-            json_files = [f for f in os.listdir(temp_dir) if f.endswith(".json") and f != "mod.json"]
-            if not json_files:
-                raise Exception("UnchainedScanner did not generate any JSON output")
-            
-            # Assuming the scanner generates one JSON per pak or one JSON for the whole scan.
-            # Based on the issue description, it generates a shape conforming to schema.
-            scanner_output_path = os.path.join(temp_dir, json_files[0])
+
+            scanner_output_path = os.path.join(temp_dir, "manifest.json")
             with open(scanner_output_path, "r") as f:
                 scanner_data = json.load(f)
 
-            # If the scanner output is a list of PakInventory, or a single one
             if isinstance(scanner_data, list):
                 pak_inventory_data = scanner_data[0]
             else:

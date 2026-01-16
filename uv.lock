@@ -980,15 +980,6 @@ wheels = [
 ]
 
 [[package]]
-name = "types-setuptools"
-version = "80.9.0.20251223"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/00/07/d1b605230730990de20477150191d6dccf6aecc037da94c9960a5d563bc8/types_setuptools-80.9.0.20251223.tar.gz", hash = "sha256:d3411059ae2f5f03985217d86ac6084efea2c9e9cacd5f0869ef950f308169b2", size = 42420, upload-time = "2025-12-23T03:18:26.752Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/5c/b8877da94012dbc6643e4eeca22bca9b99b295be05d161f8a403ae9387c0/types_setuptools-80.9.0.20251223-py3-none-any.whl", hash = "sha256:1b36db79d724c2287d83dc052cf887b47c0da6a2fff044378be0b019545f56e6", size = 64318, upload-time = "2025-12-23T03:18:25.868Z" },
-]
-
-[[package]]
 name = "types-urllib3"
 version = "1.26.25.14"
 source = { registry = "https://pypi.org/simple" }
@@ -1026,7 +1017,6 @@ dependencies = [
     { name = "semantic-version" },
     { name = "semver" },
     { name = "types-requests" },
-    { name = "types-setuptools" },
     { name = "types-urllib3" },
     { name = "urllib3" },
 ]
@@ -1042,14 +1032,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
-    { name = "pygithub", specifier = ">=2.5.0" },
-    { name = "requests", specifier = ">=2.31.0" },
+    { name = "pygithub", specifier = ">=2.8.1" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "semantic-version", specifier = ">=2.10.0" },
     { name = "semver", specifier = ">=3.0.4" },
-    { name = "types-requests", specifier = ">=2.31.0.2" },
-    { name = "types-setuptools", specifier = ">=65.3.0.5" },
+    { name = "types-requests", specifier = ">=2.32.4" },
     { name = "types-urllib3", specifier = ">=1.26.25.14" },
-    { name = "urllib3", specifier = ">=2.0.4" },
+    { name = "urllib3", specifier = ">=2.0.5" },
 ]
 
 [package.metadata.requires-dev]
