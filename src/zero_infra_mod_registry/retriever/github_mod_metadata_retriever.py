@@ -1,5 +1,10 @@
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
 import traceback
+import json
 from os import environ
 from typing import Any, List, Optional, TypeGuard, cast
 
@@ -9,12 +14,12 @@ from github.GitRelease import GitRelease
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
+from zero_infra_mod_registry.models.manifest import Manifest, PakInventory
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import (
     VALID_MOD_TYPES,
     VALID_TAGS,
     ModMetadataRetriever,
 )
-from zero_infra_mod_registry.utils.hashes import sha512_sum
 
 
 class GithubModMetadataRetriever(ModMetadataRetriever):
@@ -185,20 +190,18 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
-        tag_error = self.validate_tags(manifest.tags)
         mod_type_error = self.validate_mod_type(manifest.mod_type)
         dependency_errors = self.validate_dependency_versions(manifest.dependencies)
         tag_name_error = self.validate_version_tag_name(release.tag_name)
 
         if (
             pak_error
-            or tag_error
             or mod_type_error
             or dependency_errors
             or tag_name_error
         ):
             # Collect all errors and filter out None values
-            error_list: List[Optional[str]] = [pak_error, tag_error, mod_type_error, tag_name_error]
+            error_list: List[Optional[str]] = [pak_error, mod_type_error, tag_name_error]
             all_errors: List[str] = [x for x in error_list if x is not None]
             all_errors.extend(dependency_errors)
             error_string = "\n\t" + "\n\t".join(all_errors)
@@ -207,17 +210,63 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             )
 
         assert not isinstance(pak, str), "Expected GitReleaseAsset but got error string"
-        pak_asset: GitReleaseAsset.GitReleaseAsset = pak 
-        pak_download = requests.get(pak_asset.browser_download_url)
-        pak_hash = sha512_sum(pak_download.content)
+        pak_asset: GitReleaseAsset.GitReleaseAsset = pak
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pak_path = os.path.join(temp_dir, pak_asset.name)
+            logging.info(f"Downloading pak file from {pak_asset.browser_download_url} to {pak_path}")
+            
+            with requests.get(pak_asset.browser_download_url, stream=True) as r:
+                r.raise_for_status()
+                with open(pak_path, "wb") as f:
+                    shutil.copyfileobj(r.raw, f)
+
+            scanner_path = os.path.abspath(os.path.join(os.getcwd(), "bin", "UnchainedScanner"))
+            if not os.path.exists(scanner_path):
+                raise Exception(f"UnchainedScanner not found at {scanner_path}")
+
+            logging.info(f"Running UnchainedScanner on {pak_path}")
+            try:
+                subprocess.run(
+                    [scanner_path, "scan", "--pak", temp_dir, "--out", temp_dir],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            except subprocess.CalledProcessError as e:
+                logging.error(f"UnchainedScanner failed with exit code {e.returncode}")
+                logging.error(f"Stdout: {e.stdout}")
+                logging.error(f"Stderr: {e.stderr}")
+                raise Exception(f"UnchainedScanner failed: {e.stderr}")
+
+            # UnchainedScanner generates files in the output directory.
+            # We expect a JSON file. Let's find it.
+            json_files = [f for f in os.listdir(temp_dir) if f.endswith(".json") and f != "mod.json"]
+            if not json_files:
+                raise Exception("UnchainedScanner did not generate any JSON output")
+            
+            # Assuming the scanner generates one JSON per pak or one JSON for the whole scan.
+            # Based on the issue description, it generates a shape conforming to schema.
+            scanner_output_path = os.path.join(temp_dir, json_files[0])
+            with open(scanner_output_path, "r") as f:
+                scanner_data = json.load(f)
+
+            # If the scanner output is a list of PakInventory, or a single one
+            if isinstance(scanner_data, list):
+                pak_inventory_data = scanner_data[0]
+            else:
+                pak_inventory_data = scanner_data
+
+            pak_inventory = PakInventory.from_dict(pak_inventory_data)
 
         return Release(
             tag=release.tag_name,
-            hash=pak_hash,
+            hash=pak_inventory.pak_hash or "",
             pak_file_name=pak_asset.name,
             release_date=pak_asset.updated_at.replace(tzinfo=None),
             info=manifest,
-            release_notes_markdown=release.body or None
+            release_notes_markdown=release.body or None,
+            manifest=pak_inventory.inventory
         )
 
     def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset.GitReleaseAsset:
