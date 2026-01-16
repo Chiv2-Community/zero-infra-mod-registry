@@ -8,7 +8,7 @@ from github import Auth, Github, GitReleaseAsset
 from github.GitRelease import GitRelease
 from semver import Version
 
-from zero_infra_mod_registry.models import Dependency, Manifest, Mod, Release, Repo
+from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import (
     VALID_MOD_TYPES,
     VALID_TAGS,
@@ -53,7 +53,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 logging.warning(f"Repo {repo} has no valid releases.")
                 return None
 
-            return Mod(latest_manifest=releases[0].manifest, releases=releases)
+            return Mod(latest_release_info=releases[0].info, releases=releases)
         except Exception as e:
             logging.error(f"Failed to fetch metadata for repo {repo}: {e}")
             return None
@@ -69,7 +69,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Returns:
             Release object with metadata, or None if the release is invalid
         """
-        (org, repoName) = mod.latest_manifest.repo_url.split("/")[-2:]
+        (org, repoName) = mod.latest_release_info.repo_url.split("/")[-2:]
         repo = Repo(org, repoName)
         try:
             repoString = str(repo)
@@ -104,7 +104,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         """
         mod_releases = mod.releases + [release]
         mod_releases.sort(key=lambda x: x.release_date, reverse=True)
-        return Mod(latest_manifest=mod_releases[0].manifest, releases=mod_releases)
+        return Mod(latest_release_info=mod_releases[0].info, releases=mod_releases)
 
     def fetch_all_releases(self, repo: Repo) -> List[Release]:
         """
@@ -131,7 +131,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 has_error = True
                 print()
                 logging.error(
-                    f"Mod manifest {repo} {release.tag_name} missing required field: {e}"
+                    f"Mod info {repo} {release.tag_name} missing required field: {e}"
                 )
             except Exception as e:
                 has_error = True
@@ -181,7 +181,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         response_json = response.json()
 
         response_json["repo_url"] = repo.github_url()
-        manifest = Manifest.from_dict(response_json)
+        manifest = ModInfo.from_dict(response_json)
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
@@ -216,7 +216,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             hash=pak_hash,
             pak_file_name=pak_asset.name,
             release_date=pak_asset.updated_at.replace(tzinfo=None),
-            manifest=manifest,
+            info=manifest,
             release_notes_markdown=release.body or None
         )
 

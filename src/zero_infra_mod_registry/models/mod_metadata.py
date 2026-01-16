@@ -26,7 +26,7 @@ class Dependency:
 
 
 @dataclass(frozen=True)
-class Manifest:
+class ModInfo:
     repo_url: str
     name: str
     description: str
@@ -37,8 +37,8 @@ class Manifest:
     ag_mod: bool
 
     @staticmethod
-    def from_dict(data: Dict) -> "Manifest":
-        return Manifest(
+    def from_dict(data: Dict) -> "ModInfo":
+        return ModInfo(
             repo_url=data["repo_url"],
             name=data["name"],
             description=data["description"],
@@ -56,7 +56,7 @@ class Release:
     hash: str
     pak_file_name: str
     release_date: datetime
-    manifest: Manifest
+    info: ModInfo
     release_notes_markdown: str
 
     @staticmethod
@@ -66,20 +66,20 @@ class Release:
             hash=data["hash"],
             pak_file_name=data["pak_file_name"],
             release_date=datetime.fromisoformat(data["release_date"]),
-            manifest=Manifest.from_dict(data["manifest"]),
-            release_notes_markdown=Manifest.from_dict(data["release_notes_markdown"]),
+            info=ModInfo.from_dict(data["info"]),
+            release_notes_markdown=data["release_notes_markdown"],
         )
 
 
 @dataclass(frozen=True)
 class Mod:
-    latest_manifest: Manifest
+    latest_release_info: ModInfo
     releases: List[Release]
 
     @staticmethod
     def from_dict(data: Dict) -> "Mod":
         return Mod(
-            latest_manifest=Manifest.from_dict(data["latest_manifest"]),
+            latest_release_info=ModInfo.from_dict(data["latest_release_info"]),
             releases=[Release.from_dict(release) for release in data["releases"]],
         )
 

@@ -256,7 +256,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Process each mod
         for mod in filtered_mods:
             # Parse and log the URL components
-            url_parts = mod.latest_manifest.repo_url.split("/")
+            url_parts = mod.latest_release_info.repo_url.split("/")
             logging.info(f"URL Parts: {url_parts}")
 
             # Extract org and repo name
@@ -268,7 +268,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                 org = url_parts[-3]
 
             logging.info(
-                f"Extracted org={org}, repoName={repoName} from {mod.latest_manifest.repo_url}"
+                f"Extracted org={org}, repoName={repoName} from {mod.latest_release_info.repo_url}"
             )
 
             # Create org directory if it doesn't exist
@@ -282,7 +282,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                 file.write(self.json_encoder.encode(mod.asdict()))
 
             # Add to registry index
-            repo_url = mod.latest_manifest.repo_url
+            repo_url = mod.latest_release_info.repo_url
             index_entry = f"{org}/{repoName}"
 
             # Debug URL parsing
@@ -523,7 +523,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         missing_deps: List[Tuple[Release, Dependency]] = []
         for mod in mods:
             for release in mod.releases:
-                for dep in release.manifest.dependencies:
+                for dep in release.info.dependencies:
                     found_release = self._find_dependency(mods, dep)
                     if found_release is None:
                         missing_deps.append((release, dep))
@@ -533,7 +533,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
             for release, dep in missing_deps:
                 logging.error(
-                    f"{release.manifest.name} {release.tag} requires missing dependency {dep.repo_url} {dep.version}"
+                    f"{release.info.name} {release.tag} requires missing dependency {dep.repo_url} {dep.version}"
                 )
 
             logging.error("Package database is invalid.")
@@ -564,7 +564,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                     dep_version = dep_version[1:]
 
                 resolved_manifest_url = self.redirect_manager.resolve(
-                    release.manifest.repo_url
+                    release.info.repo_url
                 )
                 resolved_dep_url = self.redirect_manager.resolve(dep.repo_url)
                 if resolved_manifest_url == resolved_dep_url and Version(
