@@ -31,7 +31,6 @@ class BlueprintModInfo(BaseAsset):
     host_only: bool = False
     allow_on_frontend: bool = False
     is_hidden: bool = False
-    orphaned: bool = False
 
     @staticmethod
     def from_dict(data: Dict) -> "BlueprintModInfo":
@@ -51,7 +50,6 @@ class BlueprintModInfo(BaseAsset):
             host_only=data.get("host_only", False),
             allow_on_frontend=data.get("allow_on_frontend", False),
             is_hidden=data.get("is_hidden", False),
-            orphaned=data.get("orphaned", False),
         )
 
 
