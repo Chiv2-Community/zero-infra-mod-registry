@@ -38,9 +38,7 @@ class TestGithubModMetadataRetrieverProcessRelease(unittest.TestCase):
             "name": "Test Mod",
             "description": "Description",
             "authors": ["Author"],
-            "dependencies": [],
-            "tags": ["Mutator"],
-            "mod_type": "Client"
+            "dependencies": []
         }
         
         # Mock requests.get for pak download (stream=True)

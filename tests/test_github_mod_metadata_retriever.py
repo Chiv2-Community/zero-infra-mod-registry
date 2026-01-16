@@ -5,46 +5,12 @@ from zero_infra_mod_registry.models.mod_metadata import Dependency, Mod, Release
 from zero_infra_mod_registry.retriever.github_mod_metadata_retriever import (
     GithubModMetadataRetriever,
 )
-from zero_infra_mod_registry.retriever.mod_metadata_retriever import (
-    VALID_MOD_TYPES,
-    VALID_TAGS,
-)
-
 
 class TestGithubModMetadataRetriever(unittest.TestCase):
     def setUp(self):
         # Create a mock Github client
         self.mock_github = MagicMock()
         self.mod_retriever = GithubModMetadataRetriever(self.mock_github)
-
-    def test_validate_tags(self):
-        """Test tag validation."""
-        # Valid tags
-        valid_tags = ["Mutator", "Map", "Cosmetic"]
-        self.assertIsNone(self.mod_retriever.validate_tags(valid_tags))
-
-        # Empty tags
-        self.assertIsNone(self.mod_retriever.validate_tags([]))
-
-        # Invalid tags
-        invalid_tags = ["Mutator", "InvalidTag", "Map"]
-        error = self.mod_retriever.validate_tags(invalid_tags)
-        self.assertIsNotNone(error)
-        self.assertIn("InvalidTag", error)
-        self.assertIn(str(VALID_TAGS), error)
-
-    def test_validate_mod_type(self):
-        """Test mod type validation."""
-        # Valid mod types
-        for mod_type in VALID_MOD_TYPES:
-            self.assertIsNone(self.mod_retriever.validate_mod_type(mod_type))
-
-        # Invalid mod type
-        invalid_mod_type = "InvalidType"
-        error = self.mod_retriever.validate_mod_type(invalid_mod_type)
-        self.assertIsNotNone(error)
-        self.assertIn(invalid_mod_type, error)
-        self.assertIn(str(VALID_MOD_TYPES), error)
 
     def test_validate_version_tag_name(self):
         """Test version tag validation."""
