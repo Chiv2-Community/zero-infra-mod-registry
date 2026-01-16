@@ -24,6 +24,10 @@ REPO_URL="$2"
 RELEASE_TAG="$3"
 
 case "$COMMAND" in
+  --help)
+    zero-infra-mod-registry --help
+    ;;
+
   add_package)
     if [ -z "$REPO_URL" ]; then
       echo "Error: Repository URL is required for add_package command"
