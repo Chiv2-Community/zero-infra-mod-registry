@@ -36,7 +36,6 @@ class ModInfo:
     image_urls: List[str]
     authors: List[str]
     dependencies: List[Dependency]
-    mod_type: str
 
     @staticmethod
     def from_dict(data: Dict) -> "ModInfo":
@@ -48,7 +47,6 @@ class ModInfo:
             image_urls=data.get("image_urls", []),
             authors=data["authors"],
             dependencies=[Dependency.from_dict(dep) for dep in data["dependencies"]],
-            mod_type=data.get("mod_type", "Shared"),
         )
 
 
@@ -60,7 +58,7 @@ class Release:
     release_date: datetime
     info: ModInfo
     release_notes_markdown: str | None
-    manifest: Manifest | None = None
+    manifest: Manifest
 
     @staticmethod
     def from_dict(data: Dict) -> "Release":

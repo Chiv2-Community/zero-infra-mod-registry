@@ -22,7 +22,15 @@ class BlueprintModInfo(BaseAsset):
     mod_name: str | None = None
     version: str | None = None
     author: str | None = None
-    is_clientside: bool = False
+    mod_description: str | None = None
+    mod_repo_url: str | None = None
+    silent_load: bool = False
+    show_in_gui: bool = False
+    is_client_side: bool = False
+    online_only: bool = False
+    host_only: bool = False
+    allow_on_frontend: bool = False
+    is_hidden: bool = False
     orphaned: bool = False
 
     @staticmethod
@@ -34,7 +42,15 @@ class BlueprintModInfo(BaseAsset):
             mod_name=data.get("mod_name"),
             version=data.get("version"),
             author=data.get("author"),
-            is_clientside=data.get("is_clientside", False),
+            mod_description=data.get("mod_description"),
+            mod_repo_url=data.get("mod_repo_url"),
+            silent_load=data.get("silent_load", False),
+            show_in_gui=data.get("show_in_gui", False),
+            is_client_side=data.get("is_client_side", False),
+            online_only=data.get("online_only", False),
+            host_only=data.get("host_only", False),
+            allow_on_frontend=data.get("allow_on_frontend", False),
+            is_hidden=data.get("is_hidden", False),
             orphaned=data.get("orphaned", False),
         )
 
@@ -120,6 +136,7 @@ class Manifest:
 
 @dataclass(frozen=True)
 class PakInventory:
+    pak_name: str
     pak_path: str
     pak_hash: str | None
     inventory: Manifest
@@ -127,6 +144,7 @@ class PakInventory:
     @staticmethod
     def from_dict(data: Dict) -> "PakInventory":
         return PakInventory(
+            pak_name=data["pak_name"],
             pak_path=data["pak_path"],
             pak_hash=data.get("pak_hash"),
             inventory=Manifest.from_dict(data.get("inventory", {})),
