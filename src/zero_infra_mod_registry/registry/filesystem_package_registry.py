@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Tuple
 
-from semantic_version import SimpleSpec, Version
+from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
@@ -567,10 +567,14 @@ class FilesystemPackageRegistry(PackageRegistry):
                     release.info.repo_url
                 )
                 resolved_dep_url = self.redirect_manager.resolve(dep.repo_url)
-                if resolved_manifest_url == resolved_dep_url and Version(
-                    release_tag
-                ) in SimpleSpec(dep_version):
-                    return release
+                if resolved_manifest_url == resolved_dep_url:
+                    try:
+                        v = Version.parse(release_tag)
+                        if v.match(dep_version):
+                            return release
+                    except ValueError:
+                        # If version parsing fails, skip this release
+                        continue
 
         return None
 

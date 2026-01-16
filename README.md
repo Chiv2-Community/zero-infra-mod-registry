@@ -268,7 +268,7 @@ Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - Python 3.10+
 - PyGithub: GitHub API integration
 - requests: HTTP client
-- semantic-version: Semantic versioning support
+- semver: Semantic versioning support
 - argparse: Command-line parsing
 
 ## License

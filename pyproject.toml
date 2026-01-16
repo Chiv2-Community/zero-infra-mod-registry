@@ -15,7 +15,6 @@ dependencies = [
     "types-urllib3>=1.26.25.14",
     "urllib3>=2.0.5",
     "semver>=3.0.4",
-    "semantic-version>=2.10.0"
 ]
 [project.scripts]
 zero-infra-mod-registry = "zero_infra_mod_registry.main:main"
@@ -46,7 +45,3 @@ build-backend = "hatchling.build"
 packages = ["src/zero_infra_mod_registry"]
 
 [tool.mypy]
-
-[[tool.mypy.overrides]]
-module = "semantic_version.*"
-ignore_missing_imports = true
