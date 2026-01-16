@@ -4,20 +4,20 @@ FROM python:3.14-alpine AS builder
 # Install build dependencies
 RUN apk add build-base libffi-dev
 
-# Install Poetry
-RUN pip install poetry==1.5.1
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /build
 
 # Copy project files needed for building
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY src/ ./src/
 COPY bin/ ./bin/
 
 # Build wheel package
-RUN poetry build -f wheel
+RUN uv build --wheel
 
 # Runtime stage
 FROM python:3.14-alpine
