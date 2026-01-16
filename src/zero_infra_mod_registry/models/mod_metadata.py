@@ -62,7 +62,7 @@ class Release:
 
     @staticmethod
     def from_dict(data: Dict) -> "Release":
-        manifest = Manifest.from_dict(data["manifest"]) if "manifest" in data else None
+        manifest = Manifest.from_dict(data["manifest"])
         return Release(
             tag=data["tag"],
             hash=data["hash"],
