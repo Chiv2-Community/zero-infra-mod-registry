@@ -20,6 +20,10 @@ from zero_infra_mod_registry.utils.redirect_manager import SimpleRedirectManager
 class PackageManagerJsonEncoder(json.JSONEncoder):
     """A custom JSON encoder that can encode datetime objects."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.indent = 4
+
     def default(self, obj):
         if isinstance(obj, datetime):
             return obj.isoformat()
