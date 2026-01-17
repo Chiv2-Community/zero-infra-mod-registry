@@ -60,7 +60,7 @@ class BlueprintModInfo(BaseAsset):
 
 @dataclass(frozen=True)
 class GameMapInfo(BaseAsset):
-    gamemode: str | None = None
+    game_mode: str | None = None
     map_name: str | None = None
     defending_faction: str | None = None
     game_mode_type: str | None = None
@@ -71,7 +71,7 @@ class GameMapInfo(BaseAsset):
             path=data["path"],
             hash=data["hash"],
             object_class=data.get("object_class"),
-            gamemode=data.get("gamemode"),
+            game_mode=data.get("game_mode"),
             map_name=data.get("map_name"),
             defending_faction=data.get("defending_faction"),
             game_mode_type=data.get("game_mode_type"),
