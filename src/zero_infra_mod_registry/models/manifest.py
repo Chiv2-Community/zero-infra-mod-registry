@@ -49,7 +49,7 @@ class BlueprintModInfo(BaseAsset):
             mod_repo_url=data.get("mod_repo_url"),
             silent_load=data.get("silent_load", False),
             show_in_gui=data.get("show_in_gui", False),
-            show_in_gui=data.get("enable_by_default", False),
+            enable_by_default=data.get("enable_by_default", False),
             is_client_side=data.get("is_client_side", False),
             online_only=data.get("online_only", False),
             host_only=data.get("host_only", False),
@@ -63,6 +63,7 @@ class GameMapInfo(BaseAsset):
     game_mode: str | None = None
     map_name: str | None = None
     defending_faction: str | None = None
+    attacking_faction: str | None = None
     game_mode_type: str | None = None
 
     @staticmethod
