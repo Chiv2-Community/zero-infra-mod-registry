@@ -236,6 +236,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
 
             scanner_output_path = os.path.join(temp_dir, "manifest.json")
             with open(scanner_output_path, "r") as f:
+                logging.debug(f"Pak Inventory: " + f.read())
                 scanner_data = json.load(f)
 
             paks = scanner_data.get("paks", [])
