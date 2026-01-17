@@ -54,17 +54,17 @@ class TestFilesystemPackageRegistryCoreFunctions(TestFilesystemPackageRegistryBa
         
         # Create test files
         with open(os.path.join(self.registry_path, "org1.txt"), "w") as f:
-            f.write("https://github.com/org1/repo1\n")
-            f.write("# This is a comment\n")
-            f.write("https://github.com/org1/repo2\n")
-            f.write("\n")  # Empty line
+            f.write(f"https://github.com/org1/repo1{os.linesep}")
+            f.write(f"# This is a comment{os.linesep}")
+            f.write(f"https://github.com/org1/repo2{os.linesep}")
+            f.write(os.linesep)  # Empty line
 
     def test_load_package_list(self):
         """Test loading a package list from a file."""
         # Create a test package list file
         package_list_path = os.path.join(self.test_dir, "mod_list_index.txt")
         with open(package_list_path, "w") as f:
-            f.write("org1/repo1\norg2/repo2\norg3/repo3")
+            f.write(f"org1/repo1{os.linesep}org2/repo2{os.linesep}org3/repo3")
 
         packages = self.registry._load_package_list(package_list_path)
         self.assertEqual(len(packages), 3)
