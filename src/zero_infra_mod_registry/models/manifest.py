@@ -40,7 +40,7 @@ class BlueprintModInfo(BaseAsset):
         return BlueprintModInfo(
             path=data["path"],
             hash=data["hash"],
-            class_path=data["class_path"],
+            class_path=data.get("class_path"),
             object_class=data.get("object_class"),
             mod_name=data.get("mod_name"),
             version=data.get("version"),
