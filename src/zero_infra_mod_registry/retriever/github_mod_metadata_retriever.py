@@ -138,6 +138,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 logging.error(
                     f"Failed to process release {repo} {release.tag_name}: {e}"
                 )
+                traceback.print_exc()
 
         results.sort(key=lambda x: x.release_date, reverse=True)
 
@@ -210,7 +211,10 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 with open(pak_path, "wb") as f:
                     shutil.copyfileobj(r.raw, f)
 
-            scanner_path = os.path.abspath(os.path.join(os.getcwd(), "bin", "UnchainedScanner"))
+            scanner_path = os.environ.get("UNCHAINED_SCANNER_PATH")
+            if not scanner_path:
+                scanner_path = os.path.abspath(os.path.join(os.getcwd(), "bin", "UnchainedScanner"))
+
             if not os.path.exists(scanner_path):
                 raise Exception(f"UnchainedScanner not found at {scanner_path}")
 
@@ -236,8 +240,9 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
 
             scanner_output_path = os.path.join(temp_dir, "manifest.json")
             with open(scanner_output_path, "r") as f:
-                logging.debug(f"Pak Inventory: " + f.read())
-                scanner_data = json.load(f)
+                content = f.read()
+                logging.debug(f"Pak Inventory: " + content)
+                scanner_data = json.loads(content)
 
             paks = scanner_data.get("paks", [])
             if not paks:

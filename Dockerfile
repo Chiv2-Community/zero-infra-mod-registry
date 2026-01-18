@@ -27,7 +27,6 @@ RUN apk add --no-cache \
     git \
     curl \
     jq \
-    dotnet10-runtime \
     bash
 
 # Set working directory
@@ -46,8 +45,15 @@ RUN chmod +x /docker-entrypoint.sh
 COPY github-action-entrypoint.sh /github-action-entrypoint.sh
 RUN chmod +x /github-action-entrypoint.sh
 
+RUN apk add --no-cache dotnet10-runtime gcompat
+COPY bin/UnchainedScanner /usr/local/bin/UnchainedScanner
+RUN chmod +x /usr/local/bin/UnchainedScanner
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV LOG_LEVEL=INFO
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=UTF-8
+ENV UNCHAINED_SCANNER_PATH=/usr/local/bin/UnchainedScanner
 
 ENTRYPOINT ["/github-action-entrypoint.sh"]

@@ -1,9 +1,9 @@
 #!/bin/bash
 set +e
 
-# Capture output to a file
-/docker-entrypoint.sh "$1" "$2" "$3" > /tmp/result.txt 2>&1
-EXIT_CODE=$?
+# Capture output to a file while streaming it to stdout
+/docker-entrypoint.sh "$1" "$2" "$3" 2>&1 | tee /tmp/result.txt
+EXIT_CODE=${PIPESTATUS[0]}
 
 # Read the result
 RESULT=$(cat /tmp/result.txt)
@@ -38,9 +38,6 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     fi
   fi
 fi
-
-# Always print the result to stdout
-echo "$RESULT"
 
 # Exit with the same exit code as the main script
 exit $EXIT_CODE
