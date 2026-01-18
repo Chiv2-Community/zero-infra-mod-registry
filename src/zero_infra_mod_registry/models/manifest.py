@@ -7,6 +7,7 @@ class BaseAsset:
     path: str
     hash: str
     object_class: str | None = None
+    class_path: str | None = None
 
     @staticmethod
     def from_dict(data: Dict) -> "BaseAsset":
@@ -14,6 +15,7 @@ class BaseAsset:
             path=data["path"],
             hash=data["hash"],
             object_class=data.get("object_class"),
+            class_path=data.get("class_path"),
         )
 
 
@@ -26,6 +28,7 @@ class BlueprintModInfo(BaseAsset):
     mod_repo_url: str | None = None
     silent_load: bool = False
     show_in_gui: bool = False
+    enable_by_default: bool = False
     is_client_side: bool = False
     online_only: bool = False
     host_only: bool = False
@@ -37,6 +40,7 @@ class BlueprintModInfo(BaseAsset):
         return BlueprintModInfo(
             path=data["path"],
             hash=data["hash"],
+            class_path=data.get("class_path"),
             object_class=data.get("object_class"),
             mod_name=data.get("mod_name"),
             version=data.get("version"),
@@ -45,6 +49,7 @@ class BlueprintModInfo(BaseAsset):
             mod_repo_url=data.get("mod_repo_url"),
             silent_load=data.get("silent_load", False),
             show_in_gui=data.get("show_in_gui", False),
+            enable_by_default=data.get("enable_by_default", False),
             is_client_side=data.get("is_client_side", False),
             online_only=data.get("online_only", False),
             host_only=data.get("host_only", False),
@@ -55,7 +60,11 @@ class BlueprintModInfo(BaseAsset):
 
 @dataclass(frozen=True)
 class GameMapInfo(BaseAsset):
-    gamemode: str | None = None
+    game_mode: str | None = None
+    map_name: str | None = None
+    defending_faction: str | None = None
+    attacking_faction: str | None = None
+    game_mode_type: str | None = None
 
     @staticmethod
     def from_dict(data: Dict) -> "GameMapInfo":
@@ -63,7 +72,10 @@ class GameMapInfo(BaseAsset):
             path=data["path"],
             hash=data["hash"],
             object_class=data.get("object_class"),
-            gamemode=data.get("gamemode"),
+            game_mode=data.get("game_mode"),
+            map_name=data.get("map_name"),
+            defending_faction=data.get("defending_faction"),
+            game_mode_type=data.get("game_mode_type"),
         )
 
 
