@@ -53,3 +53,7 @@ jobs:
       - name: Validate program in built image
         run: |
           docker run --rm zero-infra-mod-registry:${{ github.run_number }} --help
+
+      - name: Validate .net installation
+        run: |
+          docker run --rm --entrypoint=/usr/loca/bin/UnchainedScanner zero-infra-mod-registry:${{ github.run_number }} --help
