@@ -56,4 +56,4 @@ jobs:
 
       - name: Validate .net installation
         run: |
-          docker run --rm --entrypoint=/usr/loca/bin/UnchainedScanner zero-infra-mod-registry:${{ github.run_number }} --help
+          docker run --rm --entrypoint=/usr/local/bin/UnchainedScanner zero-infra-mod-registry:${{ github.run_number }} --help
