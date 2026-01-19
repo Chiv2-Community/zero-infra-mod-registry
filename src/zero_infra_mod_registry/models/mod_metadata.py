@@ -2,6 +2,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Dict, List
 
+from zero_infra_mod_registry.models.manifest import Manifest
+
 
 @dataclass(frozen=True)
 class Repo:
@@ -26,27 +28,25 @@ class Dependency:
 
 
 @dataclass(frozen=True)
-class Manifest:
+class ModInfo:
     repo_url: str
     name: str
     description: str
-    mod_type: str
+    icon_url: str | None
+    image_urls: List[str]
     authors: List[str]
     dependencies: List[Dependency]
-    tags: List[str]
-    ag_mod: bool
 
     @staticmethod
-    def from_dict(data: Dict) -> "Manifest":
-        return Manifest(
+    def from_dict(data: Dict) -> "ModInfo":
+        return ModInfo(
             repo_url=data["repo_url"],
             name=data["name"],
             description=data["description"],
-            mod_type=data["mod_type"],
+            icon_url=data.get("icon_url"),
+            image_urls=data.get("image_urls", []),
             authors=data["authors"],
             dependencies=[Dependency.from_dict(dep) for dep in data["dependencies"]],
-            tags=data["tags"],
-            ag_mod=data.get("ag_mod", False),
         )
 
 
@@ -56,30 +56,33 @@ class Release:
     hash: str
     pak_file_name: str
     release_date: datetime
+    info: ModInfo
+    release_notes_markdown: str | None
     manifest: Manifest
-    release_notes_markdown: str
 
     @staticmethod
     def from_dict(data: Dict) -> "Release":
+        manifest = Manifest.from_dict(data["manifest"])
         return Release(
             tag=data["tag"],
             hash=data["hash"],
             pak_file_name=data["pak_file_name"],
             release_date=datetime.fromisoformat(data["release_date"]),
-            manifest=Manifest.from_dict(data["manifest"]),
-            release_notes_markdown=Manifest.from_dict(data["release_notes_markdown"]),
+            info=ModInfo.from_dict(data["info"]),
+            release_notes_markdown=data["release_notes_markdown"],
+            manifest=manifest
         )
 
 
 @dataclass(frozen=True)
 class Mod:
-    latest_manifest: Manifest
+    latest_release_info: ModInfo
     releases: List[Release]
 
     @staticmethod
     def from_dict(data: Dict) -> "Mod":
         return Mod(
-            latest_manifest=Manifest.from_dict(data["latest_manifest"]),
+            latest_release_info=ModInfo.from_dict(data["latest_release_info"]),
             releases=[Release.from_dict(release) for release in data["releases"]],
         )
 

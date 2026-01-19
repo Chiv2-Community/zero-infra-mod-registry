@@ -4,14 +4,13 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
-from semantic_version import SimpleSpec, Version
+from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
-    GithubModMetadataRetriever,
     ModMetadataRetriever,
 )
 from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
@@ -20,6 +19,10 @@ from zero_infra_mod_registry.utils.redirect_manager import SimpleRedirectManager
 
 class PackageManagerJsonEncoder(json.JSONEncoder):
     """A custom JSON encoder that can encode datetime objects."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.indent = 4
 
     def default(self, obj):
         if isinstance(obj, datetime):
@@ -148,6 +151,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         Returns:
             True if processing was successful, False otherwise
         """
+        start_time = datetime.now()
         redirects_dir = os.path.join(self.registry_path, "redirects")
         redirect_lines = self._get_all_text_lines_in_directory(redirects_dir)
         redirect_manager = SimpleRedirectManager.parse_redirects(redirect_lines)
@@ -217,6 +221,12 @@ class FilesystemPackageRegistry(PackageRegistry):
             file.write("\n".join(updated_index_entries))
 
         logging.info("Package list built.")
+
+        finish_time = datetime.now()
+        seconds_elapsed = (finish_time - start_time).total_seconds()
+        logging.info(f"Processed all registry updates in {seconds_elapsed} seconds.")
+
+
         return True
 
     def add_package(self, repos: List[Repo], dry_run: bool = False) -> int:
@@ -244,6 +254,68 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         self.validate_package_db(filtered_mods)
 
+        new_maps = []
+        new_blueprints = []
+        new_markers = []
+        new_assets = []
+        new_replacements = []
+
+        logging.info("=======================================================")
+        logging.info("")
+        logging.info("New packages summary")
+        logging.info("")
+
+        for mod in filtered_mods:
+            logging.debug(f"{mod.latest_release_info.name}:")
+            for release in mod.releases:
+                logging.debug(f"\t{release.tag}:")
+
+                if len(release.manifest.maps) > 0:
+                    logging.debug("\t\tMaps:")
+                    for map in release.manifest.maps:
+                        logging.debug(f"\t\t\t{map.path}")
+                        new_maps.append(map)
+
+                if len(release.manifest.markers) > 0:
+                    logging.debug("\t\tMarkers:")
+                    for marker in release.manifest.markers:
+                        logging.debug(f"\t\t\t{marker.path}")
+                        new_markers.append(marker)
+
+                if len(release.manifest.blueprints) > 0:
+                    logging.debug("\t\tBlueprints:")
+                    for blueprint in release.manifest.blueprints:
+                        logging.debug(f"\t\t\t{blueprint.path}")
+                        new_blueprints.append(blueprint)
+
+                if len(release.manifest.replacements) > 0:
+                    logging.debug("\t\tReplacements:")
+                    for replacement in release.manifest.replacements:
+                        logging.debug(f"\t\t\t{replacement.path}")
+                        new_replacements.append(replacement)
+
+                if len(release.manifest.arbitrary) > 0:
+                    logging.debug("\t\tAssets:")
+                    for asset in release.manifest.arbitrary:
+                        logging.debug(f"\t\t\t{asset.path}")
+                        new_assets.append(asset)
+
+                logging.debug("")
+
+            logging.debug("")
+
+        logging.debug("-------------------------------------------------------")
+        logging.debug("")
+        logging.info(f"New maps: {len(new_maps)}")
+        logging.info(f"New markers: {len(new_markers)}")
+        logging.info(f"New blueprints: {len(new_blueprints)}")
+        logging.info(f"New assets: {len(new_assets)}")
+        logging.info("")
+        logging.info(f"New Mods: {len(filtered_mods)}")
+        logging.info(f"New Releases: {sum([len(mod.releases) for mod in filtered_mods])}")
+        logging.info("")
+        logging.info("=======================================================")
+
         if dry_run:
             logging.warning("Dry run; not writing to package dir or registry.")
             return len(filtered_mods)  # Return count of repos that would be initialized
@@ -256,19 +328,19 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Process each mod
         for mod in filtered_mods:
             # Parse and log the URL components
-            url_parts = mod.latest_manifest.repo_url.split("/")
-            logging.info(f"URL Parts: {url_parts}")
+            url_parts = mod.latest_release_info.repo_url.split("/")
+            logging.debug(f"URL Parts: {url_parts}")
 
             # Extract org and repo name
             org = url_parts[-2]
-            repoName = url_parts[-1]
+            repo_name = url_parts[-1]
             # Handle trailing slash in URL
-            if repoName == "":
-                repoName = url_parts[-2]
+            if repo_name == "":
+                repo_name = url_parts[-2]
                 org = url_parts[-3]
 
-            logging.info(
-                f"Extracted org={org}, repoName={repoName} from {mod.latest_manifest.repo_url}"
+            logging.debug(
+                f"Extracted org={org}, repoName={repo_name} from {mod.latest_release_info.repo_url}"
             )
 
             # Create org directory if it doesn't exist
@@ -277,13 +349,13 @@ class FilesystemPackageRegistry(PackageRegistry):
                 os.makedirs(org_dir, exist_ok=True)
 
             # Write mod metadata to package db
-            mod_file_path = os.path.join(self.packages_dir, org, f"{repoName}.json")
+            mod_file_path = os.path.join(self.packages_dir, org, f"{repo_name}.json")
             with open(mod_file_path, "w") as file:
                 file.write(self.json_encoder.encode(mod.asdict()))
 
             # Add to registry index
-            repo_url = mod.latest_manifest.repo_url
-            index_entry = f"{org}/{repoName}"
+            repo_url = mod.latest_release_info.repo_url
+            index_entry = f"{org}/{repo_name}"
 
             # Debug URL parsing
             logging.info(f"Adding {index_entry} to registry, URL: {repo_url}")
@@ -302,7 +374,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                                 content = f.read()
                                 if repo_url in content or index_entry in content:
                                     found = True
-                                    logging.info(
+                                    logging.debug(
                                         f"Package {index_entry} already exists in {file_path}"
                                     )
                                     break
@@ -323,7 +395,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                     f"Added {index_entry} to the registry index at {registry_org_index}"
                 )
 
-            logging.info(f"Repo {org}/{repoName} initialized.")
+            logging.info(f"Repo {org}/{repo_name} initialized.")
 
         logging.info("Successfully initialized all repos.")
         return len(filtered_mods)  # Return the count of successfully initialized repos
@@ -365,7 +437,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         """
         # First check if the package exists in the package list
         if not self._is_package_in_index(repo):
-            error_msg = f"Package {repo} is not in the package list. Add it first using the 'add_package' command."
+            error_msg = f"Package {repo} is not in the package list. Add it first using the 'add-package' command."
             logging.error(error_msg)
             raise ValueError(error_msg)
 
@@ -392,6 +464,57 @@ class FilesystemPackageRegistry(PackageRegistry):
                 f"Failed to fetch metadata for release {release_tag} from {repo}."
             )
             return False  # Return 0 for failed release metadata fetch
+
+        new_maps = []
+        new_blueprints = []
+        new_markers = []
+        new_assets = []
+        new_replacements = []
+
+        logging.info("=======================================================")
+        logging.info("")
+        logging.info("New release summary")
+        logging.info("")
+
+        if len(release.manifest.maps) > 0:
+            logging.debug(f"Maps:")
+            for map in release.manifest.maps:
+                logging.debug(f"\t{map.path}")
+                new_maps.append(map)
+
+        if len(release.manifest.markers) > 0:
+            logging.debug(f"Markers:")
+            for marker in release.manifest.markers:
+                logging.debug(f"\t{marker.path}")
+                new_markers.append(marker)
+
+        if len(release.manifest.blueprints) > 0:
+            logging.debug(f"Blueprints:")
+            for blueprint in release.manifest.blueprints:
+                logging.debug(f"\t{blueprint.path}")
+                new_blueprints.append(blueprint)
+
+        if len(release.manifest.replacements) > 0:
+            logging.debug(f"Replacements:")
+            for replacement in release.manifest.replacements:
+                logging.debug(f"\t{replacement.path}")
+                new_replacements.append(replacement)
+
+        if len(release.manifest.arbitrary) > 0:
+            logging.debug(f"Assets:")
+            for asset in release.manifest.arbitrary:
+                logging.debug(f"\t{asset.path}")
+                new_assets.append(asset)
+
+        logging.debug("")
+        logging.debug("-------------------------------------------------------")
+        logging.debug("")
+        logging.info(f"New maps: {len(new_maps)}")
+        logging.info(f"New markers: {len(new_markers)}")
+        logging.info(f"New blueprints: {len(new_blueprints)}")
+        logging.info(f"New assets: {len(new_assets)}")
+        logging.info("")
+        logging.info("=======================================================")
 
         updated_mod = self.mod_retriever.update_mod_with_release(mod, release)
 
@@ -523,7 +646,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         missing_deps: List[Tuple[Release, Dependency]] = []
         for mod in mods:
             for release in mod.releases:
-                for dep in release.manifest.dependencies:
+                for dep in release.info.dependencies:
                     found_release = self._find_dependency(mods, dep)
                     if found_release is None:
                         missing_deps.append((release, dep))
@@ -533,7 +656,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
             for release, dep in missing_deps:
                 logging.error(
-                    f"{release.manifest.name} {release.tag} requires missing dependency {dep.repo_url} {dep.version}"
+                    f"{release.info.name} {release.tag} requires missing dependency {dep.repo_url} {dep.version}"
                 )
 
             logging.error("Package database is invalid.")
@@ -564,13 +687,17 @@ class FilesystemPackageRegistry(PackageRegistry):
                     dep_version = dep_version[1:]
 
                 resolved_manifest_url = self.redirect_manager.resolve(
-                    release.manifest.repo_url
+                    release.info.repo_url
                 )
                 resolved_dep_url = self.redirect_manager.resolve(dep.repo_url)
-                if resolved_manifest_url == resolved_dep_url and Version(
-                    release_tag
-                ) in SimpleSpec(dep_version):
-                    return release
+                if resolved_manifest_url == resolved_dep_url:
+                    try:
+                        v = Version.parse(release_tag)
+                        if v.match(dep_version):
+                            return release
+                    except ValueError:
+                        # If version parsing fails, skip this release
+                        continue
 
         return None
 

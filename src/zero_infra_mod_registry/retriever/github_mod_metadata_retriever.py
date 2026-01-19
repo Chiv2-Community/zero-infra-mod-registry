@@ -1,6 +1,11 @@
 import logging
+import os
+import shutil
+import subprocess
+import tempfile
 import traceback
-from os import environ
+import json
+from os import environ, mkdir
 from typing import Any, List, Optional, TypeGuard, cast
 
 import requests
@@ -8,13 +13,9 @@ from github import Auth, Github, GitReleaseAsset
 from github.GitRelease import GitRelease
 from semver import Version
 
-from zero_infra_mod_registry.models import Dependency, Manifest, Mod, Release, Repo
-from zero_infra_mod_registry.retriever.mod_metadata_retriever import (
-    VALID_MOD_TYPES,
-    VALID_TAGS,
-    ModMetadataRetriever,
-)
-from zero_infra_mod_registry.utils.hashes import sha512_sum
+from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
+from zero_infra_mod_registry.models.manifest import Manifest, PakInventory
+from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
 class GithubModMetadataRetriever(ModMetadataRetriever):
@@ -53,7 +54,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 logging.warning(f"Repo {repo} has no valid releases.")
                 return None
 
-            return Mod(latest_manifest=releases[0].manifest, releases=releases)
+            return Mod(latest_release_info=releases[0].info, releases=releases)
         except Exception as e:
             logging.error(f"Failed to fetch metadata for repo {repo}: {e}")
             return None
@@ -69,7 +70,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Returns:
             Release object with metadata, or None if the release is invalid
         """
-        (org, repoName) = mod.latest_manifest.repo_url.split("/")[-2:]
+        (org, repoName) = mod.latest_release_info.repo_url.split("/")[-2:]
         repo = Repo(org, repoName)
         try:
             repoString = str(repo)
@@ -104,7 +105,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         """
         mod_releases = mod.releases + [release]
         mod_releases.sort(key=lambda x: x.release_date, reverse=True)
-        return Mod(latest_manifest=mod_releases[0].manifest, releases=mod_releases)
+        return Mod(latest_release_info=mod_releases[0].info, releases=mod_releases)
 
     def fetch_all_releases(self, repo: Repo) -> List[Release]:
         """
@@ -129,19 +130,15 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 results.append(self.process_release(repo, release))
             except KeyError as e:
                 has_error = True
-                print()
                 logging.error(
-                    f"Mod manifest {repo} {release.tag_name} missing required field: {e}"
+                    f"Mod info {repo} {release.tag_name} missing required field: {e}"
                 )
             except Exception as e:
                 has_error = True
-                print()
                 logging.error(
                     f"Failed to process release {repo} {release.tag_name}: {e}"
                 )
-
-        if has_error:
-            print()
+                traceback.print_exc()
 
         results.sort(key=lambda x: x.release_date, reverse=True)
 
@@ -181,24 +178,20 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         response_json = response.json()
 
         response_json["repo_url"] = repo.github_url()
-        manifest = Manifest.from_dict(response_json)
+        mod_info = ModInfo.from_dict(response_json)
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
-        tag_error = self.validate_tags(manifest.tags)
-        mod_type_error = self.validate_mod_type(manifest.mod_type)
-        dependency_errors = self.validate_dependency_versions(manifest.dependencies)
+        dependency_errors = self.validate_dependency_versions(mod_info.dependencies)
         tag_name_error = self.validate_version_tag_name(release.tag_name)
 
         if (
             pak_error
-            or tag_error
-            or mod_type_error
             or dependency_errors
             or tag_name_error
         ):
             # Collect all errors and filter out None values
-            error_list: List[Optional[str]] = [pak_error, tag_error, mod_type_error, tag_name_error]
+            error_list: List[Optional[str]] = [pak_error, tag_name_error]
             all_errors: List[str] = [x for x in error_list if x is not None]
             all_errors.extend(dependency_errors)
             error_string = "\n\t" + "\n\t".join(all_errors)
@@ -207,17 +200,70 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             )
 
         assert not isinstance(pak, str), "Expected GitReleaseAsset but got error string"
-        pak_asset: GitReleaseAsset.GitReleaseAsset = pak 
-        pak_download = requests.get(pak_asset.browser_download_url)
-        pak_hash = sha512_sum(pak_download.content)
+        pak_asset: GitReleaseAsset.GitReleaseAsset = pak
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pak_path = os.path.join(temp_dir, pak_asset.name)
+            logging.info(f"Downloading pak file from {pak_asset.browser_download_url} to {pak_path}")
+            
+            with requests.get(pak_asset.browser_download_url, stream=True) as r:
+                r.raise_for_status()
+                with open(pak_path, "wb") as f:
+                    shutil.copyfileobj(r.raw, f)
+
+            scanner_path = os.environ.get("UNCHAINED_SCANNER_PATH")
+            if not scanner_path:
+                scanner_path = os.path.abspath(os.path.join(os.getcwd(), "bin", "UnchainedScanner"))
+
+            if not os.path.exists(scanner_path):
+                raise Exception(f"UnchainedScanner not found at {scanner_path}")
+
+            logging.info(f"Running UnchainedScanner on {pak_path}")
+            try:
+                subprocess.run(
+                    [scanner_path, "scan", "--pak", temp_dir, "--out", temp_dir],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                manifest_path = os.path.join(temp_dir, "manifest.json")
+                if not os.path.exists(manifest_path):
+                    raise Exception(f"UnchainedScanner output not found at {manifest_path}")
+                logging.info(f"UnchainedScanner output found at {manifest_path}")
+
+            except subprocess.CalledProcessError as e:
+                logging.error(f"UnchainedScanner failed with exit code {e.returncode}")
+                logging.error(f"Stdout: {e.stdout}")
+                logging.error(f"Stderr: {e.stderr}")
+                raise Exception(f"UnchainedScanner failed: {e.stderr}")
+
+
+            scanner_output_path = os.path.join(temp_dir, "manifest.json")
+            with open(scanner_output_path, "r") as f:
+                content = f.read()
+                logging.debug(f"Pak Inventory: " + content)
+                scanner_data = json.loads(content)
+
+            paks = scanner_data.get("paks", [])
+            if not paks:
+                raise Exception(f"Pak scanner returned no .pak files for {pak_path}")
+
+            pak_inventory_data = paks[0]
+            pak_inventory = PakInventory.from_dict(pak_inventory_data)
+            blueprint_count = len(pak_inventory.inventory.blueprints)
+            replacement_count = len(pak_inventory.inventory.replacements)
+            marker_count = len(pak_inventory.inventory.markers)
+            map_count = len(pak_inventory.inventory.maps)
+            logging.info(f"Pak inventory successfully loaded from scanner output. Found {blueprint_count} blueprints, {replacement_count} replacements, {marker_count} markers, and {map_count} maps.")
 
         return Release(
             tag=release.tag_name,
-            hash=pak_hash,
+            hash=pak_inventory.pak_hash or "",
             pak_file_name=pak_asset.name,
             release_date=pak_asset.updated_at.replace(tzinfo=None),
-            manifest=manifest,
-            release_notes_markdown=release.body or None
+            info=mod_info,
+            release_notes_markdown=release.body or None,
+            manifest=pak_inventory.inventory
         )
 
     def find_pak_file(self, release: GitRelease) -> str | GitReleaseAsset.GitReleaseAsset:
@@ -301,32 +347,3 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 )
 
         return errors
-
-    def validate_tags(self, tags: List[str]) -> Optional[str]:
-        """
-        Validate mod tags against the list of valid tags.
-
-        Args:
-            tags: List of tags to validate
-
-        Returns:
-            Error message if invalid tags found, None if all tags are valid
-        """
-        invalid_tags = list(filter(lambda tag: tag not in VALID_TAGS, tags))
-        if len(invalid_tags) > 0:
-            return f"Invalid tags: {invalid_tags}. Valid tags are: {VALID_TAGS}"
-        return None
-
-    def validate_mod_type(self, mod_type: str) -> Optional[str]:
-        """
-        Validate mod type against the list of valid mod types.
-
-        Args:
-            mod_type: Mod type to validate
-
-        Returns:
-            Error message if invalid mod type, None if valid
-        """
-        if mod_type not in VALID_MOD_TYPES:
-            return f"Invalid mod type: {mod_type}. Valid types are: {VALID_MOD_TYPES}"
-        return None

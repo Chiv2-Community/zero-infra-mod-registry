@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from zero_infra_mod_registry.models import Manifest, Mod, Release, Repo
+from zero_infra_mod_registry.models import ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.registry.filesystem_package_registry import (
     FilesystemPackageRegistry,
 )
@@ -40,7 +40,7 @@ class TestFilesystemPackageRegistryBase(unittest.TestCase):
 
     def tearDown(self):
         """Clean up test environment by removing temporary directories."""
-        shutil.rmtree(self.test_dir)
+        # shutil.rmtree(self.test_dir)
 
 
 class TestFilesystemPackageRegistryCoreFunctions(TestFilesystemPackageRegistryBase):
@@ -54,17 +54,17 @@ class TestFilesystemPackageRegistryCoreFunctions(TestFilesystemPackageRegistryBa
         
         # Create test files
         with open(os.path.join(self.registry_path, "org1.txt"), "w") as f:
-            f.write("https://github.com/org1/repo1\n")
-            f.write("# This is a comment\n")
-            f.write("https://github.com/org1/repo2\n")
-            f.write("\n")  # Empty line
+            f.write(f"https://github.com/org1/repo1{os.linesep}")
+            f.write(f"# This is a comment{os.linesep}")
+            f.write(f"https://github.com/org1/repo2{os.linesep}")
+            f.write(os.linesep)  # Empty line
 
     def test_load_package_list(self):
         """Test loading a package list from a file."""
         # Create a test package list file
         package_list_path = os.path.join(self.test_dir, "mod_list_index.txt")
         with open(package_list_path, "w") as f:
-            f.write("org1/repo1\norg2/repo2\norg3/repo3")
+            f.write(f"org1/repo1{os.linesep}org2/repo2{os.linesep}org3/repo3")
 
         packages = self.registry._load_package_list(package_list_path)
         self.assertEqual(len(packages), 3)
@@ -286,6 +286,7 @@ class TestAddRelease(TestFilesystemPackageRegistryBase):
 
         # Mock the fetch_release_metadata method
         mock_release = MagicMock(spec=Release)
+        mock_release.manifest = MagicMock()
         self.mock_retriever.fetch_release_metadata = MagicMock(
             return_value=mock_release
         )
@@ -355,8 +356,11 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         
         # Create mock mod for testing
         self.mock_mod = MagicMock(spec=Mod)
-        self.mock_mod.latest_manifest = MagicMock(spec=Manifest)
-        self.mock_mod.latest_manifest.repo_url = self.repo_url
+        self.mock_mod.name = "test-mod"
+        self.mock_mod.releases = []
+        self.mock_mod.latest_release_info = MagicMock(spec=ModInfo)
+        self.mock_mod.latest_release_info.name = "test-mod"
+        self.mock_mod.latest_release_info.repo_url = self.repo_url
         self.mock_mod.asdict = MagicMock(return_value={"name": "test-mod", "releases": []})
         
         # Configure mock retriever by default
@@ -365,24 +369,18 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_creates_package_file_and_registry_entry(self, mock_logging):
         """Test that add_package creates both a package file and a registry entry."""
-        # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
-        # Call add_package
         result = self.registry.add_package([self.test_repo])
         
-        # Verify that the method returns the number of successfully initialized repos
         self.assertEqual(result, 1, "add_package should return the number of successfully initialized repos")
         
-        # Verify that the package file was created
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
         self.assertTrue(os.path.exists(package_file_path), f"Package file {package_file_path} was not created")
         
-        # Verify that the registry entry was created
-        registry_file_path = os.path.join(self.registry_path, "testorg", "testrepo.txt")
+        registry_file_path = os.path.join(self.registry_path, "testorg.txt")
         self.assertTrue(os.path.exists(registry_file_path), f"Registry file {registry_file_path} was not created")
         
-        # Check the content of the registry file
         with open(registry_file_path, "r") as f:
             content = f.read().strip()
             self.assertEqual(content, self.repo_url)
@@ -422,19 +420,19 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
         
         # Call add_package
         self.registry.add_package([self.test_repo])
-        
+
         # Verify that the package file was created
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
         self.assertTrue(os.path.exists(package_file_path), f"Package file {package_file_path} was not created")
-        
-        # Check if logging indicates the entry already exists
+
         found_log = False
-        for call in mock_logging.info.call_args_list:
+
+        for call in mock_logging.debug.call_args_list:
             args, _ = call
             if len(args) > 0 and "already exists" in args[0] and "testorg/testrepo" in args[0]:
                 found_log = True
                 break
-        
+
         self.assertTrue(found_log, "Did not log that the registry entry already exists")
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
@@ -462,46 +460,49 @@ class TestRepositoryInitialization(TestFilesystemPackageRegistryBase):
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_init_multiple_repos(self, mock_logging):
         """Test that add_package can initialize multiple repositories at once."""
-        # Create test repos
         test_repo1 = Repo("org1", "repo1")
         test_repo2 = Repo("org2", "repo2")
         
-        # Create mock mods
         mock_mod1 = MagicMock(spec=Mod)
-        mock_mod1.latest_manifest = MagicMock(spec=Manifest)
-        mock_mod1.latest_manifest.repo_url = "https://github.com/org1/repo1"
+        mock_mod1.name = "mod1"
+        mock_mod1.releases = []
+        mock_mod1.latest_release_info = MagicMock(spec=ModInfo)
+        mock_mod1.latest_release_info.name = "mod1"
+        mock_mod1.latest_release_info.repo_url = "https://github.com/org1/repo1"
         mock_mod1.asdict = MagicMock(return_value={"name": "mod1", "releases": []})
         
         mock_mod2 = MagicMock(spec=Mod)
-        mock_mod2.latest_manifest = MagicMock(spec=Manifest)
-        mock_mod2.latest_manifest.repo_url = "https://github.com/org2/repo2"
+        mock_mod2.name = "mod2"
+        mock_mod2.releases = []
+        mock_mod2.latest_release_info = MagicMock(spec=ModInfo)
+        mock_mod2.latest_release_info.name = "mod2"
+        mock_mod2.latest_release_info.repo_url = "https://github.com/org2/repo2"
         mock_mod2.asdict = MagicMock(return_value={"name": "mod2", "releases": []})
         
-        # Mock the fetch_repo_metadata method
         self.mock_retriever.fetch_repo_metadata = MagicMock(side_effect=[mock_mod1, mock_mod2])
         
-        # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
-        # Call add_package with multiple repos
         result = self.registry.add_package([test_repo1, test_repo2])
         
-        # Verify that the method returns the number of successfully initialized repos
         self.assertEqual(result, 2, "add_package should return the number of successfully initialized repos")
         
-        # Verify that both package files were created
         package_file_path1 = os.path.join(self.package_db_path, "packages", "org1", "repo1.json")
         package_file_path2 = os.path.join(self.package_db_path, "packages", "org2", "repo2.json")
         self.assertTrue(os.path.exists(package_file_path1), f"Package file {package_file_path1} was not created")
         self.assertTrue(os.path.exists(package_file_path2), f"Package file {package_file_path2} was not created")
         
-        # Verify that both registry entries were created
-        registry_file_path1 = os.path.join(self.registry_path, "org1", "repo1.txt")
-        registry_file_path2 = os.path.join(self.registry_path, "org2", "repo2.txt")
-        self.assertTrue(os.path.exists(registry_file_path1), f"Registry file {registry_file_path1} was not created")
-        self.assertTrue(os.path.exists(registry_file_path2), f"Registry file {registry_file_path2} was not created")
-        
-        # Verify the success log
+        registry_file_path1 = os.path.join(self.registry_path, "org1.txt")
+        registry_file_path2 = os.path.join(self.registry_path, "org2.txt")
+
+        with open(registry_file_path1, "r") as f:
+            self.assertIn(f"https://github.com/org1/repo1", f.read())
+
+        with open(registry_file_path2, "r") as f:
+            self.assertIn(f"https://github.com/org2/repo2", f.read())
+
+
+
         mock_logging.info.assert_any_call("Successfully initialized all repos.")
 
 
@@ -511,53 +512,42 @@ class TestRemoveMods(TestFilesystemPackageRegistryBase):
     def setUp(self):
         """Set up test environment for remove_mods tests."""
         super().setUp()
-        # Create packages directory
+
         os.makedirs(os.path.join(self.package_db_path, "packages", "testorg"), exist_ok=True)
         
-        # Create test file
         with open(os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json"), "w") as f:
             f.write('{"name": "test-mod", "releases": []}')
         
-        # Test repo
         self.test_repo = Repo("testorg", "testrepo")
         self.nonexistent_repo = Repo("nonexistent", "repo")
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_remove_mods(self, mock_logging):
         """Test removing a mod."""
-        # Mock validate_package_db
+
         self.registry.validate_package_db = MagicMock()
         
-        # Call remove_mods
         result = self.registry.remove_mods([self.test_repo])
         
-        # Verify that the method returns the number of removed mods
         self.assertEqual(result, 1, "remove_mods should return the number of successfully removed mods")
         
-        # Verify that the package file was removed
         package_file_path = os.path.join(self.package_db_path, "packages", "testorg", "testrepo.json")
         self.assertFalse(os.path.exists(package_file_path), f"Package file {package_file_path} was not removed")
         
-        # Verify that the org directory was removed since it's empty
         org_dir = os.path.join(self.package_db_path, "packages", "testorg")
         self.assertFalse(os.path.exists(org_dir), f"Org directory {org_dir} was not removed")
         
-        # Verify the success log
         mock_logging.info.assert_any_call("Successfully removed 1 mods.")
 
     @patch("zero_infra_mod_registry.registry.filesystem_package_registry.logging")
     def test_remove_nonexistent_mod(self, mock_logging):
         """Test removing a mod that doesn't exist."""
-        # Mock validate_package_db
         self.registry.validate_package_db = MagicMock()
         
-        # Call remove_mods
         result = self.registry.remove_mods([self.nonexistent_repo])
         
-        # Verify that the method returns 0 (no mods removed)
         self.assertEqual(result, 0, "remove_mods should return 0 when no mods are removed")
         
-        # Verify the warning log
         mock_logging.warning.assert_any_call(f"Mod file for {self.nonexistent_repo} not found at {os.path.join(self.package_db_path, 'packages', 'nonexistent', 'repo.json')}")
 
 
