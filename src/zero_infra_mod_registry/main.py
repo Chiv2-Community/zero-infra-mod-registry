@@ -29,7 +29,10 @@ def main() -> None:
     argparser = argparse.ArgumentParser(description="Manage the mod registry.")
 
     argparser.add_argument(
-        "--dry-run", action="store_true", help="Don't actually make any changes."
+        "--dry-run",
+        action="store_true",
+        default=os.environ.get("DRY_RUN", "false").lower() == "true",
+        help="Don't actually make any changes. Can also be set via DRY_RUN environment variable.",
     )
 
     argparser.add_argument(
@@ -47,14 +50,14 @@ def main() -> None:
     argparser.add_argument(
         "--github-token",
         type=str,
-        default=None,
-        help="GitHub token to use for authentication. Defaults to GITHUB_TOKEN environment variable.",
+        default=os.environ.get("GITHUB_TOKEN"),
+        help="GitHub token to use for authentication. Can also be set via GITHUB_TOKEN environment variable.",
     )
 
     subparsers = argparser.add_subparsers(dest="command", required=True)
 
     init_subparser = subparsers.add_parser(
-        "add_package", help="Add to package list and initialize a mod repo."
+        "add-package", help="Add to package list and initialize a mod repo."
     )
     init_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
@@ -66,7 +69,7 @@ def main() -> None:
     )
 
     add_subparser = subparsers.add_parser(
-        "add_package_release", help="Add a release to a mod repo."
+        "add-package-release", help="Add a release to a mod repo."
     )
     add_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
@@ -86,7 +89,7 @@ def main() -> None:
     args = argparser.parse_args()
 
     # Create GitHub client and mod retriever
-    auth = Auth.Token(args.github_token or os.environ.get("GITHUB_TOKEN") or "")
+    auth = Auth.Token(args.github_token or "")
     github_client = Github(auth=auth)
     mod_retriever = GithubModMetadataRetriever(github_client)
 
@@ -99,12 +102,12 @@ def main() -> None:
 
     if args.command == "process-registry-updates":
         registry.process_registry_updates(args.dry_run)
-    elif args.command == "add_package":
+    elif args.command == "add-package":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
         num_added = registry.add_package([Repo(org, repoName)], args.dry_run)
         if num_added == 0:
             exit(1)
-    elif args.command == "add_package_release":
+    elif args.command == "add-package-release":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
         result = registry.add_package_release(
             Repo(org, repoName),

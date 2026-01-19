@@ -437,7 +437,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         """
         # First check if the package exists in the package list
         if not self._is_package_in_index(repo):
-            error_msg = f"Package {repo} is not in the package list. Add it first using the 'add_package' command."
+            error_msg = f"Package {repo} is not in the package list. Add it first using the 'add-package' command."
             logging.error(error_msg)
             raise ValueError(error_msg)
 

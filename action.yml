@@ -7,14 +7,14 @@ branding:
 
 inputs:
   command:
-    description: 'Command to execute (init, process-registry-updates, add, remove, validate)'
+    description: 'Command to execute (add-package, process-registry-updates, add-package-release, remove, validate)'
     required: true
   repo_url:
-    description: 'Repository URL (required for init, add, and remove commands)'
+    description: 'Repository URL (required for add-package, add-package-release, and remove commands)'
     required: false
     default: ''
   release_tag:
-    description: 'Release tag (required for add command)'
+    description: 'Release tag (required for add-package-release command)'
     required: false
     default: ''
   dry_run:

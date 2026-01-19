@@ -46,7 +46,7 @@ jobs:
         id: add-package
         uses: yourusername/zero-infra-mod-registry@main
         with:
-          command: add_package
+          command: add-package
           repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
           github_token: ${{ secrets.GITHUB_TOKEN }}
           
@@ -73,7 +73,7 @@ jobs:
         id: add-release
         uses: yourusername/zero-infra-mod-registry@main
         with:
-          command: add_package_release
+          command: add-package-release
           repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
           release_tag: v1.0.0
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +90,7 @@ jobs:
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `command` | Command to execute (process-registry-updates, add_package, add_package_release, remove, validate) | Yes | |
+| `command` | Command to execute (process-registry-updates, add-package, add-package-release, remove, validate) | Yes | |
 | `repo_url` | Repository URL (required for init, add, and remove commands) | For some commands | '' |
 | `release_tag` | Release tag (required for add command) | For add command | '' |
 | `dry_run` | Run in dry-run mode without making changes | No | 'false' |
@@ -117,7 +117,7 @@ You can run the mod registry using Docker:
 docker build -t zero-infra-mod-registry .
 
 # Initialize a repository
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add_package https://github.com/Username/ExampleMod
+docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add-package https://github.com/Username/ExampleMod
 
 # Process registry updates with custom paths
 docker run -v $(pwd):/app \
@@ -127,7 +127,7 @@ docker run -v $(pwd):/app \
   zero-infra-mod-registry process-registry-updates
 
 # Add a release
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add_package_release https://github.com/Username/ExampleMod v1.0.0
+docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add-package-release https://github.com/Username/ExampleMod v1.0.0
 
 # Remove a mod
 docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry remove https://github.com/Username/ExampleMod
@@ -158,7 +158,7 @@ The tool provides several CLI commands to manage the mod registry:
 Add a new mod repository to the registry and package list:
 
 ```
-poetry run python -m zero_infra_mod_registry.main init <repo_url>
+poetry run python -m zero_infra_mod_registry.main add-package <repo_url>
 ```
 
 This command both fetches the repository metadata and adds it to the registry index in a single step.
@@ -168,7 +168,7 @@ Example with custom paths:
 poetry run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
-  init https://github.com/Chiv2-Community/Chiv2Turbo
+  add-package https://github.com/Chiv2-Community/Chiv2Turbo
 ```
 
 ### Process Registry Updates
@@ -192,7 +192,7 @@ poetry run python -m zero_infra_mod_registry.main \
 Add a specific release tag to a mod repository:
 
 ```
-poetry run python -m zero_infra_mod_registry.main add <repo_url> <release_tag>
+poetry run python -m zero_infra_mod_registry.main add-package-release <repo_url> <release_tag>
 ```
 
 Example with custom paths:
@@ -200,7 +200,7 @@ Example with custom paths:
 poetry run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
-  add_package_release https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
+  add-package-release https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
 ```
 
 ### Remove a Mod

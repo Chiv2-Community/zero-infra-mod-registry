@@ -2,7 +2,7 @@
 set +e
 
 # Capture output to a file while streaming it to stdout
-/docker-entrypoint.sh "$1" "$2" "$3" 2>&1 | tee /tmp/result.txt
+/docker-entrypoint.sh "$@" 2>&1 | tee /tmp/result.txt
 EXIT_CODE=${PIPESTATUS[0]}
 
 # Read the result
