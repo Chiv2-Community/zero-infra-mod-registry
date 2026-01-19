@@ -39,9 +39,6 @@ COPY --from=builder /build/dist/*.whl /tmp/
 RUN pip install /tmp/*.whl && rm /tmp/*.whl
 
 # Copy entrypoint scripts
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
 COPY github-action-entrypoint.sh /github-action-entrypoint.sh
 RUN chmod +x /github-action-entrypoint.sh
 
