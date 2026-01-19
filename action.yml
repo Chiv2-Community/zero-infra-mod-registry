@@ -41,10 +41,8 @@ inputs:
 outputs:
   result:
     description: 'Output log from the command execution'
-    value: ${{ steps.run-command.outputs.result }}
   failed:
     description: 'Whether the command failed or not'
-    value: ${{ steps.run-command.outputs.failed }}
 
 runs:
   using: 'docker'

@@ -11,30 +11,32 @@ RESULT=$(cat /tmp/result.txt)
 # Set GitHub action outputs
 if [ -n "$GITHUB_OUTPUT" ]; then
   # Set up GitHub step output with delimiter for multiline output
-  echo "result<<EOF" >> $GITHUB_OUTPUT
-  echo "$RESULT" >> $GITHUB_OUTPUT
-  echo "EOF" >> $GITHUB_OUTPUT
+   # Use a more unique delimiter to avoid collisions
+  DELIMITER=$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64 | tr -dc 'a-zA-Z0-9')
+  echo "result<<$DELIMITER" >> "$GITHUB_OUTPUT"
+  echo "$RESULT" >> "$GITHUB_OUTPUT"
+  echo "$DELIMITER" >> "$GITHUB_OUTPUT"
   
   # Set failed status based on exit code
   if [ $EXIT_CODE -ne 0 ]; then
-    echo "failed=true" >> $GITHUB_OUTPUT
+    echo "failed=true" >> "$GITHUB_OUTPUT"
     # Add to GitHub step summary if available
     if [ -n "$GITHUB_STEP_SUMMARY" ]; then
-      echo ":x: Failed." >> $GITHUB_STEP_SUMMARY
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo '```' >> $GITHUB_STEP_SUMMARY
-      echo "$RESULT" >> $GITHUB_STEP_SUMMARY
-      echo '```' >> $GITHUB_STEP_SUMMARY
+      echo ":x: Failed." >> "$GITHUB_STEP_SUMMARY"
+      echo "" >> "$GITHUB_STEP_SUMMARY"
+      echo '```' >> "$GITHUB_STEP_SUMMARY"
+      echo "$RESULT" >> "$GITHUB_STEP_SUMMARY"
+      echo '```' >> "$GITHUB_STEP_SUMMARY"
     fi
   else
-    echo "failed=false" >> $GITHUB_OUTPUT
+    echo "failed=false" >> "$GITHUB_OUTPUT"
     # Add to GitHub step summary if available
     if [ -n "$GITHUB_STEP_SUMMARY" ]; then
-      echo ":white_check_mark: All checks passed." >> $GITHUB_STEP_SUMMARY
-      echo "" >> $GITHUB_STEP_SUMMARY
-      echo '```' >> $GITHUB_STEP_SUMMARY
-      echo "$RESULT" >> $GITHUB_STEP_SUMMARY
-      echo '```' >> $GITHUB_STEP_SUMMARY
+      echo ":white_check_mark: All checks passed." >> "$GITHUB_STEP_SUMMARY"
+      echo "" >> "$GITHUB_STEP_SUMMARY"
+      echo '```' >> "$GITHUB_STEP_SUMMARY"
+      echo "$RESULT" >> "$GITHUB_STEP_SUMMARY"
+      echo '```' >> "$GITHUB_STEP_SUMMARY"
     fi
   fi
 fi
