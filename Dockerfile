@@ -49,8 +49,8 @@ RUN chmod +x /usr/local/bin/UnchainedScanner
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV LOG_LEVEL=INFO
-ENV REGISTRY_PATH=/registry
-ENV PACKAGE_DB_PATH=/package_db
+ENV REGISTRY_PATH=./registry
+ENV PACKAGE_DB_PATH=./package_db
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=UTF-8
 ENV UNCHAINED_SCANNER_PATH=/usr/local/bin/UnchainedScanner
