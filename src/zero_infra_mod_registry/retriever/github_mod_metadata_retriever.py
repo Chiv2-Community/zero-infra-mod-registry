@@ -54,14 +54,18 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         return digest.hexdigest(), size
 
     @override
-    def fetch_dll_release(self, repo: Repo, release_tag: str) -> DllRelease:
+    def fetch_dll_release(self, repo: Repo, release_tag: str, dll_file: str | None = None) -> DllRelease:
         release = self.github_client.get_repo(str(repo)).get_release(release_tag)
         if release.draft:
             raise ValueError("Draft DLL releases cannot be registered")
         version = str(Version.parse(release.tag_name.removeprefix("v")))
         assets = [asset for asset in release.get_assets() if asset.name.lower().endswith(".dll")]
+        if dll_file is not None:
+            assets = [asset for asset in assets if asset.name == dll_file]
+            if len(assets) != 1:
+                raise ValueError(f"Requested DLL asset must match exactly one DLL: {dll_file!r}")
         if len(assets) != 1:
-            raise ValueError("A DLL release must contain exactly one DLL asset")
+            raise ValueError("A DLL release must contain exactly one DLL asset unless --dll-file selects one")
         url = assets[0].browser_download_url
         DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
         digest, size = self.measure_dll(url)

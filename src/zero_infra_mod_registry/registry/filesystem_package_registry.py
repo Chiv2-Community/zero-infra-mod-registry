@@ -91,10 +91,10 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.error(f"DLL registry validation failed: {error}")
             return False
 
-    def add_dll_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> bool:
+    def add_dll_release(self, repo: Repo, release_tag: str, dry_run: bool = False, dll_file: str | None = None) -> bool:
         try:
             entries = self._load_dll_index()
-            entry = self.mod_retriever.fetch_dll_release(repo, release_tag)
+            entry = self.mod_retriever.fetch_dll_release(repo, release_tag, dll_file)
             entry.validate()
             if entry.key in {existing.key for existing in entries}:
                 raise ValueError("Duplicate DLL release")

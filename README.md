@@ -13,12 +13,20 @@ A lightweight, infrastructure-free mod registry system for managing mod reposito
 
 ## DLL registry
 
-Use the same registry CLI to register a GitHub release with exactly one DLL asset:
+Use the same registry CLI to register a GitHub release with one DLL asset, or
+select an exact asset filename when a release contains multiple DLLs:
 
 ```sh
 uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
+uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0 --dll-file MyPlugin.dll
 uv run zero-infra-mod-registry validate --verify-dll-downloads
 ```
+
+`--dll-file` (or the action's `dll_file` input) is an exact, case-sensitive DLL
+asset name, not a pattern. Missing, non-DLL, or ambiguous matches fail without
+falling back to another file. Without it, exactly one DLL asset is required.
+Only the chosen asset is downloaded and hashed; each plugin/version still has
+one immutable registry entry.
 
 DLL metadata is written to `dll_db/index.json`, independently of `package_db` and
 the mod index. Each entry records organization, name, semantic version, download

@@ -21,6 +21,10 @@ inputs:
     description: 'Run in dry-run mode without making changes'
     required: false
     default: 'false'
+  dll_file:
+    description: 'Exact DLL asset filename for add-dll-release (required for multiple DLL assets)'
+    required: false
+    default: ''
   github_token:
     description: 'GitHub token for API access'
     required: true
@@ -67,3 +71,4 @@ runs:
     DLL_DB_PATH: ${{ inputs.dll_db_path }}
     VERIFY_DLL_DOWNLOADS: ${{ inputs.verify_dll_downloads }}
     DRY_RUN: ${{ inputs.dry_run }}
+    DLL_FILE: ${{ inputs.dll_file }}

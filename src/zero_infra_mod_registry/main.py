@@ -33,6 +33,7 @@ class RegistryArguments(argparse.Namespace):
     github_token: str | None
     repo_url: str
     release_tag: str
+    dll_file: str | None
     verify_dll_downloads: bool
 
 
@@ -72,6 +73,8 @@ def main() -> None:
     dll_subparser = subparsers.add_parser("add-dll-release", help="Register a native DLL release separately from pak mods.")
     dll_subparser.add_argument("repo_url")
     dll_subparser.add_argument("release_tag")
+    dll_subparser.add_argument("--dll-file", default=os.environ.get("DLL_FILE") or None,
+                               help="Exact DLL asset filename (required when a release has multiple DLLs).")
 
     init_subparser = subparsers.add_parser(
         "add-package", help="Add to package list and initialize a mod repo."
@@ -126,7 +129,7 @@ def main() -> None:
         parts = url.path.strip("/").split("/")
         if url.scheme != "https" or url.netloc != "github.com" or len(parts) != 2:
             argparser.error("DLL repo_url must be https://github.com/Organization/Repository")
-        if not registry.add_dll_release(Repo(parts[0], parts[1]), args.release_tag, args.dry_run):
+        if not registry.add_dll_release(Repo(parts[0], parts[1]), args.release_tag, args.dry_run, args.dll_file):
             exit(1)
     elif args.command == "process-registry-updates":
         if not registry.process_registry_updates(args.dry_run):

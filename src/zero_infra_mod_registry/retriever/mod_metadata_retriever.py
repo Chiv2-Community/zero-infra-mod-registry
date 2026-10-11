@@ -10,7 +10,7 @@ class ModMetadataRetriever(ABC):
     This is the base abstract class that all metadata retrievers should extend.
     """
 
-    def fetch_dll_release(self, repo: Repo, release_tag: str) -> DllRelease:
+    def fetch_dll_release(self, repo: Repo, release_tag: str, dll_file: str | None = None) -> DllRelease:
         """Retrieve metadata and calculated integrity information for a native DLL."""
         raise NotImplementedError("This retriever does not support DLL releases")
 

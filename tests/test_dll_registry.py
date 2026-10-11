@@ -129,6 +129,42 @@ def test_download_rejects_insecure_redirect(monkeypatch: pytest.MonkeyPatch) -> 
         GithubModMetadataRetriever(FakeGithub([]).as_github()).measure_dll(DLL.download_url)
 
 
+@pytest.mark.parametrize("filename", ["Plugin.dll", "Plugin_dbg.dll"])
+def test_multiple_assets_allow_exact_explicit_selection(monkeypatch: pytest.MonkeyPatch, filename: str) -> None:
+    assets = [FakeAsset(name=name, browser_download_url=f"https://example.com/{name}", size=len(BINARY))
+              for name in ("Plugin.dll", "Plugin_dbg.dll")]
+    retriever = GithubModMetadataRetriever(FakeGithub([FakeRelease(assets=assets)]).as_github())
+    downloaded: list[str] = []
+
+    def measure(url: str) -> tuple[str, int]:
+        downloaded.append(url)
+        return DLL.sha256, DLL.size
+
+    monkeypatch.setattr(retriever, "measure_dll", measure)
+    result = retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", filename)
+    assert result.download_url == f"https://example.com/{filename}"
+    assert downloaded == [result.download_url]
+
+
+@pytest.mark.parametrize("filename", ["Missing.dll", "plugin.dll", "*.dll", "readme.txt", "", "../Plugin.dll"])
+def test_explicit_selection_never_falls_back(monkeypatch: pytest.MonkeyPatch, filename: str) -> None:
+    release = FakeRelease(assets=[FakeAsset(), FakeAsset(name="readme.txt")])
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+
+    def measure(url: str) -> tuple[str, int]:
+        pytest.fail("A rejected selection must not download anything")
+
+    monkeypatch.setattr(retriever, "measure_dll", measure)
+    with pytest.raises(ValueError, match="Requested DLL asset"):
+        retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", filename)
+
+
+def test_duplicate_asset_names_are_ambiguous() -> None:
+    retriever = GithubModMetadataRetriever(FakeGithub([FakeRelease(assets=[FakeAsset(), FakeAsset()])]).as_github())
+    with pytest.raises(ValueError, match="Requested DLL asset"):
+        retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", "Plugin.dll")
+
+
 @pytest.mark.parametrize("contents", ["", "Existing", "Existing\n"])
 def test_index_append_preserves_newlines(tmp_path: Path, contents: str) -> None:
     path = tmp_path / "index.txt"
@@ -147,8 +183,9 @@ def test_cli_passes_dll_options_and_propagates_errors(tmp_path: Path, retriever:
     monkeypatch.setattr("zero_infra_mod_registry.main.FilesystemPackageRegistry", build)
     common = ["registry", "--github-token", "test", "--registry-path", str(tmp_path / "registry"),
               "--package-db-path", str(tmp_path / "packages"), "--dll-db-path", str(tmp_path / "dlls")]
-    monkeypatch.setattr(sys, "argv", common + ["add-dll-release", "https://github.com/Test/Plugin", "v1.0.0"])
+    monkeypatch.setattr(sys, "argv", common + ["add-dll-release", "https://github.com/Test/Plugin", "v1.0.0", "--dll-file", "Plugin.dll"])
     main()
+    assert retriever.dll_calls == [(Repo("Test", "Plugin"), "v1.0.0", "Plugin.dll")]
     assert locations == [str(tmp_path / "dlls")]
     assert decode_json((tmp_path / "dlls/index.json").read_text()) == [ENTRY]
     retriever.measurement = "0" * 64, DLL.size

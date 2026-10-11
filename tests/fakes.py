@@ -32,6 +32,7 @@ class FakeRetriever(ModMetadataRetriever):
         self.releases: dict[str, Release] = {}
         self.dll: DllRelease | None = None
         self.dll_error: Exception | None = None
+        self.dll_calls: list[tuple[Repo, str, str | None]] = []
         self.measurement = ("0" * 64, 1)
         self.repo_calls: list[Repo] = []
         self.release_calls: list[tuple[Mod, str]] = []
@@ -54,7 +55,8 @@ class FakeRetriever(ModMetadataRetriever):
         return Mod(releases[0].info, releases)
 
     @override
-    def fetch_dll_release(self, repo: Repo, release_tag: str) -> DllRelease:
+    def fetch_dll_release(self, repo: Repo, release_tag: str, dll_file: str | None = None) -> DllRelease:
+        self.dll_calls.append((repo, release_tag, dll_file))
         if self.dll_error is not None:
             raise self.dll_error
         if self.dll is None:
