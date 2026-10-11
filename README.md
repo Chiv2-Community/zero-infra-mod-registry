@@ -30,6 +30,8 @@ They must refer to registered DLL releases with a matching version; register
 dependencies first. Exact versions, comma-separated comparisons and caret ranges
 are supported. `plugin.json` is read from the release tag, not the default branch.
 Missing or malformed metadata rejects the registration, including dry runs.
+Optional `icon_url` and `image_urls` fields work like those in `mod.json`; use
+HTTPS URLs without embedded credentials. `image_urls` is a list of screenshots.
 
 Use the same registry CLI to register a GitHub release with one DLL asset, or
 select an exact asset filename when a release contains multiple DLLs:

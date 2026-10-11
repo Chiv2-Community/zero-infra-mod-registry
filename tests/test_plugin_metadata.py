@@ -56,6 +56,25 @@ def test_metadata_round_trip_and_legacy_compatibility() -> None:
     assert "info" not in legacy.asdict()
 
 
+def test_optional_icon_and_images_round_trip() -> None:
+    info = replace(INFO, icon_url="https://example.com/icon.png", image_urls=["https://example.com/screenshot.png"])
+    assert PluginInfo.from_dict(info.asdict()) == info
+    release = replace(ENTRY, info=info)
+    assert DllRelease.from_dict(release.asdict()) == release
+    assert PluginInfo.from_dict(INFO.asdict()).icon_url is None
+    assert PluginInfo.from_dict(INFO.asdict()).image_urls == []
+
+
+@pytest.mark.parametrize("field,value", [("icon_url", "http://example.com/icon.png"), ("icon_url", "file:///icon.png"),
+                                         ("icon_url", 5), ("icon_url", "https://user:password@example.com/icon.png"),
+                                         ("image_urls", "https://example.com/image.png"), ("image_urls", [None]),
+                                         ("image_urls", ["http://example.com/image.png"])])
+def test_invalid_icon_and_images_are_rejected(field: str, value: JsonValue) -> None:
+    data: JsonObject = {**INFO.asdict(), field: value}
+    with pytest.raises(ValueError):
+        PluginInfo.from_dict(data)
+
+
 def test_registry_requires_registered_dependency_versions() -> None:
     info = replace(INFO, dependencies=[Dependency("https://github.com/Test/Other", ">=1.0.0,<2.0.0")])
     plugin = replace(ENTRY, info=info)

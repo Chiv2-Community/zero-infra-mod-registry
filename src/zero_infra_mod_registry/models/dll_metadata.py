@@ -1,14 +1,14 @@
 """Validated DLL metadata, independent of pak mod metadata."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 from typing import List, Tuple
 from urllib.parse import urlparse
 from semver import Version
 from zero_infra_mod_registry.models.mod_metadata import Dependency
 
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, string_array
+from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, optional_string, string_array
 
 
 def dependency_matches(version: str, requirement: str) -> bool:
@@ -28,10 +28,17 @@ class PluginInfo:
     description: str
     authors: List[str]
     dependencies: List[Dependency]
+    icon_url: str | None = None
+    image_urls: List[str] = field(default_factory=list)
 
     def validate(self) -> None:
         if not self.name.strip() or not self.description.strip() or not self.authors or any(not author.strip() for author in self.authors):
             raise ValueError("plugin.json requires a name, description and authors")
+        urls = self.image_urls + ([self.icon_url] if self.icon_url is not None else [])
+        for image_url in urls:
+            image = urlparse(image_url)
+            if image.scheme != "https" or not image.hostname or image.username or image.password:
+                raise ValueError("Plugin image/icon URLs must use HTTPS without credentials")
         repos: set[str] = set()
         for dependency in self.dependencies:
             url = urlparse(dependency.repo_url)
@@ -46,16 +53,23 @@ class PluginInfo:
     @staticmethod
     def from_dict(value: JsonValue) -> PluginInfo:
         data = json_object(value)
-        if set(data) != {"name", "description", "authors", "dependencies"}:
+        required = {"name", "description", "authors", "dependencies"}
+        if not required <= set(data) or not set(data) <= required | {"icon_url", "image_urls"}:
             raise ValueError("Invalid plugin.json fields")
         info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
-                          [Dependency.from_dict(item) for item in json_array(data["dependencies"])])
+                          [Dependency.from_dict(item) for item in json_array(data["dependencies"])],
+                          optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])))
         info.validate()
         return info
 
     def asdict(self) -> JsonObject:
-        return {"name": self.name, "description": self.description,
-                "authors": [author for author in self.authors], "dependencies": [dep.asdict() for dep in self.dependencies]}
+        data: JsonObject = {"name": self.name, "description": self.description,
+                            "authors": [author for author in self.authors], "dependencies": [dep.asdict() for dep in self.dependencies]}
+        if self.icon_url is not None:
+            data["icon_url"] = self.icon_url
+        if self.image_urls:
+            data["image_urls"] = [url for url in self.image_urls]
+        return data
 
 
 @dataclass(frozen=True)
