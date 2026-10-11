@@ -96,8 +96,11 @@ class FilesystemPackageRegistry(PackageRegistry):
             entries = self._load_dll_index()
             entry = self.mod_retriever.fetch_dll_release(repo, release_tag, dll_file)
             entry.validate()
+            if entry.info is None:
+                raise ValueError("New DLL releases require plugin.json metadata")
             if entry.key in {existing.key for existing in entries}:
                 raise ValueError("Duplicate DLL release")
+            validate_dll_entries([release.asdict() for release in entries + [entry]])
             if dry_run:
                 return True
             directory = os.path.dirname(self.dll_index_path)

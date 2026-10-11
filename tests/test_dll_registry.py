@@ -10,15 +10,23 @@ import requests
 
 from zero_infra_mod_registry.main import main
 from zero_infra_mod_registry.models import DllRelease, Repo
-from zero_infra_mod_registry.models.dll_metadata import validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import PluginInfo, validate_dll_entries
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
 from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, response_fixture
 
 BINARY = b"registered DLL bytes"
-DLL = DllRelease("Test", "Plugin", "1.0.0", "https://example.com/Plugin.dll", hashlib.sha256(BINARY).hexdigest(), len(BINARY))
+INFO = PluginInfo("Plugin", "A native plugin", ["Author"], [])
+DLL = DllRelease("Test", "Plugin", "1.0.0", "https://example.com/Plugin.dll", hashlib.sha256(BINARY).hexdigest(), len(BINARY), INFO)
 ENTRY: JsonObject = DLL.asdict()
+
+
+@pytest.fixture(autouse=True)
+def plugin_info_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fetch(self: GithubModMetadataRetriever, repo: Repo, release_tag: str) -> PluginInfo:
+        return INFO
+    monkeypatch.setattr(GithubModMetadataRetriever, "fetch_plugin_info", fetch)
 
 
 @pytest.fixture()

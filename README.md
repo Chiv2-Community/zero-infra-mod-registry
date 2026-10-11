@@ -13,6 +13,24 @@ A lightweight, infrastructure-free mod registry system for managing mod reposito
 
 ## DLL registry
 
+Commit `plugin.json` at the repository root before tagging a DLL release:
+
+```json
+{
+  "name": "My Plugin",
+  "description": "What the plugin does",
+  "authors": ["Author Name"],
+  "dependencies": []
+}
+```
+
+Dependencies use the same `repo_url` and `version` fields as `mod.json`, for
+example `{"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}`.
+They must refer to registered DLL releases with a matching version; register
+dependencies first. Exact versions, comma-separated comparisons and caret ranges
+are supported. `plugin.json` is read from the release tag, not the default branch.
+Missing or malformed metadata rejects the registration, including dry runs.
+
 Use the same registry CLI to register a GitHub release with one DLL asset, or
 select an exact asset filename when a release contains multiple DLLs:
 
@@ -32,7 +50,9 @@ DLL metadata is written to `dll_db/index.json`, independently of `package_db` an
 the mod index. Each entry records organization, name, semantic version, download
 URL, SHA-256 and byte size. Organization/name come from the repository; version
 comes from the release tag. The GitHub retriever streams the DLL to calculate its
-hash and size without invoking the pak scanner or requiring `mod.json`.
+hash and size without invoking the pak scanner. The release's `info` field stores
+its plugin name, description, authors and dependencies. Previously approved DLL
+entries without `info` remain readable; all new registrations require `plugin.json`.
 
 `validate` checks both databases; `--verify-dll-downloads` also checks downloaded
 DLL content against registered metadata. `--dll-db-path` (or `DLL_DB_PATH`) changes

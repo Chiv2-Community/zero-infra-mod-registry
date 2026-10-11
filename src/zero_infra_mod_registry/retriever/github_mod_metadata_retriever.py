@@ -16,7 +16,7 @@ from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
-from zero_infra_mod_registry.models.dll_metadata import DllRelease
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.utils.json_types import decode_json, json_array, json_object
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
@@ -70,12 +70,23 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             raise ValueError("A DLL release must contain exactly one DLL asset unless --dll-file selects one")
         url = assets[0].browser_download_url
         DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
+        info = self.fetch_plugin_info(repo, release.tag_name)
         digest, size = self.measure_dll(url)
-        entry = DllRelease(repo.org, repo.name, version, url, digest, size)
+        entry = DllRelease(repo.org, repo.name, version, url, digest, size, info)
         entry.validate()
         if entry.size != assets[0].size:
             raise ValueError("Downloaded DLL size differs from release asset")
         return entry
+
+    def fetch_plugin_info(self, repo: Repo, release_tag: str) -> PluginInfo:
+        url = f"https://raw.githubusercontent.com/{repo}/{release_tag}/plugin.json"
+        response = requests.get(url, timeout=60)
+        if response.status_code == 404:
+            raise ValueError("plugin.json does not exist at the release tag; commit it before tagging the release")
+        response.raise_for_status()
+        if urlparse(response.url).scheme != "https":
+            raise ValueError("Insecure plugin.json redirect")
+        return PluginInfo.from_dict(decode_json(response.text))
 
     @override
     def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:
