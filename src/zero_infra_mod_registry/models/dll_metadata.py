@@ -27,9 +27,10 @@ class PluginInfo:
     name: str
     description: str
     authors: List[str]
-    dependencies: List[Dependency]
+    plugin_dependencies: List[Dependency]
     icon_url: str | None = None
     image_urls: List[str] = field(default_factory=list)
+    mod_dependencies: List[Dependency] = field(default_factory=list)
 
     def validate(self) -> None:
         if not self.name.strip() or not self.description.strip() or not self.authors or any(not author.strip() for author in self.authors):
@@ -39,12 +40,12 @@ class PluginInfo:
             image = urlparse(image_url)
             if image.scheme != "https" or not image.hostname or image.username or image.password:
                 raise ValueError("Plugin image/icon URLs must use HTTPS without credentials")
-        repos: set[str] = set()
-        for dependency in self.dependencies:
+        repos: set[Tuple[str, str]] = set()
+        for kind, dependency in [("mod", dependency) for dependency in self.mod_dependencies] + [("plugin", dependency) for dependency in self.plugin_dependencies]:
             url = urlparse(dependency.repo_url)
             if url.scheme != "https" or url.netloc != "github.com" or not re.fullmatch(r"/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", url.path) or url.query or url.fragment:
                 raise ValueError("Plugin dependencies must reference a GitHub repository")
-            key = dependency.repo_url.lower()
+            key = kind, dependency.repo_url.lower()
             if key in repos:
                 raise ValueError("Duplicate plugin dependency")
             repos.add(key)
@@ -53,18 +54,21 @@ class PluginInfo:
     @staticmethod
     def from_dict(value: JsonValue) -> PluginInfo:
         data = json_object(value)
-        required = {"name", "description", "authors", "dependencies"}
-        if not required <= set(data) or not set(data) <= required | {"icon_url", "image_urls"}:
+        required = {"name", "description", "authors"}
+        if not required <= set(data) or not set(data) <= required | {"mod_dependencies", "plugin_dependencies", "icon_url", "image_urls"}:
             raise ValueError("Invalid plugin.json fields")
         info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
-                          [Dependency.from_dict(item) for item in json_array(data["dependencies"])],
-                          optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])))
+                          [Dependency.from_dict(item) for item in json_array(data.get("plugin_dependencies", []))],
+                          optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
+                          [Dependency.from_dict(item) for item in json_array(data.get("mod_dependencies", []))])
         info.validate()
         return info
 
     def asdict(self) -> JsonObject:
         data: JsonObject = {"name": self.name, "description": self.description,
-                            "authors": [author for author in self.authors], "dependencies": [dep.asdict() for dep in self.dependencies]}
+                            "authors": [author for author in self.authors],
+                            "plugin_dependencies": [dep.asdict() for dep in self.plugin_dependencies],
+                            "mod_dependencies": [dep.asdict() for dep in self.mod_dependencies]}
         if self.icon_url is not None:
             data["icon_url"] = self.icon_url
         if self.image_urls:
@@ -130,7 +134,7 @@ def validate_dll_entries(value: JsonValue) -> List[DllRelease]:
     for release in releases:
         if release.info is None:
             continue  # Previously approved entries predate plugin.json.
-        for dependency in release.info.dependencies:
+        for dependency in release.info.plugin_dependencies:
             org, name = urlparse(dependency.repo_url).path.strip("/").split("/")
             if org.lower() == release.key[0] and name.lower() == release.key[1]:
                 raise ValueError("Plugin cannot depend on itself")

@@ -10,7 +10,7 @@ from typing import Callable, List, Optional, Tuple, override
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, dependency_matches, validate_dll_entries
 from zero_infra_mod_registry.utils.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
@@ -81,6 +81,7 @@ class FilesystemPackageRegistry(PackageRegistry):
     def validate_dll_db(self, verify_downloads: bool = False) -> bool:
         try:
             entries = self._load_dll_index()
+            self._validate_plugin_mod_dependencies(entries)
             if verify_downloads:
                 for entry in entries:
                     actual = self.mod_retriever.measure_dll(entry.download_url)
@@ -101,6 +102,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             if entry.key in {existing.key for existing in entries}:
                 raise ValueError("Duplicate DLL release")
             validate_dll_entries([release.asdict() for release in entries + [entry]])
+            self._validate_plugin_mod_dependencies(entries + [entry])
             if dry_run:
                 return True
             directory = os.path.dirname(self.dll_index_path)
@@ -119,6 +121,29 @@ class FilesystemPackageRegistry(PackageRegistry):
             return True
         except Exception as error:
             logging.error(f"Failed to register DLL release: {error}")
+            return False
+
+    def _validate_plugin_mod_dependencies(self, entries: List[DllRelease]) -> None:
+        dependencies = [dependency for entry in entries if entry.info is not None for dependency in entry.info.mod_dependencies]
+        if not dependencies:
+            return
+        mods: List[Mod] = []
+        for package in self._load_package_list(self.mod_list_index_path):
+            org, name = package.split("/")
+            mod = self.load_mod(Repo(org, name))
+            if mod is None:
+                raise ValueError(f"Missing indexed mod: {package}")
+            mods.append(mod)
+        for dependency in dependencies:
+            if self._find_dependency(mods, dependency) is None:
+                raise ValueError(f"Unregistered mod dependency: {dependency.repo_url} {dependency.version}")
+
+    @staticmethod
+    def _has_plugin_dependency(entries: List[DllRelease], dependency: Dependency) -> bool:
+        try:
+            return any(dependency.repo_url.lower() == f"https://github.com/{entry.organization}/{entry.name}".lower()
+                       and dependency_matches(entry.version, dependency.version) for entry in entries)
+        except ValueError:
             return False
 
     @staticmethod
@@ -702,11 +727,19 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         # Check for missing dependencies
         missing_deps: List[Tuple[Release, Dependency]] = []
+        try:
+            plugins = self._load_dll_index()
+        except ValueError as error:
+            logging.error("DLL registry is invalid: %s", error)
+            return False
         for mod in mods:
             for release in mod.releases:
-                for dep in release.info.dependencies:
+                for dep in release.info.mod_dependencies:
                     found_release = self._find_dependency(mods, dep)
                     if found_release is None:
+                        missing_deps.append((release, dep))
+                for dep in release.info.plugin_dependencies:
+                    if not self._has_plugin_dependency(plugins, dep):
                         missing_deps.append((release, dep))
 
         if len(missing_deps) > 0:
@@ -748,10 +781,9 @@ class FilesystemPackageRegistry(PackageRegistry):
                     release.info.repo_url
                 )
                 resolved_dep_url = self.redirect_manager.resolve(dep.repo_url)
-                if resolved_manifest_url == resolved_dep_url:
+                if resolved_manifest_url.lower() == resolved_dep_url.lower():
                     try:
-                        v = Version.parse(release_tag)
-                        if v.match(dep_version):
+                        if dependency_matches(release_tag, dep_version):
                             return release
                     except ValueError:
                         # If version parsing fails, skip this release

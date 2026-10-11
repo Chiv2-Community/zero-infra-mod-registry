@@ -40,9 +40,9 @@ def test_missing_or_invalid_plugin_json_is_rejected(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.parametrize("field,value", [("name", ""), ("description", None), ("authors", "Author"),
-                                         ("authors", []), ("authors", [False]), ("dependencies", {}),
-                                         ("dependencies", [{"repo_url": "https://evil.com/a/b", "version": "1.0.0"}]),
-                                         ("dependencies", [{"repo_url": "https://github.com/Test/Other", "version": "latest"}])])
+                                         ("authors", []), ("authors", [False]), ("plugin_dependencies", {}),
+                                         ("plugin_dependencies", [{"repo_url": "https://evil.com/a/b", "version": "1.0.0"}]),
+                                         ("plugin_dependencies", [{"repo_url": "https://github.com/Test/Other", "version": "latest"}])])
 def test_plugin_info_rejects_invalid_fields(field: str, value: JsonValue) -> None:
     data: JsonObject = {**INFO.asdict(), field: value}
     with pytest.raises(ValueError):
@@ -76,7 +76,7 @@ def test_invalid_icon_and_images_are_rejected(field: str, value: JsonValue) -> N
 
 
 def test_registry_requires_registered_dependency_versions() -> None:
-    info = replace(INFO, dependencies=[Dependency("https://github.com/Test/Other", ">=1.0.0,<2.0.0")])
+    info = replace(INFO, plugin_dependencies=[Dependency("https://github.com/Test/Other", ">=1.0.0,<2.0.0")])
     plugin = replace(ENTRY, info=info)
     dependency = replace(ENTRY, name="Other", info=None)
     assert validate_dll_entries([plugin.asdict(), dependency.asdict()]) == [plugin, dependency]
@@ -99,6 +99,6 @@ def test_new_registration_requires_info_and_does_not_write_on_failure(tmp_path: 
     registry = FilesystemPackageRegistry(retriever, str(tmp_path / "registry"), str(tmp_path / "packages"), str(tmp_path / "dlls"))
     assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
     assert not Path(registry.dll_index_path).exists()
-    retriever.dll = replace(ENTRY, info=replace(INFO, dependencies=[Dependency("https://github.com/Test/Missing", "1.0.0")]))
+    retriever.dll = replace(ENTRY, info=replace(INFO, plugin_dependencies=[Dependency("https://github.com/Test/Missing", "1.0.0")]))
     assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0", dry_run=True)
     assert not Path(registry.dll_index_path).exists()

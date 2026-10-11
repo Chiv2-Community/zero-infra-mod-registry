@@ -236,7 +236,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
-        dependency_errors = self.validate_dependency_versions(mod_info.dependencies)
+        dependency_errors = self.validate_dependency_versions(mod_info.mod_dependencies + mod_info.plugin_dependencies)
         tag_name_error = self.validate_version_tag_name(release.tag_name)
 
         if (

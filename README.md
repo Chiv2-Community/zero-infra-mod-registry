@@ -20,13 +20,17 @@ Commit `plugin.json` at the repository root before tagging a DLL release:
   "name": "My Plugin",
   "description": "What the plugin does",
   "authors": ["Author Name"],
-  "dependencies": []
+  "mod_dependencies": [],
+  "plugin_dependencies": []
 }
 ```
 
-Dependencies use the same `repo_url` and `version` fields as `mod.json`, for
+Both `mod.json` and `plugin.json` support `mod_dependencies` for pak mods and
+`plugin_dependencies` for DLL plugins. Existing mods' `dependencies` are read
+as `mod_dependencies`, including previously published registry records.
+Dependencies use the same `repo_url` and `version` fields in both files, for
 example `{"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}`.
-They must refer to registered DLL releases with a matching version; register
+They must refer to releases in the corresponding registry with a matching version; register
 dependencies first. Exact versions, comma-separated comparisons and caret ranges
 are supported. `plugin.json` is read from the release tag, not the default branch.
 Missing or malformed metadata rejects the registration, including dry runs.
