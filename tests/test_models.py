@@ -3,7 +3,7 @@ import json
 
 import pytest
 from zero_infra_mod_registry.models import Mod
-from zero_infra_mod_registry.models.manifest import (
+from zero_infra_mod_registry.models.pak_manifest import (
     ArbitraryAssetInfo, AssetReplacementInfo, BlueprintModInfo, GameMapInfo, Manifest, ModMarkerInfo,
 )
 from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json

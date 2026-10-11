@@ -14,7 +14,7 @@ from github.PaginatedList import PaginatedList
 from urllib3.response import HTTPResponse
 
 from zero_infra_mod_registry.models import DllRelease, Mod, ModInfo, Release, Repo
-from zero_infra_mod_registry.models.manifest import Manifest
+from zero_infra_mod_registry.models.pak_manifest import Manifest
 from zero_infra_mod_registry.retriever import ModMetadataRetriever
 
 T = TypeVar("T")

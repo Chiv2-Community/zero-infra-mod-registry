@@ -15,8 +15,8 @@ from github.GitRelease import GitRelease
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
-from zero_infra_mod_registry.models.manifest import Manifest, PakInventory
-from zero_infra_mod_registry.models.dll_release import DllRelease
+from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
+from zero_infra_mod_registry.models.dll_metadata import DllRelease
 from zero_infra_mod_registry.utils.json_types import decode_json, json_array, json_object
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 

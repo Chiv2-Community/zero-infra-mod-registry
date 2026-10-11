@@ -1,4 +1,4 @@
-"""Validated metadata for native plugins, independent of pak mod metadata."""
+"""Validated DLL metadata, independent of pak mod metadata."""
 from __future__ import annotations
 
 from dataclasses import dataclass

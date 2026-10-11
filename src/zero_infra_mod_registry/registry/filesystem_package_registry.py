@@ -10,7 +10,7 @@ from typing import Callable, List, Optional, Tuple, override
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_release import DllRelease, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, validate_dll_entries
 from zero_infra_mod_registry.utils.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (

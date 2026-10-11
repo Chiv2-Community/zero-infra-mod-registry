@@ -1,3 +1,4 @@
+"""Pak asset manifests and scanner inventories."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

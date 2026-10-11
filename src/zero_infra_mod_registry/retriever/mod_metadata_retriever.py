@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
 from zero_infra_mod_registry.models import Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_release import DllRelease
+from zero_infra_mod_registry.models.dll_metadata import DllRelease
 
 class ModMetadataRetriever(ABC):
     """

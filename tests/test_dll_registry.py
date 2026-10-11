@@ -10,7 +10,7 @@ import requests
 
 from zero_infra_mod_registry.main import main
 from zero_infra_mod_registry.models import DllRelease, Repo
-from zero_infra_mod_registry.models.dll_release import validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import validate_dll_entries
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
 from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
