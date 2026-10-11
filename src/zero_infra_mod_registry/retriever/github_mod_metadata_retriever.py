@@ -4,9 +4,10 @@ import shutil
 import subprocess
 import tempfile
 import traceback
-import json
-from os import environ, mkdir
-from typing import Any, List, Optional, TypeGuard, cast
+import hashlib
+from urllib.parse import urlparse
+from os import environ
+from typing import List, Optional, Tuple, cast, override
 
 import requests
 from github import Auth, Github, GitReleaseAsset
@@ -15,6 +16,8 @@ from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.models.manifest import Manifest, PakInventory
+from zero_infra_mod_registry.models.dll_release import DllRelease
+from zero_infra_mod_registry.utils.json_types import decode_json, json_array, json_object
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
@@ -23,7 +26,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
     Implementation of ModMetadataRetriever that retrieves metadata from GitHub repositories.
     """
 
-    def __init__(self, github_client: Optional[Github] = None):
+    def __init__(self, github_client: Optional[Github] = None) -> None:
         """
         Initialize a GithubModMetadataRetriever with an optional GitHub client.
         If no client is provided, one will be created using the GITHUB_TOKEN environment variable.
@@ -37,6 +40,38 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         else:
             self.github_client = github_client
 
+    @override
+    def measure_dll(self, url: str) -> Tuple[str, int]:
+        digest = hashlib.sha256()
+        size = 0
+        with requests.get(url, stream=True, timeout=60) as response:
+            response.raise_for_status()
+            if urlparse(response.url).scheme != "https":
+                raise ValueError("Insecure DLL download redirect")
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                digest.update(chunk)
+                size += len(chunk)
+        return digest.hexdigest(), size
+
+    @override
+    def fetch_dll_release(self, repo: Repo, release_tag: str) -> DllRelease:
+        release = self.github_client.get_repo(str(repo)).get_release(release_tag)
+        if release.draft:
+            raise ValueError("Draft DLL releases cannot be registered")
+        version = str(Version.parse(release.tag_name.removeprefix("v")))
+        assets = [asset for asset in release.get_assets() if asset.name.lower().endswith(".dll")]
+        if len(assets) != 1:
+            raise ValueError("A DLL release must contain exactly one DLL asset")
+        url = assets[0].browser_download_url
+        DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
+        digest, size = self.measure_dll(url)
+        entry = DllRelease(repo.org, repo.name, version, url, digest, size)
+        entry.validate()
+        if entry.size != assets[0].size:
+            raise ValueError("Downloaded DLL size differs from release asset")
+        return entry
+
+    @override
     def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:
         """
         Fetch metadata for all releases in a GitHub repository.
@@ -59,6 +94,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             logging.error(f"Failed to fetch metadata for repo {repo}: {e}")
             return None
 
+    @override
     def fetch_release_metadata(self, mod: Mod, release_tag: str) -> Optional[Release]:
         """
         Fetch metadata for a specific GitHub release.
@@ -92,6 +128,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             traceback.print_exc()
             return None
 
+    @override
     def update_mod_with_release(self, mod: Mod, release: Release) -> Mod:
         """
         Create a new Mod with an additional release included and sorted correctly.
@@ -175,7 +212,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             )
 
         logging.info(f"Successfully downloaded mod.json")
-        response_json = response.json()
+        response_json = json_object(decode_json(response.text))
 
         response_json["repo_url"] = repo.github_url()
         mod_info = ModInfo.from_dict(response_json)
@@ -233,18 +270,24 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
 
             except subprocess.CalledProcessError as e:
                 logging.error(f"UnchainedScanner failed with exit code {e.returncode}")
-                logging.error(f"Stdout: {e.stdout}")
-                logging.error(f"Stderr: {e.stderr}")
-                raise Exception(f"UnchainedScanner failed: {e.stderr}")
+                stdout = cast(str | bytes | None, e.stdout)
+                stderr = cast(str | bytes | None, e.stderr)
+                if isinstance(stdout, bytes):
+                    stdout = stdout.decode(errors="replace")
+                if isinstance(stderr, bytes):
+                    stderr = stderr.decode(errors="replace")
+                logging.error(f"Stdout: {stdout}")
+                logging.error(f"Stderr: {stderr}")
+                raise Exception(f"UnchainedScanner failed: {stderr}")
 
 
             scanner_output_path = os.path.join(temp_dir, "manifest.json")
             with open(scanner_output_path, "r") as f:
                 content = f.read()
                 logging.debug(f"Pak Inventory: " + content)
-                scanner_data = json.loads(content)
+                scanner_data = json_object(decode_json(content))
 
-            paks = scanner_data.get("paks", [])
+            paks = json_array(scanner_data.get("paks", []))
             if not paks:
                 raise Exception(f"Pak scanner returned no .pak files for {pak_path}")
 
@@ -276,9 +319,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Returns:
             Asset object representing the .pak file, or an error string if not found or multiple found
         """
-        paks = list(
-            filter(lambda asset: asset.name.endswith(".pak"), release.get_assets())
-        )
+        paks = [asset for asset in release.get_assets() if asset.name.endswith(".pak")]
 
         if len(paks) == 0:
             return f"No pak file found for release {release.tag_name}."

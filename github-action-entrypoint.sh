@@ -2,7 +2,15 @@
 set +e
 
 # Capture output to a file while streaming it to stdout
-zero-infra-mod-registry "$@" 2>&1 | tee /tmp/result.txt
+# Docker actions supply empty optional repo/tag positional arguments. Omit them
+# so commands such as validate (including DLL verification) receive only values.
+ARGS=()
+for ARG in "$@"; do
+  if [[ -n "$ARG" ]]; then
+    ARGS+=("$ARG")
+  fi
+done
+zero-infra-mod-registry "${ARGS[@]}" 2>&1 | tee /tmp/result.txt
 EXIT_CODE=${PIPESTATUS[0]}
 
 # Read the result

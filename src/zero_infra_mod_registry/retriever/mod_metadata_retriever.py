@@ -1,13 +1,22 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from zero_infra_mod_registry.models import Mod, Release, Repo
+from zero_infra_mod_registry.models.dll_release import DllRelease
 
 class ModMetadataRetriever(ABC):
     """
     Interface for retrieving mod metadata from a repository.
     This is the base abstract class that all metadata retrievers should extend.
     """
+
+    def fetch_dll_release(self, repo: Repo, release_tag: str) -> DllRelease:
+        """Retrieve metadata and calculated integrity information for a native DLL."""
+        raise NotImplementedError("This retriever does not support DLL releases")
+
+    def measure_dll(self, url: str) -> Tuple[str, int]:
+        """Download a DLL and return its SHA-256 and byte size."""
+        raise NotImplementedError("This retriever does not support DLL downloads")
 
     @abstractmethod
     def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:

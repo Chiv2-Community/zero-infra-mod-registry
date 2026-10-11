@@ -1,3 +1,3 @@
-from .package_registry import PackageRegistry
-from .filesystem_package_registry import FilesystemPackageRegistry
-from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
+from .package_registry import PackageRegistry as PackageRegistry
+from .filesystem_package_registry import FilesystemPackageRegistry as FilesystemPackageRegistry
+from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry as repo_to_index_entry

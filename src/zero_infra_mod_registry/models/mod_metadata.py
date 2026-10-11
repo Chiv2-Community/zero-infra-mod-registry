@@ -1,8 +1,13 @@
-from dataclasses import asdict, dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List
+from typing import List, override
 
 from zero_infra_mod_registry.models.manifest import Manifest
+from zero_infra_mod_registry.utils.json_types import (
+    JsonObject, JsonValue, json_array, json_object, json_string, optional_string, string_array,
+)
 
 
 @dataclass(frozen=True)
@@ -10,6 +15,7 @@ class Repo:
     org: str
     name: str
 
+    @override
     def __str__(self) -> str:
         return f"{self.org}/{self.name}"
 
@@ -23,8 +29,12 @@ class Dependency:
     version: str
 
     @staticmethod
-    def from_dict(data: Dict) -> "Dependency":
-        return Dependency(repo_url=data["repo_url"], version=data["version"])
+    def from_dict(value: JsonValue) -> Dependency:
+        data = json_object(value)
+        return Dependency(json_string(data["repo_url"]), json_string(data["version"]))
+
+    def asdict(self) -> JsonObject:
+        return {"repo_url": self.repo_url, "version": self.version}
 
 
 @dataclass(frozen=True)
@@ -38,16 +48,19 @@ class ModInfo:
     dependencies: List[Dependency]
 
     @staticmethod
-    def from_dict(data: Dict) -> "ModInfo":
+    def from_dict(value: JsonValue) -> ModInfo:
+        data = json_object(value)
         return ModInfo(
-            repo_url=data["repo_url"],
-            name=data["name"],
-            description=data["description"],
-            icon_url=data.get("icon_url"),
-            image_urls=data.get("image_urls", []),
-            authors=data["authors"],
-            dependencies=[Dependency.from_dict(dep) for dep in data["dependencies"]],
+            repo_url=json_string(data["repo_url"]), name=json_string(data["name"]),
+            description=json_string(data["description"]), icon_url=optional_string(data.get("icon_url")),
+            image_urls=string_array(data.get("image_urls", [])), authors=string_array(data["authors"]),
+            dependencies=[Dependency.from_dict(item) for item in json_array(data["dependencies"])],
         )
+
+    def asdict(self) -> JsonObject:
+        return {"repo_url": self.repo_url, "name": self.name, "description": self.description,
+                "icon_url": self.icon_url, "image_urls": [url for url in self.image_urls],
+                "authors": [author for author in self.authors], "dependencies": [dep.asdict() for dep in self.dependencies]}
 
 
 @dataclass(frozen=True)
@@ -61,17 +74,21 @@ class Release:
     manifest: Manifest
 
     @staticmethod
-    def from_dict(data: Dict) -> "Release":
-        manifest = Manifest.from_dict(data["manifest"])
+    def from_dict(value: JsonValue) -> Release:
+        data = json_object(value)
         return Release(
-            tag=data["tag"],
-            hash=data["hash"],
-            pak_file_name=data["pak_file_name"],
-            release_date=datetime.fromisoformat(data["release_date"]),
+            tag=json_string(data["tag"]), hash=json_string(data["hash"]),
+            pak_file_name=json_string(data["pak_file_name"]),
+            release_date=datetime.fromisoformat(json_string(data["release_date"])),
             info=ModInfo.from_dict(data["info"]),
-            release_notes_markdown=data["release_notes_markdown"],
-            manifest=manifest
+            release_notes_markdown=optional_string(data["release_notes_markdown"]),
+            manifest=Manifest.from_dict(data["manifest"]),
         )
+
+    def asdict(self) -> JsonObject:
+        return {"tag": self.tag, "hash": self.hash, "pak_file_name": self.pak_file_name,
+                "release_date": self.release_date.isoformat(), "info": self.info.asdict(),
+                "release_notes_markdown": self.release_notes_markdown, "manifest": self.manifest.asdict()}
 
 
 @dataclass(frozen=True)
@@ -80,11 +97,11 @@ class Mod:
     releases: List[Release]
 
     @staticmethod
-    def from_dict(data: Dict) -> "Mod":
-        return Mod(
-            latest_release_info=ModInfo.from_dict(data["latest_release_info"]),
-            releases=[Release.from_dict(release) for release in data["releases"]],
-        )
+    def from_dict(value: JsonValue) -> Mod:
+        data = json_object(value)
+        return Mod(ModInfo.from_dict(data["latest_release_info"]),
+                   [Release.from_dict(item) for item in json_array(data["releases"])])
 
-    def asdict(self) -> Dict:
-        return asdict(self)
+    def asdict(self) -> JsonObject:
+        return {"latest_release_info": self.latest_release_info.asdict(),
+                "releases": [release.asdict() for release in self.releases]}

@@ -3,12 +3,12 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+from urllib.parse import urlparse
 
 from github import Auth, Github
 
 from zero_infra_mod_registry.models import Repo
-from zero_infra_mod_registry.registry import (FilesystemPackageRegistry,
-                                              PackageRegistry)
+from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
 
 # Configure logging
@@ -22,6 +22,18 @@ logging.basicConfig(
 # Default paths that can be overridden by environment variables
 DEFAULT_REGISTRY_PATH = os.environ.get("REGISTRY_PATH", "./registry")
 DEFAULT_PACKAGE_DB_DIR = os.environ.get("PACKAGE_DB_PATH", "./package_db")
+
+
+class RegistryArguments(argparse.Namespace):
+    command: str
+    dry_run: bool
+    registry_path: str
+    package_db_path: str
+    dll_db_path: str
+    github_token: str | None
+    repo_url: str
+    release_tag: str
+    verify_dll_downloads: bool
 
 
 def main() -> None:
@@ -56,6 +68,11 @@ def main() -> None:
 
     subparsers = argparser.add_subparsers(dest="command", required=True)
 
+    argparser.add_argument("--dll-db-path", default=os.environ.get("DLL_DB_PATH", "./dll_db"))
+    dll_subparser = subparsers.add_parser("add-dll-release", help="Register a native DLL release separately from pak mods.")
+    dll_subparser.add_argument("repo_url")
+    dll_subparser.add_argument("release_tag")
+
     init_subparser = subparsers.add_parser(
         "add-package", help="Add to package list and initialize a mod repo."
     )
@@ -86,7 +103,10 @@ def main() -> None:
     validate_subparser = subparsers.add_parser(
         "validate", help="Validate the package registry database."
     )
-    args = argparser.parse_args()
+    validate_subparser.add_argument("--verify-dll-downloads", action="store_true",
+                                   default=os.environ.get("VERIFY_DLL_DOWNLOADS", "false").lower() == "true")
+    args = RegistryArguments()
+    argparser.parse_args(namespace=args)
 
     # Create GitHub client and mod retriever
     auth = Auth.Token(args.github_token or "")
@@ -94,14 +114,23 @@ def main() -> None:
     mod_retriever = GithubModMetadataRetriever(github_client)
 
     # Initialize the registry with the mod retriever
-    registry: PackageRegistry = FilesystemPackageRegistry(
+    registry = FilesystemPackageRegistry(
         mod_retriever=mod_retriever,
         registry_path=args.registry_path,
         package_db_path=args.package_db_path,
+        dll_db_path=args.dll_db_path,
     )
 
-    if args.command == "process-registry-updates":
-        registry.process_registry_updates(args.dry_run)
+    if args.command == "add-dll-release":
+        url = urlparse(args.repo_url)
+        parts = url.path.strip("/").split("/")
+        if url.scheme != "https" or url.netloc != "github.com" or len(parts) != 2:
+            argparser.error("DLL repo_url must be https://github.com/Organization/Repository")
+        if not registry.add_dll_release(Repo(parts[0], parts[1]), args.release_tag, args.dry_run):
+            exit(1)
+    elif args.command == "process-registry-updates":
+        if not registry.process_registry_updates(args.dry_run):
+            exit(1)
     elif args.command == "add-package":
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
         num_added = registry.add_package([Repo(org, repoName)], args.dry_run)
@@ -121,7 +150,10 @@ def main() -> None:
         [org, repoName] = args.repo_url.strip().split("/")[-2:]
         registry.remove_mods([Repo(org, repoName)], args.dry_run)
     elif args.command == "validate":
-        registry.validate_package_db([])
+        if not registry.validate_dll_db(args.verify_dll_downloads):
+            exit(1)
+        if not registry.validate_package_db([]):
+            exit(1)
         logging.info("Validation complete!")
     else:
         logging.error("Unknown command.")

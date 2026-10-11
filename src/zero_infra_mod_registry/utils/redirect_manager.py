@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, override
 
 
 class RedirectManager(ABC):
@@ -16,7 +16,7 @@ class RedirectManager(ABC):
 class SimpleRedirectManager(RedirectManager):
     """Implementation of RedirectManager that uses a dictionary of redirects."""
 
-    def __init__(self, redirects: Dict[str, str]):
+    def __init__(self, redirects: Dict[str, str]) -> None:
         """Initialize with a dictionary of redirects."""
         self.redirects = redirects
 
@@ -42,6 +42,7 @@ class SimpleRedirectManager(RedirectManager):
         redirects = {line[0]: line[1] for line in parsed_lines}
         return SimpleRedirectManager(redirects)
 
+    @override
     def resolve(self, repo: str) -> str:
         """Resolve a repository URL through the redirect chain."""
         if repo in self.redirects:
