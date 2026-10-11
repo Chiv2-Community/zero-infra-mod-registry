@@ -64,6 +64,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             assets = [asset for asset in assets if asset.name == dll_file]
             if len(assets) != 1:
                 raise ValueError(f"Requested DLL asset must match exactly one DLL: {dll_file!r}")
+        if not assets:
+            raise ValueError("The release contains no DLL assets")
         if len(assets) != 1:
             raise ValueError("A DLL release must contain exactly one DLL asset unless --dll-file selects one")
         url = assets[0].browser_download_url

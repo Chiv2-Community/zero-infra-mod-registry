@@ -165,6 +165,12 @@ def test_duplicate_asset_names_are_ambiguous() -> None:
         retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", "Plugin.dll")
 
 
+def test_no_assets_does_not_request_filename_selection() -> None:
+    retriever = GithubModMetadataRetriever(FakeGithub([FakeRelease(assets=[])]).as_github())
+    with pytest.raises(ValueError, match="no DLL assets"):
+        retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+
+
 @pytest.mark.parametrize("contents", ["", "Existing", "Existing\n"])
 def test_index_append_preserves_newlines(tmp_path: Path, contents: str) -> None:
     path = tmp_path / "index.txt"
