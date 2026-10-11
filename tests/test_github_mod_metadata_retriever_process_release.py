@@ -1,97 +1,54 @@
-import unittest
-from unittest.mock import MagicMock, patch, mock_open
-import os
 import json
-from datetime import datetime
-from zero_infra_mod_registry.retriever.github_mod_metadata_retriever import GithubModMetadataRetriever
-from zero_infra_mod_registry.models.mod_metadata import Repo
+from pathlib import Path
+import subprocess
 
-class TestGithubModMetadataRetrieverProcessRelease(unittest.TestCase):
-    def setUp(self):
-        with patch.dict(os.environ, {"GITHUB_TOKEN": "test_token"}):
-            self.retriever = GithubModMetadataRetriever()
+import pytest
+import requests
+from zero_infra_mod_registry.models import Repo
+from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
+from zero_infra_mod_registry.utils.json_types import JsonObject
+from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.requests.get")
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.subprocess.run")
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.os.path.exists")
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.os.listdir")
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.open", new_callable=mock_open)
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.shutil.copyfileobj")
-    def test_process_release_success(self, mock_copyfileobj, mock_file_open, mock_listdir, mock_path_exists, mock_subprocess_run, mock_requests_get):
-        repo = Repo(org="testorg", name="testrepo")
-        mock_release = MagicMock()
-        mock_release.tag_name = "v1.0.0"
-        mock_release.body = "Release notes"
-        
-        mock_pak_asset = MagicMock()
-        mock_pak_asset.name = "test.pak"
-        mock_pak_asset.browser_download_url = "http://example.com/test.pak"
-        mock_pak_asset.updated_at = datetime(2023, 1, 1)
-        mock_release.get_assets.return_value = [mock_pak_asset]
 
-        mock_response_mod_json = MagicMock()
-        mock_response_mod_json.status_code = 200
-        mock_response_mod_json.json.return_value = {
-            "name": "Test Mod",
-            "description": "Description",
-            "authors": ["Author"],
-            "dependencies": []
-        }
-        
-        mock_response_pak = MagicMock()
-        mock_response_pak.status_code = 200
-        mock_response_pak.__enter__.return_value = mock_response_pak
-        
-        mock_requests_get.side_effect = [mock_response_mod_json, mock_response_pak]
+def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = Repo("Test", "Plugin")
+    release = FakeRelease(assets=[FakeAsset(name="test.pak")])
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+    calls: list[str] = []
+    metadata: JsonObject = {"name": "Test Mod", "description": "Description", "authors": ["Author"], "dependencies": []}
 
-        mock_path_exists.return_value = True
-        
-        mock_listdir.return_value = ["test.pak.json"]
-        
-        scanner_output = {
-            "paks": [
-                {
-                    "pak_name": "test.pak",
-                    "pak_path": "test.pak",
-                    "pak_hash": "abc123hash",
-                    "inventory": {
-                        "markers": [],
-                        "blueprints": [],
-                        "maps": [],
-                        "replacements": [],
-                        "arbitrary": []
-                    }
-                }
-            ]
-        }
+    def get(url: str, *, stream: bool = False) -> requests.Response:
+        calls.append(url)
+        return response_fixture(b"pak content" if stream else json.dumps(metadata).encode(), url)
 
-        # We need to handle multiple open calls.
-        # 1st: write pak file
-        # 2nd: read scanner output JSON
-        mock_file_open.side_effect = [
-            mock_open().return_value, # for pak file
-            mock_open(read_data=json.dumps(scanner_output)).return_value # for scanner output
-        ]
+    def scan(args: list[str], *, check: bool, capture_output: bool, text: bool) -> subprocess.CompletedProcess[str]:
+        assert check and capture_output and text
+        output = Path(args[args.index("--out") + 1])
+        assert (output / "test.pak").read_bytes() == b"pak content"
+        scanner: JsonObject = {"paks": [{"pak_name": "test.pak", "pak_path": "test.pak", "pak_hash": "abc123hash",
+                                       "inventory": {"markers": [], "blueprints": [], "maps": [], "replacements": [], "arbitrary": []}}]}
+        (output / "manifest.json").write_text(json.dumps(scanner))
+        return subprocess.CompletedProcess(args, 0, "", "")
 
-        release = self.retriever.process_release(repo, mock_release)
+    scanner = tmp_path / "scanner"
+    scanner.touch()
+    monkeypatch.setenv("UNCHAINED_SCANNER_PATH", str(scanner))
+    monkeypatch.setattr(requests, "get", get)
+    monkeypatch.setattr(subprocess, "run", scan)
+    result = retriever.process_release(repo, release.as_release())
+    assert result.tag == "v1.0.0" and result.hash == "abc123hash"
+    assert result.info.name == "Test Mod" and result.info.repo_url == repo.github_url()
+    assert result.release_notes_markdown == "Release notes"
+    assert len(calls) == 2
 
-        self.assertEqual(release.tag, "v1.0.0")
-        self.assertEqual(release.hash, "abc123hash")
-        self.assertEqual(release.info.name, "Test Mod")
-        mock_subprocess_run.assert_called_once()
-        
-    @patch("zero_infra_mod_registry.retriever.github_mod_metadata_retriever.requests.get")
-    def test_process_release_no_mod_json(self, mock_requests_get):
-        repo = Repo(org="testorg", name="testrepo")
-        mock_release = MagicMock()
-        mock_release.tag_name = "v1.0.0"
-        
-        mock_response = MagicMock()
-        mock_response.status_code = 404
-        mock_requests_get.return_value = mock_response
-        
-        with self.assertRaisesRegex(Exception, "mod.json does not exist"):
-            self.retriever.process_release(repo, mock_release)
 
-if __name__ == "__main__":
-    unittest.main()
+def test_process_release_no_mod_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    release = FakeRelease()
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+
+    def get(url: str) -> requests.Response:
+        return response_fixture(b"not found", url, status=404)
+
+    monkeypatch.setattr(requests, "get", get)
+    with pytest.raises(Exception, match="mod.json does not exist"):
+        retriever.process_release(Repo("Test", "Plugin"), release.as_release())

@@ -7,20 +7,24 @@ branding:
 
 inputs:
   command:
-    description: 'Command to execute (add-package, process-registry-updates, add-package-release, remove, validate)'
+    description: 'Command to execute (add-package, process-registry-updates, add-package-release, add-dll-release, remove, validate)'
     required: true
   repo_url:
-    description: 'Repository URL (required for add-package, add-package-release, and remove commands)'
+    description: 'Repository URL (required for add-package, add-package-release, add-dll-release, and remove commands)'
     required: false
     default: ''
   release_tag:
-    description: 'Release tag (required for add-package-release command)'
+    description: 'Release tag (required for add-package-release and add-dll-release commands)'
     required: false
     default: ''
   dry_run:
     description: 'Run in dry-run mode without making changes'
     required: false
     default: 'false'
+  dll_file:
+    description: 'Exact DLL asset filename for add-dll-release (required for multiple DLL assets)'
+    required: false
+    default: ''
   github_token:
     description: 'GitHub token for API access'
     required: true
@@ -37,6 +41,14 @@ inputs:
     description: 'Path to the package database directory'
     required: false
     default: './package_db'
+  dll_db_path:
+    description: 'Path to the separate DLL database directory'
+    required: false
+    default: './dll_db'
+  verify_dll_downloads:
+    description: 'Download and verify registered DLL hashes and sizes during validation'
+    required: false
+    default: 'false'
 
 outputs:
   result:
@@ -56,4 +68,7 @@ runs:
     LOG_LEVEL: ${{ inputs.log_level }}
     REGISTRY_PATH: ${{ inputs.registry_path }}
     PACKAGE_DB_PATH: ${{ inputs.package_db_path }}
+    DLL_DB_PATH: ${{ inputs.dll_db_path }}
+    VERIFY_DLL_DOWNLOADS: ${{ inputs.verify_dll_downloads }}
     DRY_RUN: ${{ inputs.dry_run }}
+    DLL_FILE: ${{ inputs.dll_file }}

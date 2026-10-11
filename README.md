@@ -9,25 +9,69 @@ A lightweight, infrastructure-free mod registry system for managing mod reposito
 - Handle dependencies between mods
 - Validate the package database to ensure all dependencies are satisfied
 - Support for redirects to handle repository name changes
+- Register native DLL releases separately from pak mods, with download source, SHA-256 and size
+
+## DLL registry
+
+Use the same registry CLI to register a GitHub release with one DLL asset, or
+select an exact asset filename when a release contains multiple DLLs:
+
+```sh
+uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
+uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0 --dll-file MyPlugin.dll
+uv run zero-infra-mod-registry validate --verify-dll-downloads
+```
+
+`--dll-file` (or the action's `dll_file` input) is an exact, case-sensitive DLL
+asset name, not a pattern. Missing, non-DLL, or ambiguous matches fail without
+falling back to another file. Without it, exactly one DLL asset is required.
+Only the chosen asset is downloaded and hashed; each plugin/version still has
+one immutable registry entry.
+
+DLL metadata is written to `dll_db/index.json`, independently of `package_db` and
+the mod index. Each entry records organization, name, semantic version, download
+URL, SHA-256 and byte size. Organization/name come from the repository; version
+comes from the release tag. The GitHub retriever streams the DLL to calculate its
+hash and size without invoking the pak scanner or requiring `mod.json`.
+
+`validate` checks both databases; `--verify-dll-downloads` also checks downloaded
+DLL content against registered metadata. `--dll-db-path` (or `DLL_DB_PATH`) changes
+the DLL database location. `--dry-run` validates an addition without writing it.
+Existing DLL versions cannot be registered again or overwritten by the command.
+Registry operators should require review of each DLL version before publishing it.
+Hashes establish integrity, not a sandbox or proof that native code is harmless.
 
 ## Installation
 
-This project uses Poetry for dependency management. To set up the project:
+This project uses uv for dependency management. To set up the project:
 
-1. Make sure you have Python 3.10 or newer installed
-2. Install Poetry if you don't have it already:
+1. Make sure you have Python 3.12 or newer installed (CI and Docker use 3.14)
+2. Install uv if you don't have it already:
    ```
-   curl -sSL https://install.python-poetry.org | python3 -
+    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 3. Clone the repository:
    ```
-   git clone https://github.com/yourusername/zero-infra-mod-registry.git
+    git clone https://github.com/Chiv2-Community/zero-infra-mod-registry.git
    cd zero-infra-mod-registry
    ```
 4. Install dependencies:
    ```
-   poetry install
-   ```
+    uv sync --all-groups
+    ```
+
+## Type checking
+
+Run `uv run mypy .` and `uv run pytest .` before committing. Strict mypy checking
+covers both production and test code, including explicit and inferred dynamic
+types, untyped definitions/calls, generic type parameters, decorators and imports.
+There are no file exclusions or per-module relaxations. CI runs the same command.
+
+Use concrete dataclasses for registry records. JSON input passes through a
+recursive JSON-value union, then runtime narrowing/validation before creating
+models. Do not use broad catch-all annotations or type-checker suppressions.
+Tests use typed API fixtures rather than dynamically typed mock attributes;
+regression tests also enforce these type rules and prove invalid code is rejected.
 
 ## Using as a GitHub Action
 
@@ -158,14 +202,14 @@ The tool provides several CLI commands to manage the mod registry:
 Add a new mod repository to the registry and package list:
 
 ```
-poetry run python -m zero_infra_mod_registry.main add-package <repo_url>
+uv run python -m zero_infra_mod_registry.main add-package <repo_url>
 ```
 
 This command both fetches the repository metadata and adds it to the registry index in a single step.
 
 Example with custom paths:
 ```
-poetry run python -m zero_infra_mod_registry.main \
+uv run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
   add-package https://github.com/Chiv2-Community/Chiv2Turbo
@@ -176,12 +220,12 @@ poetry run python -m zero_infra_mod_registry.main \
 Find new package list entries and load all of their releases:
 
 ```
-poetry run python -m zero_infra_mod_registry.main process-registry-updates
+uv run python -m zero_infra_mod_registry.main process-registry-updates
 ```
 
 With custom paths:
 ```
-poetry run python -m zero_infra_mod_registry.main \
+uv run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
   process-registry-updates
@@ -192,12 +236,12 @@ poetry run python -m zero_infra_mod_registry.main \
 Add a specific release tag to a mod repository:
 
 ```
-poetry run python -m zero_infra_mod_registry.main add-package-release <repo_url> <release_tag>
+uv run python -m zero_infra_mod_registry.main add-package-release <repo_url> <release_tag>
 ```
 
 Example with custom paths:
 ```
-poetry run python -m zero_infra_mod_registry.main \
+uv run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
   add-package-release https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
@@ -208,12 +252,12 @@ poetry run python -m zero_infra_mod_registry.main \
 Remove a mod from the registry:
 
 ```
-poetry run python -m zero_infra_mod_registry.main remove <repo_url>
+uv run python -m zero_infra_mod_registry.main remove <repo_url>
 ```
 
 Example with custom paths:
 ```
-poetry run python -m zero_infra_mod_registry.main \
+uv run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
   remove https://github.com/Chiv2-Community/Chiv2Turbo
@@ -224,12 +268,12 @@ poetry run python -m zero_infra_mod_registry.main \
 Validate the package registry database to ensure all dependencies are satisfied:
 
 ```
-poetry run python -m zero_infra_mod_registry.main validate
+uv run python -m zero_infra_mod_registry.main validate
 ```
 
 Example with custom paths:
 ```
-poetry run python -m zero_infra_mod_registry.main \
+uv run python -m zero_infra_mod_registry.main \
   --registry-path ./custom-registry \
   --package-db-path ./custom-package-db \
   validate
@@ -242,7 +286,7 @@ poetry run python -m zero_infra_mod_registry.main \
 All commands support a `--dry-run` flag to preview changes without actually applying them:
 
 ```
-poetry run python -m zero_infra_mod_registry.main --dry-run <command> <args>
+uv run python -m zero_infra_mod_registry.main --dry-run <command> <args>
 ```
 
 ## Testing
@@ -250,7 +294,7 @@ poetry run python -m zero_infra_mod_registry.main --dry-run <command> <args>
 This project uses pytest for testing. To run the tests:
 
 ```bash
-poetry run pytest
+uv run pytest
 ```
 
 ## Logging
@@ -258,14 +302,14 @@ poetry run pytest
 You can control the log level by setting the `LOG_LEVEL` environment variable:
 
 ```
-LOG_LEVEL=DEBUG poetry run python -m zero_infra_mod_registry.main <command> <args>
+LOG_LEVEL=DEBUG uv run python -m zero_infra_mod_registry.main <command> <args>
 ```
 
 Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 ## Dependencies
 
-- Python 3.10+
+- Python 3.12+
 - PyGithub: GitHub API integration
 - requests: HTTP client
 - semver: Semantic versioning support

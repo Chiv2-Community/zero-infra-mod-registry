@@ -3,12 +3,14 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from typing import override
 
 from zero_infra_mod_registry.utils.redirect_manager import SimpleRedirectManager
 
 
 class TestSimpleRedirectManager(unittest.TestCase):
-    def setUp(self):
+    @override
+    def setUp(self) -> None:
         # Create a temporary directory for test files
         self.test_dir = tempfile.mkdtemp()
 
@@ -24,11 +26,12 @@ class TestSimpleRedirectManager(unittest.TestCase):
                 + "https://github.com/no-arrow-org/repo1\n"
             )
 
-    def tearDown(self):
+    @override
+    def tearDown(self) -> None:
         # Remove the temporary directory and its contents
         shutil.rmtree(self.test_dir)
 
-    def test_init(self):
+    def test_init(self) -> None:
         """Test initializing a SimpleRedirectManager with a dictionary."""
         redirects = {
             "https://github.com/old-org/repo1": "https://github.com/new-org/repo1",
@@ -46,7 +49,7 @@ class TestSimpleRedirectManager(unittest.TestCase):
             "https://github.com/new-org/repo2",
         )
 
-    def test_from_file(self):
+    def test_from_file(self) -> None:
         """Test creating a SimpleRedirectManager from a file."""
         manager = SimpleRedirectManager.from_file(self.redirects_path)
 
@@ -73,7 +76,7 @@ class TestSimpleRedirectManager(unittest.TestCase):
         self.assertNotIn("This is not a valid redirect", manager.redirects)
         self.assertNotIn("https://github.com/no-arrow-org/repo1", manager.redirects)
 
-    def test_from_file_nonexistent(self):
+    def test_from_file_nonexistent(self) -> None:
         """Test creating a SimpleRedirectManager from a nonexistent file."""
         nonexistent_path = os.path.join(self.test_dir, "nonexistent.txt")
         manager = SimpleRedirectManager.from_file(nonexistent_path)
@@ -81,7 +84,7 @@ class TestSimpleRedirectManager(unittest.TestCase):
         # Should have an empty redirects dictionary
         self.assertEqual(len(manager.redirects), 0)
 
-    def test_parse_redirects(self):
+    def test_parse_redirects(self) -> None:
         """Test parsing redirect lines."""
         redirect_lines = [
             "https://github.com/old-org/repo1 -> https://github.com/new-org/repo1",
@@ -102,7 +105,7 @@ class TestSimpleRedirectManager(unittest.TestCase):
             "https://github.com/new-org/repo2",
         )
 
-    def test_resolve(self):
+    def test_resolve(self) -> None:
         """Test resolving a repository URL through the redirect chain."""
         manager = SimpleRedirectManager.from_file(self.redirects_path)
 
