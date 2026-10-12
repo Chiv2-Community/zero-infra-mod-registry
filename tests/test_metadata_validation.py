@@ -80,6 +80,30 @@ def test_metadata_cli_rejects_no_files(tmp_path: Path, monkeypatch: pytest.Monke
     assert failure.value.code == 2
 
 
+def test_local_validation_needs_no_retriever_or_synthetic_identity(tmp_path: Path, registry: FilesystemPackageRegistry) -> None:
+    local = FilesystemPackageRegistry(registry_path=str(tmp_path / "registry"),
+        package_db_path=str(tmp_path / "package_db"), dll_db_path=str(tmp_path / "dll_db"))
+    assert local.mod_retriever is None
+    for kind in ("mod", "plugin"):
+        path = tmp_path / f"{kind}.json"
+        data = metadata()
+        path.write_text(json.dumps(data))
+        original = path.read_bytes()
+        validate_metadata(path, kind, local)
+        assert path.read_bytes() == original
+
+
+def test_local_registry_construction_does_not_create_directories(tmp_path: Path) -> None:
+    local = FilesystemPackageRegistry(registry_path=str(tmp_path / "registry"),
+        package_db_path=str(tmp_path / "package_db"), dll_db_path=str(tmp_path / "dll_db"))
+    assert not (tmp_path / "package_db").exists()
+    assert not (tmp_path / "registry").exists()
+    assert not local.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    with pytest.raises(ValueError, match="no release retriever"):
+        local.add_package([Repo("Test", "Pak")])
+    assert not (tmp_path / "package_db").exists()
+
+
 @pytest.mark.parametrize("target", list(PluginTarget))
 def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPackageRegistry, target: PluginTarget) -> None:
     root = Path(__file__).resolve().parents[1]

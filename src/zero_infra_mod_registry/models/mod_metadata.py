@@ -37,10 +37,13 @@ class Dependency:
         return {"repo_url": self.repo_url, "version": self.version}
 
 
+def dependencies_from_dict(data: JsonObject, field_name: str) -> List[Dependency]:
+    return [Dependency.from_dict(item) for item in json_array(data.get(field_name, []))]
+
+
 def mod_dependencies_from_dict(data: JsonObject) -> List[Dependency]:
     # Preserve legacy declarations even if both spellings appear in one record.
-    dependencies = [Dependency.from_dict(item) for item in
-                    json_array(data.get("mod_dependencies", [])) + json_array(data.get("dependencies", []))]
+    dependencies = dependencies_from_dict(data, "mod_dependencies") + dependencies_from_dict(data, "dependencies")
     unique: dict[tuple[str, str], Dependency] = {}
     for dependency in dependencies:
         unique[(dependency.repo_url.lower(), dependency.version)] = dependency
@@ -71,7 +74,7 @@ class ModInfo:
             description=json_string(data["description"]), icon_url=optional_string(data.get("icon_url")),
             image_urls=string_array(data.get("image_urls", [])), authors=string_array(data["authors"]),
             mod_dependencies=mod_dependencies_from_dict(data),
-            plugin_dependencies=[Dependency.from_dict(item) for item in json_array(data.get("plugin_dependencies", []))],
+            plugin_dependencies=dependencies_from_dict(data, "plugin_dependencies"),
         )
 
     def asdict(self) -> JsonObject:

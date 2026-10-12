@@ -1,21 +1,11 @@
-from pathlib import Path
+import socket
 
-from jsonschema import Draft202012Validator, FormatChecker
 import pytest
 
 from zero_infra_mod_registry.models.dll_metadata import PluginInfo, PluginTarget
 from zero_infra_mod_registry.models.mod_metadata import ModInfo
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json, json_object
-
-
-SCHEMAS = Path(__file__).resolve().parents[1] / "schemas"
-
-
-def validator(kind: str) -> Draft202012Validator:
-    schema = json_object(decode_json((SCHEMAS / f"{kind}.schema.json").read_text()))
-    instance = Draft202012Validator(schema, format_checker=FormatChecker())
-    instance.check_schema(schema)
-    return instance
+from zero_infra_mod_registry.metadata_validation import metadata_validator as validator
+from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue
 
 
 @pytest.mark.parametrize("kind", ["mod", "plugin"])
@@ -106,3 +96,16 @@ def test_schemas_keep_plugin_repository_names_strict(kind: str) -> None:
     data: JsonObject = {"name": "Example", "description": "Description", "authors": ["Author"],
                         "plugin_dependencies": [{"repo_url": "https://github.com/Test/Plugin.Core", "version": "1.0.0"}]}
     assert not validator(kind).is_valid(data)
+
+
+@pytest.mark.parametrize("kind", ["mod", "plugin"])
+def test_shared_schema_references_resolve_without_network(kind: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    def block_connection(address: tuple[str, int], timeout: float | None = None,
+                         source_address: tuple[str, int] | None = None, *, all_errors: bool = False) -> socket.socket:
+        raise AssertionError("Bundled schemas must resolve without network access")
+
+    monkeypatch.setattr(socket, "create_connection", block_connection)
+    data: JsonObject = {"name": "Example", "description": "Description", "authors": ["Author"],
+                        "mod_dependencies": [{"repo_url": "https://github.com/Test/Pak.Core", "version": "^1.0.0"}],
+                        "plugin_dependencies": [{"repo_url": "https://github.com/Test/Plugin", "version": ">=1.0.0,<2.0.0"}]}
+    validator(kind).validate(data)

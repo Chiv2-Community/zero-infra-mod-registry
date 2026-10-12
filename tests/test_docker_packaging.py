@@ -29,7 +29,7 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
     wheel, = (context / "dist").glob("*.whl")
     installed = tmp_path / "installed"
     with ZipFile(wheel) as archive:
-        for kind in ("mod", "plugin"):
+        for kind in ("common", "mod", "plugin"):
             assert f"zero_infra_mod_registry/schemas/{kind}.schema.json" in archive.namelist()
         archive.extractall(installed)
     # -I prevents cwd/PYTHONPATH from providing source-tree schemas. Dependencies
@@ -42,9 +42,7 @@ sys.path.insert(0, sys.argv[1])
 from zero_infra_mod_registry.metadata_validation import validate_metadata
 from zero_infra_mod_registry.models.dll_metadata import PluginInfo, PluginTarget
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
-from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
-from github import Github
-registry = FilesystemPackageRegistry(GithubModMetadataRetriever(Github()), 'registry', 'package_db', 'dll_db')
+registry = FilesystemPackageRegistry(registry_path='registry', package_db_path='package_db', dll_db_path='dll_db')
 for target in ('server', 'client', 'shared'):
     data = {'name': 'Plugin', 'description': 'Description', 'authors': ['Author'], 'target': target}
     path = Path('plugin.json')
@@ -54,6 +52,11 @@ for target in ('server', 'client', 'shared'):
 path = Path('mod.json')
 path.write_text(json.dumps({'name': 'Pak', 'description': 'Description', 'authors': ['Author']}))
 validate_metadata(path, 'mod', registry)
+from zero_infra_mod_registry.metadata_validation import metadata_validator
+for kind in ('mod', 'plugin'):
+    metadata_validator(kind).validate({'name': 'Example', 'description': 'Description', 'authors': ['Author'],
+        'mod_dependencies': [{'repo_url': 'https://github.com/Test/Pak.Core', 'version': '^1.0.0'}],
+        'plugin_dependencies': [{'repo_url': 'https://github.com/Test/Plugin', 'version': '>=1.0.0,<2.0.0'}]})
 """
     validation = subprocess.run([sys.executable, "-I", "-c", script, str(installed)],
                                 cwd=tmp_path, capture_output=True, text=True)

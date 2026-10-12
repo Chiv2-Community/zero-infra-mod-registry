@@ -13,7 +13,7 @@ import requests
 
 from zero_infra_mod_registry.main import main
 from zero_infra_mod_registry.models import DllRelease, Repo
-from zero_infra_mod_registry.models.dll_metadata import Plugin, PluginInfo, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import Plugin, PluginInfo, validate_dll_entries, validate_dll_releases
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
 from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
@@ -51,6 +51,28 @@ def test_metadata_and_duplicate_validation() -> None:
     duplicate: JsonObject = {**ENTRY, "organization": "TEST", "name": "PLUGIN"}
     with pytest.raises(ValueError, match="Duplicate"):
         validate_dll_entries([ENTRY, duplicate])
+
+
+def test_typed_release_validation_does_not_reconstruct_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    def serialize(self: DllRelease) -> JsonObject:
+        raise AssertionError("Domain validation must not serialize models")
+
+    monkeypatch.setattr(DllRelease, "asdict", serialize)
+    releases = [DLL]
+    validate_dll_releases(releases)
+    assert releases[0] is DLL
+    with pytest.raises(ValueError, match="Duplicate"):
+        validate_dll_releases([DLL, replace(DLL, organization="TEST")])
+
+
+def test_registry_loading_validates_without_json_round_trip(registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+
+    def serialize(self: DllRelease) -> JsonObject:
+        raise AssertionError("Registry loading must not serialize parsed models")
+
+    monkeypatch.setattr(DllRelease, "asdict", serialize)
+    assert registry._load_dll_index() == [DLL]
 
 
 @pytest.mark.parametrize("field,value", [

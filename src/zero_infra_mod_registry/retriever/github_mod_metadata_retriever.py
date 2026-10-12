@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import traceback
 import hashlib
+from dataclasses import replace
 from urllib.parse import urlparse
 from os import environ
 from typing import List, Optional, Tuple, cast, override
@@ -17,6 +18,7 @@ from semver import Version
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
+from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
 from zero_infra_mod_registry.utils.json_types import JsonObject, decode_json, json_array, json_object
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
@@ -104,8 +106,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         info = PluginInfo.from_dict(self._fetch_release_json(repo, release, "plugin.json"))
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
-        return PluginInfo(info.name, info.description, info.authors, info.plugin_dependencies,
-                          info.icon_url, info.image_urls, info.mod_dependencies, repo.github_url(), info.target)
+        return replace(info, repo_url=repo.github_url())
 
     @override
     def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:
@@ -382,24 +383,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         errors = []
         for dependency in dependencies:
             try:
-                input_version_range = dependency.version
-                if input_version_range.startswith("v"):
-                    input_version_range = input_version_range[1:]
-                
-                # Handle caret notation like "^1.0.0" - transform to semver format
-                if input_version_range.startswith("^"):
-                    input_version_range = ">=" + input_version_range[1:]
-                
-                # Handle comma-separated version ranges like ">=1.0.0,<2.0.0"
-                # Transform to semver format by checking each range separately
-                if "," in input_version_range:
-                    parts = input_version_range.split(",")
-                    for part in parts:
-                        test_version = Version.parse("1.0.0")
-                        test_version.match(part.strip())
-                else:
-                    test_version = Version.parse("1.0.0")
-                    test_version.match(input_version_range)
+                parse_version_requirement(dependency.version)
             except ValueError as e:
                 dependency_name = "/".join(dependency.repo_url.split("/")[-2:])
                 errors.append(

@@ -11,7 +11,8 @@ from typing import Callable, List, Optional, Tuple, override
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, dependency_matches, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_entries, validate_dll_releases
+from zero_infra_mod_registry.utils.version_requirements import dependency_matches
 from zero_infra_mod_registry.utils.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
@@ -37,7 +38,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def __init__(
         self,
-        mod_retriever: ModMetadataRetriever,
+        mod_retriever: ModMetadataRetriever | None = None,
         registry_path: str = os.environ.get("REGISTRY_PATH", "./registry"),
         package_db_path: str = os.environ.get("PACKAGE_DB_PATH", "./package_db"),
         dll_db_path: str = os.environ.get("DLL_DB_PATH", "./dll_db"),
@@ -60,11 +61,11 @@ class FilesystemPackageRegistry(PackageRegistry):
         self.redirects_path = os.path.join(package_db_path, "redirects.txt")
 
         # Create package_db_path directory if it doesn't exist
-        if not os.path.exists(self.package_db_path):
+        if mod_retriever is not None and not os.path.exists(self.package_db_path):
             os.makedirs(self.package_db_path, exist_ok=True)
 
         # Create packages directory if it doesn't exist
-        if not os.path.exists(self.packages_dir):
+        if mod_retriever is not None and not os.path.exists(self.packages_dir):
             os.makedirs(self.packages_dir, exist_ok=True)
 
         # Setup JSON encoder
@@ -74,6 +75,11 @@ class FilesystemPackageRegistry(PackageRegistry):
 
         # Load redirect manager
         self.redirect_manager = SimpleRedirectManager.from_file(self.redirects_path)
+
+    def _require_retriever(self) -> ModMetadataRetriever:
+        if self.mod_retriever is None:
+            raise ValueError("This registry has no release retriever; only local validation is available")
+        return self.mod_retriever
 
     def _load_dll_index(self) -> List[DllRelease]:
         entries: List[DllRelease] = []
@@ -101,7 +107,9 @@ class FilesystemPackageRegistry(PackageRegistry):
                 if entry.info is None and old is None:
                     raise ValueError("Plugin package release is missing metadata")
                 merged[entry.key] = entry
-        return validate_dll_entries([entry.asdict() for entry in merged.values()])
+        releases = list(merged.values())
+        validate_dll_releases(releases)
+        return releases
 
     def validate_dll_db(self, verify_downloads: bool = False) -> bool:
         try:
@@ -109,7 +117,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             self._validate_plugin_mod_dependencies(entries)
             if verify_downloads:
                 for entry in entries:
-                    actual = self.mod_retriever.measure_dll(entry.download_url)
+                    actual = self._require_retriever().measure_dll(entry.download_url)
                     if actual != (entry.sha256, entry.size):
                         raise ValueError(f"DLL content mismatch: {entry.organization}/{entry.name}:{entry.version}")
             return True
@@ -120,13 +128,13 @@ class FilesystemPackageRegistry(PackageRegistry):
     def add_dll_release(self, repo: Repo, release_tag: str, dry_run: bool = False, dll_file: str | None = None) -> bool:
         try:
             entries = self._load_dll_index()
-            entry = self.mod_retriever.fetch_dll_release(repo, release_tag, dll_file)
+            entry = self._require_retriever().fetch_dll_release(repo, release_tag, dll_file)
             entry.validate()
             if entry.info is None:
                 raise ValueError("New DLL releases require plugin.json metadata")
             if entry.key in {existing.key for existing in entries}:
                 raise ValueError("Duplicate DLL release")
-            validate_dll_entries([release.asdict() for release in entries + [entry]])
+            validate_dll_releases(entries + [entry])
             self._validate_plugin_mod_dependencies(entries + [entry])
             if dry_run:
                 return True
@@ -383,7 +391,8 @@ class FilesystemPackageRegistry(PackageRegistry):
             The number of repositories successfully initialized
         """
         logging.info(f"Initializing {len(repos)} repos...")
-        mods = [self.mod_retriever.fetch_repo_metadata(repo) for repo in repos]
+        retriever = self._require_retriever()
+        mods = [retriever.fetch_repo_metadata(repo) for repo in repos]
         filtered_mods = [mod for mod in mods if mod is not None]
 
         if len(filtered_mods) != len(repos):
@@ -598,7 +607,8 @@ class FilesystemPackageRegistry(PackageRegistry):
             return False  # Return 0 for no action taken
 
         logging.info(f"Adding release {release_tag} to repo {repo}...")
-        release = self.mod_retriever.fetch_release_metadata(mod, release_tag)
+        retriever = self._require_retriever()
+        release = retriever.fetch_release_metadata(mod, release_tag)
 
         if release is None:
             logging.error(
@@ -657,7 +667,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         logging.info("")
         logging.info("=======================================================")
 
-        updated_mod = self.mod_retriever.update_mod_with_release(mod, release)
+        updated_mod = retriever.update_mod_with_release(mod, release)
 
         if not self.validate_package_db([updated_mod]):
             return False

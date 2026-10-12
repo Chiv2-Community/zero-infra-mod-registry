@@ -8,20 +8,10 @@ import re
 from typing import List, Tuple
 from urllib.parse import urlparse
 from semver import Version
-from zero_infra_mod_registry.models.mod_metadata import Dependency
+from zero_infra_mod_registry.models.mod_metadata import Dependency, dependencies_from_dict
+from zero_infra_mod_registry.utils.version_requirements import dependency_matches as dependency_matches, parse_version_requirement
 
 from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, optional_string, string_array
-
-
-def dependency_matches(version: str, requirement: str) -> bool:
-    candidate = Version.parse(version)
-    requirement = requirement.removeprefix("v")
-    if requirement.startswith("^"):
-        base = Version.parse(requirement[1:])
-        upper = Version(base.major + 1, 0, 0) if base.major else (
-            Version(0, base.minor + 1, 0) if base.minor else Version(0, 0, base.patch + 1))
-        return base <= candidate < upper
-    return all([candidate.match(part.strip()) for part in requirement.split(",")])
 
 
 class PluginTarget(str, Enum):
@@ -64,7 +54,7 @@ class PluginInfo:
             if key in repos:
                 raise ValueError("Duplicate plugin dependency")
             repos.add(key)
-            dependency_matches("1.0.0", dependency.version)
+            parse_version_requirement(dependency.version)
 
     @staticmethod
     def from_dict(value: JsonValue) -> PluginInfo:
@@ -75,9 +65,9 @@ class PluginInfo:
         if "$schema" in data:
             json_string(data["$schema"])
         info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
-                          [Dependency.from_dict(item) for item in json_array(data.get("plugin_dependencies", []))],
+                          dependencies_from_dict(data, "plugin_dependencies"),
                           optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
-                          [Dependency.from_dict(item) for item in json_array(data.get("mod_dependencies", []))],
+                          dependencies_from_dict(data, "mod_dependencies"),
                           optional_string(data.get("repo_url")),
                           PluginTarget(json_string(data.get("target", "shared"))))
         info.validate()
@@ -202,10 +192,14 @@ class Plugin:
 
     def asdict(self) -> JsonObject:
         releases = self.sorted_releases()
-        info = next((release.info for release in releases if release.info is not None), None)
+        info = self.latest_info()
+        return {"latest_release_info": info.asdict(), "releases": [release.package_dict() for release in releases]}
+
+    def latest_info(self) -> PluginInfo:
+        info = next((release.info for release in self.sorted_releases() if release.info is not None), None)
         if info is None:
             raise ValueError("Plugin package has no metadata")
-        return {"latest_release_info": info.asdict(), "releases": [release.package_dict() for release in releases]}
+        return info
 
     @staticmethod
     def from_dict(org: str, name: str, value: JsonValue) -> Plugin:
@@ -215,13 +209,20 @@ class Plugin:
         latest = PluginInfo.from_dict(data["latest_release_info"])
         releases = [DllRelease.from_package_dict(org, name, item) for item in json_array(data["releases"])]
         plugin = Plugin(releases)
-        if not releases or latest.asdict() != plugin.asdict()["latest_release_info"]:
+        if not releases or latest != plugin.latest_info():
             raise ValueError("Plugin latest-release metadata mismatch")
         return plugin
 
 
 def validate_dll_entries(value: JsonValue) -> List[DllRelease]:
     releases = [DllRelease.from_dict(entry) for entry in json_array(value)]
+    validate_dll_releases(releases)
+    return releases
+
+
+def validate_dll_releases(releases: List[DllRelease]) -> None:
+    for release in releases:
+        release.validate()
     keys = [release.key for release in releases]
     if len(set(keys)) != len(keys):
         raise ValueError("Duplicate DLL release")
@@ -235,4 +236,3 @@ def validate_dll_entries(value: JsonValue) -> List[DllRelease]:
             if not any(candidate.key[0] == org.lower() and candidate.key[1] == name.lower() and dependency_matches(candidate.version, dependency.version)
                        for candidate in releases):
                 raise ValueError(f"Unregistered plugin dependency: {dependency.repo_url} {dependency.version}")
-    return releases

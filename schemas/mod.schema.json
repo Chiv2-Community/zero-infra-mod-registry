@@ -6,37 +6,15 @@
   "required": ["name", "description", "authors"],
   "properties": {
     "$schema": {"type": "string", "format": "uri"},
-    "repo_url": {"$ref": "#/$defs/repository", "description": "Optional in mod.json; the registry supplies the source repository URL."},
+    "repo_url": {"$ref": "common.schema.json#/$defs/pakRepository", "description": "Optional in mod.json; the registry supplies the source repository URL."},
     "name": {"type": "string"},
     "description": {"type": "string"},
     "authors": {"type": "array", "items": {"type": "string"}},
     "icon_url": {"type": ["string", "null"], "description": "Optional icon URL."},
     "image_urls": {"type": "array", "items": {"type": "string"}, "default": [], "description": "Optional screenshot URLs."},
-    "mod_dependencies": {"$ref": "#/$defs/dependencies", "default": [], "description": "Required pak mods, validated against package_db."},
-    "plugin_dependencies": {"$ref": "#/$defs/pluginDependencies", "default": [], "description": "Required DLL plugins, validated against dll_db. The launcher requires explicit enablement and Unchained launch."},
-    "dependencies": {"$ref": "#/$defs/dependencies", "deprecated": true, "description": "Legacy spelling of mod_dependencies. Both lists are combined on read, deduplicating repository/version pairs. Use mod_dependencies in new metadata."}
+    "mod_dependencies": {"$ref": "common.schema.json#/$defs/dependencies", "default": [], "description": "Required pak mods, validated against package_db."},
+    "plugin_dependencies": {"$ref": "common.schema.json#/$defs/pluginDependencies", "default": [], "description": "Required DLL plugins, validated against dll_db. The launcher requires explicit enablement and Unchained launch."},
+    "dependencies": {"$ref": "common.schema.json#/$defs/dependencies", "deprecated": true, "description": "Legacy spelling of mod_dependencies. Both lists are combined on read, deduplicating repository/version pairs. Use mod_dependencies in new metadata."}
   },
-  "additionalProperties": true,
-  "$defs": {
-    "repository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/(?!\\.{1,2}$)[A-Za-z0-9_.-]+$"},
-    "pluginRepository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$"},
-    "pluginDependencies": {"allOf": [{"$ref": "#/$defs/dependencies"}, {"items": {"properties": {"repo_url": {"$ref": "#/$defs/pluginRepository"}}}}]},
-    "dependencies": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["repo_url", "version"],
-        "properties": {
-          "repo_url": {"$ref": "#/$defs/repository"},
-          "version": {
-            "type": "string",
-            "not": {"pattern": "^v?\\^.*,"},
-            "pattern": "^(?:v?\\^|v?(?:>=|<=|==|!=|>|<)?)[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?(?:,\\s*(?:>=|<=|==|!=|>|<)?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)*$",
-            "description": "Semantic version, caret range, or comma-separated comparisons. Registry validation also parses SemVer and checks matching registered releases. Caret ranges cannot be combined with comparisons.",
-            "examples": ["1.0.0", ">=1.0.0,<2.0.0", "^1.0.0"]
-          }
-        }
-      }
-    }
-  }
+  "additionalProperties": true
 }
