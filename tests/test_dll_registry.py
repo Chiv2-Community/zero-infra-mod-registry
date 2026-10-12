@@ -121,6 +121,29 @@ def test_plugin_package_tracks_release_notes_and_latest_metadata(registry: Files
     assert registry.validate_dll_db(verify_downloads=True)
 
 
+def test_plugin_serialization_sorts_once_and_preserves_latest_info_selection(monkeypatch: pytest.MonkeyPatch) -> None:
+    first_info = replace(INFO, name="First tied release")
+    first = replace(DLL, version="2.0.0", tag="v2.0.0", release_date=datetime(2024, 1, 1), info=first_info)
+    second = replace(DLL, version="3.0.0", tag="v3.0.0", release_date=first.release_date, info=replace(INFO, name="Second tied release"))
+    legacy = replace(DLL, version="4.0.0", tag="v4.0.0", release_date=datetime(2025, 1, 1), info=None)
+    undated = replace(DLL, version="0.9.0", tag="v0.9.0", release_date=None)
+    plugin = Plugin([DLL, first, second, undated, legacy])
+    original = Plugin.sorted_releases
+    calls = 0
+
+    def sorted_releases(self: Plugin) -> list[DllRelease]:
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(Plugin, "sorted_releases", sorted_releases)
+    data = plugin.asdict()
+    assert calls == 1
+    assert data == {"latest_release_info": first_info.asdict(),
+                    "releases": [release.package_dict() for release in [legacy, first, second, DLL, undated]]}
+    assert plugin.latest_info() == first_info
+
+
 def test_legacy_releases_are_preserved_when_adding_plugin_package(registry: FilesystemPackageRegistry, retriever: FakeRetriever) -> None:
     legacy = replace(DLL, info=None, tag=None, release_date=None, release_notes_markdown=None, dll_file_name=None)
     path = Path(registry.dll_index_path)

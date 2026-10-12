@@ -192,11 +192,15 @@ class Plugin:
 
     def asdict(self) -> JsonObject:
         releases = self.sorted_releases()
-        info = self.latest_info()
+        info = self._latest_info(releases)
         return {"latest_release_info": info.asdict(), "releases": [release.package_dict() for release in releases]}
 
     def latest_info(self) -> PluginInfo:
-        info = next((release.info for release in self.sorted_releases() if release.info is not None), None)
+        return self._latest_info(self.sorted_releases())
+
+    @staticmethod
+    def _latest_info(releases: List[DllRelease]) -> PluginInfo:
+        info = next((release.info for release in releases if release.info is not None), None)
         if info is None:
             raise ValueError("Plugin package has no metadata")
         return info
