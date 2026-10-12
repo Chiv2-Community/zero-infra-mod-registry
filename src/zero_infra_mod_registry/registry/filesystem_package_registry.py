@@ -177,6 +177,15 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def _validate_plugin_mod_dependencies(self, entries: List[DllRelease]) -> None:
         dependencies = [dependency for entry in entries if entry.info is not None for dependency in entry.info.mod_dependencies]
+        self.validate_metadata_dependencies(dependencies, [])
+
+    def validate_metadata_dependencies(self, mod_dependencies: List[Dependency], plugin_dependencies: List[Dependency]) -> None:
+        """Validate release metadata dependencies against this published database."""
+        plugins = self._load_dll_index() if plugin_dependencies else []
+        for dependency in plugin_dependencies:
+            if not self._has_plugin_dependency(plugins, dependency):
+                raise ValueError(f"Unregistered plugin dependency: {dependency.repo_url} {dependency.version}")
+        dependencies = mod_dependencies
         if not dependencies:
             return
         mods: List[Mod] = []

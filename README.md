@@ -289,45 +289,43 @@ Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 See the [LICENSE](LICENSE) file for details.
 
-## Mod and Plugin Dependencies
+## Metadata Schemas
 
-Both `mod.json` and `plugin.json` support two optional dependency fields:
+Use the JSON schemas to check your release metadata:
 
-- `mod_dependencies`: A list of required pak mods, checked against `package_db`.
-- `plugin_dependencies`: A list of required DLL plugins, checked against `dll_db`.
+- [mod.json schema](schemas/mod.schema.json) for pak mods.
+- [plugin.json schema](schemas/plugin.schema.json) for DLL plugins.
 
-Each list defaults to empty when omitted. Add these fields to your metadata file as needed:
+The schemas document required fields, optional media, mod and plugin dependencies, version requirements and legacy compatibility. You can reference a schema using the metadata file's `$schema` property or your editor's JSON schema settings.
 
-```json
-{
-  "mod_dependencies": [
-    {"repo_url": "https://github.com/MyOrg/MyMod", "version": "1.0.0"}
-  ],
-  "plugin_dependencies": [
-    {"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}
-  ]
-}
+Schema validation checks the file's structure. The registry also checks version requirements and matching releases in the corresponding database, so register dependencies first.
+
+### Validate Metadata in GitHub Actions
+
+Add a workflow to your mod or plugin repository to validate release metadata and dependencies:
+
+```yaml
+name: Validate metadata
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Chiv2-Community/zero-infra-mod-registry/actions/validate-metadata@prepare-v1
 ```
 
-Each entry requires `repo_url`, the dependency's GitHub repository URL, and `version`, the required version or range. Exact versions (`1.0.0`), comma-separated comparisons (`>=1.0.0,<2.0.0`) and caret ranges (`^1.0.0`) are supported. Dependencies must have a matching release in the corresponding database, so register them first.
+The action checks `mod.json` and `plugin.json` at the repository root when present, and fails if neither file exists. It validates their schemas and checks dependency versions against the published C2ModRegistry databases without downloading release assets.
 
-Existing mods' `dependencies` are treated as `mod_dependencies`, including in previously published records. If a mod declares both fields, their entries are combined and duplicate repository/version pairs are removed. New metadata should use the explicit field names. The legacy `dependencies` field is not supported in `plugin.json`.
+Use `mod_file` and `plugin_file` for metadata stored elsewhere. Set `registry_repository` and `registry_ref` to validate against another registry or revision. For a private registry, provide `registry_token` with read access to that repository. Pin the action to a commit SHA for reproducible workflows.
 
 ## DLL Registry
 
 You can use the registry to manage native DLL plugins separately from pak mods. To register a DLL release:
 
-1. Add `plugin.json` to the repository root before tagging the release:
-   ```json
-   {
-     "name": "My Plugin",
-     "description": "What the plugin does",
-     "authors": ["Author Name"],
-     "mod_dependencies": [],
-     "plugin_dependencies": []
-   }
-   ```
-   The registry reads this file from the release tag, not the default branch. Missing or invalid metadata prevents registration, including in dry-run mode. You can also include `icon_url` and `image_urls` for an icon and a list of screenshots. These URLs must use HTTPS without embedded credentials.
+1. Add `plugin.json` to the repository root using the [plugin metadata schema](schemas/plugin.schema.json), then tag the release. The registry reads this file from the release tag, not the default branch. Missing or invalid metadata prevents registration, including in dry-run mode.
 2. Register a GitHub release containing one DLL asset:
    ```sh
    uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
@@ -341,7 +339,7 @@ You can use the registry to manage native DLL plugins separately from pak mods. 
 
 ### Database Files
 
-Plugin files are stored in `dll_db/packages/<organization>/<repository>.json` and listed in `dll_db/plugin_list_index.txt`. Like mod files, they contain `latest_release_info` and `releases`. Each release includes its tag, release date, GitHub release notes Markdown, DLL filename, download URL, SHA-256 (`hash`), byte size and plugin `info`, but no pak manifest. The organization and repository name come from the package path, and the version comes from the release tag. DLL downloads do not use the pak scanner.
+Plugin files are stored in `dll_db/packages/<organization>/<repository>.json` and listed in `dll_db/plugin_list_index.txt`. They use a mod-style package layout with release metadata and GitHub release notes, but no pak manifest. DLL downloads do not use the pak scanner.
 
 Previously approved entries in `dll_db/index.json` remain readable and unchanged. When you register another version, those releases are also included in the plugin file. Conflicting legacy and per-plugin records fail validation.
 

@@ -57,8 +57,10 @@ class PluginInfo:
     def from_dict(value: JsonValue) -> PluginInfo:
         data = json_object(value)
         required = {"name", "description", "authors"}
-        if not required <= set(data) or not set(data) <= required | {"mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url"}:
+        if not required <= set(data) or not set(data) <= required | {"$schema", "mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url"}:
             raise ValueError("Invalid plugin.json fields")
+        if "$schema" in data:
+            json_string(data["$schema"])
         info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
                           [Dependency.from_dict(item) for item in json_array(data.get("plugin_dependencies", []))],
                           optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
