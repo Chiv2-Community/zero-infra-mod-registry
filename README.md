@@ -52,13 +52,16 @@ falling back to another file. Without it, exactly one DLL asset is required.
 Only the chosen asset is downloaded and hashed; each plugin/version still has
 one immutable registry entry.
 
-DLL metadata is written to `dll_db/index.json`, independently of `package_db` and
-the mod index. Each entry records organization, name, semantic version, download
-URL, SHA-256 and byte size. Organization/name come from the repository; version
-comes from the release tag. The GitHub retriever streams the DLL to calculate its
-hash and size without invoking the pak scanner. The release's `info` field stores
-its plugin name, description, authors and dependencies. Previously approved DLL
-entries without `info` remain readable; all new registrations require `plugin.json`.
+DLL metadata is written to `dll_db/packages/<organization>/<repository>.json`,
+with repositories listed in `dll_db/plugin_list_index.txt`, independently of
+`package_db`. Like mods, each plugin file contains `latest_release_info` and
+`releases`. Releases record the tag, release date, GitHub release notes Markdown,
+DLL filename, download URL, SHA-256 (`hash`), byte size and plugin `info`; there is
+no pak manifest. Organization/name come from the package path; version comes
+from the release tag. The retriever streams the DLL without invoking the pak scanner.
+Previously approved entries in `dll_db/index.json` remain readable and unchanged.
+Registering another version includes those releases in the plugin file; conflicting
+legacy and per-plugin records fail validation. All new registrations require `plugin.json`.
 
 `validate` checks both databases; `--verify-dll-downloads` also checks downloaded
 DLL content against registered metadata. `--dll-db-path` (or `DLL_DB_PATH`) changes

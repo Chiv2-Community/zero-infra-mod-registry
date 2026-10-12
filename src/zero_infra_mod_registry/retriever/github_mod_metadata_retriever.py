@@ -72,7 +72,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
         info = self.fetch_plugin_info(repo, release.tag_name)
         digest, size = self.measure_dll(url)
-        entry = DllRelease(repo.org, repo.name, version, url, digest, size, info)
+        entry = DllRelease(repo.org, repo.name, version, url, digest, size, info,
+                           release.tag_name, release.published_at, release.body, assets[0].name)
         entry.validate()
         if entry.size != assets[0].size:
             raise ValueError("Downloaded DLL size differs from release asset")
@@ -86,7 +87,11 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         response.raise_for_status()
         if urlparse(response.url).scheme != "https":
             raise ValueError("Insecure plugin.json redirect")
-        return PluginInfo.from_dict(decode_json(response.text))
+        info = PluginInfo.from_dict(decode_json(response.text))
+        if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
+            raise ValueError("plugin.json repository mismatch")
+        return PluginInfo(info.name, info.description, info.authors, info.plugin_dependencies,
+                          info.icon_url, info.image_urls, info.mod_dependencies, repo.github_url())
 
     @override
     def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:

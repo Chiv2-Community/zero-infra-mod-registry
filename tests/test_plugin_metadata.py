@@ -26,7 +26,7 @@ def test_plugin_json_is_fetched_from_exact_release_tag(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(requests, "get", get)
     result = GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), "v1.0.0-RC2")
-    assert result == INFO
+    assert result == replace(INFO, repo_url="https://github.com/Test/Plugin")
     assert calls == ["https://raw.githubusercontent.com/Test/Plugin/v1.0.0-RC2/plugin.json"]
 
 

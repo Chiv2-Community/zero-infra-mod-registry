@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime
 from typing import Callable, List, Optional, Tuple, override
@@ -10,7 +11,7 @@ from typing import Callable, List, Optional, Tuple, override
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, dependency_matches, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, dependency_matches, validate_dll_entries
 from zero_infra_mod_registry.utils.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
@@ -52,6 +53,8 @@ class FilesystemPackageRegistry(PackageRegistry):
         self.registry_path = registry_path
         self.package_db_path = package_db_path
         self.dll_index_path = os.path.join(dll_db_path, "index.json")
+        self.plugin_list_index_path = os.path.join(dll_db_path, "plugin_list_index.txt")
+        self.plugin_packages_dir = os.path.join(dll_db_path, "packages")
         self.packages_dir = os.path.join(package_db_path, "packages")
         self.mod_list_index_path = os.path.join(package_db_path, "mod_list_index.txt")
         self.redirects_path = os.path.join(package_db_path, "redirects.txt")
@@ -73,10 +76,32 @@ class FilesystemPackageRegistry(PackageRegistry):
         self.redirect_manager = SimpleRedirectManager.from_file(self.redirects_path)
 
     def _load_dll_index(self) -> List[DllRelease]:
-        if not os.path.exists(self.dll_index_path):
-            return []
-        with open(self.dll_index_path) as file:
-            return validate_dll_entries(decode_json(file.read()))
+        entries: List[DllRelease] = []
+        if os.path.exists(self.dll_index_path):
+            with open(self.dll_index_path) as file:
+                entries = validate_dll_entries(decode_json(file.read()))
+        legacy = {entry.key: entry for entry in entries}
+        merged = legacy.copy()
+        seen: set[str] = set()
+        for package in self._load_package_list(self.plugin_list_index_path):
+            if not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", package) or package.lower() in seen:
+                raise ValueError("Invalid or duplicate plugin index entry")
+            seen.add(package.lower())
+            org, name = package.split("/")
+            with open(os.path.join(self.plugin_packages_dir, org, name + ".json")) as file:
+                plugin = Plugin.from_dict(org, name, decode_json(file.read()))
+            package_keys: set[Tuple[str, str, str]] = set()
+            for entry in plugin.releases:
+                if entry.key in package_keys:
+                    raise ValueError("Duplicate DLL release")
+                package_keys.add(entry.key)
+                old = legacy.get(entry.key)
+                if old is not None and old.package_dict() != entry.package_dict():
+                    raise ValueError("Plugin package conflicts with legacy DLL entry")
+                if entry.info is None and old is None:
+                    raise ValueError("Plugin package release is missing metadata")
+                merged[entry.key] = entry
+        return validate_dll_entries([entry.asdict() for entry in merged.values()])
 
     def validate_dll_db(self, verify_downloads: bool = False) -> bool:
         try:
@@ -105,23 +130,50 @@ class FilesystemPackageRegistry(PackageRegistry):
             self._validate_plugin_mod_dependencies(entries + [entry])
             if dry_run:
                 return True
-            directory = os.path.dirname(self.dll_index_path)
-            os.makedirs(directory, exist_ok=True)
-            fd, temp = tempfile.mkstemp(dir=directory, prefix=".dll-index-")
-            try:
-                os.fchmod(fd, 0o644)
-                with os.fdopen(fd, "w") as file:
-                    index: JsonValue = [release.asdict() for release in entries + [entry]]
-                    json.dump(index, file, indent=2)
-                    file.write("\n")
-                os.replace(temp, self.dll_index_path)
-            finally:
-                if os.path.exists(temp):
-                    os.unlink(temp)
+            packages = self._load_package_list(self.plugin_list_index_path)
+            package = next((value for value in packages if value.lower() == str(repo).lower()), str(repo))
+            org, name = package.split("/")
+            releases = [entry] + [old for old in entries if old.organization.lower() == repo.org.lower() and old.name.lower() == repo.name.lower()]
+            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): json.dumps(Plugin(releases).asdict(), indent=2) + "\n",
+                     self.plugin_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n"}
+            self._write_plugin_files(paths)
             return True
         except Exception as error:
             logging.error(f"Failed to register DLL release: {error}")
             return False
+
+    @staticmethod
+    def _write_text_atomic(path: str, text: str) -> None:
+        directory = os.path.dirname(path)
+        os.makedirs(directory, exist_ok=True)
+        fd, temp = tempfile.mkstemp(dir=directory, prefix=".plugin-metadata-")
+        try:
+            os.fchmod(fd, 0o644)
+            with os.fdopen(fd, "w") as file:
+                file.write(text)
+            os.replace(temp, path)
+        finally:
+            if os.path.exists(temp):
+                os.unlink(temp)
+
+    def _write_plugin_files(self, files: dict[str, str]) -> None:
+        originals: dict[str, str | None] = {}
+        for path in files:
+            if os.path.exists(path):
+                with open(path) as file:
+                    originals[path] = file.read()
+            else:
+                originals[path] = None
+        try:
+            for path, text in files.items():
+                self._write_text_atomic(path, text)
+        except Exception:
+            for path, original in originals.items():
+                if original is not None:
+                    self._write_text_atomic(path, original)
+                elif os.path.exists(path):
+                    os.unlink(path)
+            raise
 
     def _validate_plugin_mod_dependencies(self, entries: List[DllRelease]) -> None:
         dependencies = [dependency for entry in entries if entry.info is not None for dependency in entry.info.mod_dependencies]

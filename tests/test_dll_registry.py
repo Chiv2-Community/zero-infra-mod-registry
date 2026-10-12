@@ -1,4 +1,6 @@
 import hashlib
+from dataclasses import replace
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -10,7 +12,7 @@ import requests
 
 from zero_infra_mod_registry.main import main
 from zero_infra_mod_registry.models import DllRelease, Repo
-from zero_infra_mod_registry.models.dll_metadata import PluginInfo, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import Plugin, PluginInfo, validate_dll_entries
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
 from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
@@ -18,7 +20,8 @@ from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, respo
 
 BINARY = b"registered DLL bytes"
 INFO = PluginInfo("Plugin", "A native plugin", ["Author"], [])
-DLL = DllRelease("Test", "Plugin", "1.0.0", "https://example.com/Plugin.dll", hashlib.sha256(BINARY).hexdigest(), len(BINARY), INFO)
+DLL = DllRelease("Test", "Plugin", "1.0.0", "https://example.com/Plugin.dll", hashlib.sha256(BINARY).hexdigest(), len(BINARY), INFO,
+                 "v1.0.0", datetime(2023, 1, 1), "Release notes", "Plugin.dll")
 ENTRY: JsonObject = DLL.asdict()
 
 
@@ -69,11 +72,85 @@ def test_invalid_index(entries: JsonValue) -> None:
 
 def test_registration_separate_from_pak_index_and_immutable(registry: FilesystemPackageRegistry) -> None:
     assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert decode_json(Path(registry.dll_index_path).read_text()) == [ENTRY]
-    assert stat.S_IMODE(os.stat(registry.dll_index_path).st_mode) == 0o644
+    path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"
+    assert decode_json(path.read_text()) == Plugin([DLL]).asdict()
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o644
+    assert Path(registry.plugin_list_index_path).read_text() == "Test/Plugin\n"
+    assert not Path(registry.dll_index_path).exists()
     assert not Path(registry.mod_list_index_path).exists()
     assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert decode_json(Path(registry.dll_index_path).read_text()) == [ENTRY]
+    assert decode_json(path.read_text()) == Plugin([DLL]).asdict()
+
+
+def test_plugin_package_tracks_release_notes_and_latest_metadata(registry: FilesystemPackageRegistry, retriever: FakeRetriever) -> None:
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    older = replace(DLL, version="0.9.0", tag="v0.9.0", release_date=datetime(2022, 1, 1),
+                    release_notes_markdown="# Older notes", info=replace(INFO, name="Older name"))
+    retriever.dll = older
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v0.9.0")
+    path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"
+    data = decode_json(path.read_text())
+    assert data == Plugin([DLL, older]).asdict()
+    assert Plugin.from_dict("Test", "Plugin", data).releases == [DLL, older]
+    assert "manifest" not in DLL.package_dict()
+    assert DLL.package_dict()["release_notes_markdown"] == "Release notes"
+    assert Path(registry.plugin_list_index_path).read_text() == "Test/Plugin\n"
+    assert registry.validate_dll_db(verify_downloads=True)
+
+
+def test_legacy_releases_are_preserved_when_adding_plugin_package(registry: FilesystemPackageRegistry, retriever: FakeRetriever) -> None:
+    legacy = replace(DLL, info=None, tag=None, release_date=None, release_notes_markdown=None, dll_file_name=None)
+    path = Path(registry.dll_index_path)
+    path.parent.mkdir(parents=True)
+    entries: JsonValue = [legacy.asdict()]
+    path.write_text(json.dumps(entries))
+    original = path.read_bytes()
+    retriever.dll = replace(DLL, version="2.0.0", tag="v2.0.0")
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v2.0.0")
+    assert registry.validate_dll_db(verify_downloads=True)
+    assert path.read_bytes() == original
+    assert not registry.add_dll_release(Repo("Test", "Plugin"), "v2.0.0")
+    package = Plugin.from_dict("Test", "Plugin", decode_json((Path(registry.plugin_packages_dir) / "Test/Plugin.json").read_text()))
+    assert len(package.releases) == 2
+    assert package.releases[1].info is None
+
+
+def test_conflicting_legacy_and_package_releases_fail_validation(registry: FilesystemPackageRegistry) -> None:
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    entries: JsonValue = [replace(DLL, sha256="0" * 64).asdict()]
+    Path(registry.dll_index_path).write_text(json.dumps(entries))
+    assert not registry.validate_dll_db()
+
+
+@pytest.mark.parametrize("index", ["../escape\n", "Test/Plugin\nTEST/PLUGIN\n"])
+def test_invalid_plugin_package_index_is_rejected(registry: FilesystemPackageRegistry, index: str) -> None:
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    Path(registry.plugin_list_index_path).write_text(index)
+    assert not registry.validate_dll_db()
+
+
+def test_plugin_package_rejects_inconsistent_latest_metadata() -> None:
+    data = Plugin([DLL]).asdict()
+    data["latest_release_info"] = replace(INFO, name="Incorrect").asdict()
+    with pytest.raises(ValueError, match="latest-release"):
+        Plugin.from_dict("Test", "Plugin", data)
+
+
+def test_plugin_package_write_failure_rolls_back(registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
+    write = registry._write_text_atomic
+    failed = False
+
+    def fail_index_once(path: str, text: str) -> None:
+        nonlocal failed
+        if path == registry.plugin_list_index_path and not failed:
+            failed = True
+            raise OSError("Index write failed")
+        write(path, text)
+
+    monkeypatch.setattr(registry, "_write_text_atomic", fail_index_once)
+    assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    assert not (Path(registry.plugin_packages_dir) / "Test/Plugin.json").exists()
+    assert not Path(registry.plugin_list_index_path).exists()
 
 
 def test_dry_run_and_failed_retrieval_do_not_write(registry: FilesystemPackageRegistry, retriever: FakeRetriever) -> None:
@@ -201,7 +278,7 @@ def test_cli_passes_dll_options_and_propagates_errors(tmp_path: Path, retriever:
     main()
     assert retriever.dll_calls == [(Repo("Test", "Plugin"), "v1.0.0", "Plugin.dll")]
     assert locations == [str(tmp_path / "dlls")]
-    assert decode_json((tmp_path / "dlls/index.json").read_text()) == [ENTRY]
+    assert decode_json((tmp_path / "dlls/packages/Test/Plugin.json").read_text()) == Plugin([DLL]).asdict()
     retriever.measurement = "0" * 64, DLL.size
     monkeypatch.setattr(sys, "argv", common + ["validate", "--verify-dll-downloads"])
     with pytest.raises(SystemExit) as error:

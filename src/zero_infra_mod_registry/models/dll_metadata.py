@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 import re
 from typing import List, Tuple
 from urllib.parse import urlparse
@@ -31,6 +32,7 @@ class PluginInfo:
     icon_url: str | None = None
     image_urls: List[str] = field(default_factory=list)
     mod_dependencies: List[Dependency] = field(default_factory=list)
+    repo_url: str | None = None
 
     def validate(self) -> None:
         if not self.name.strip() or not self.description.strip() or not self.authors or any(not author.strip() for author in self.authors):
@@ -55,12 +57,13 @@ class PluginInfo:
     def from_dict(value: JsonValue) -> PluginInfo:
         data = json_object(value)
         required = {"name", "description", "authors"}
-        if not required <= set(data) or not set(data) <= required | {"mod_dependencies", "plugin_dependencies", "icon_url", "image_urls"}:
+        if not required <= set(data) or not set(data) <= required | {"mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url"}:
             raise ValueError("Invalid plugin.json fields")
         info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
                           [Dependency.from_dict(item) for item in json_array(data.get("plugin_dependencies", []))],
                           optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
-                          [Dependency.from_dict(item) for item in json_array(data.get("mod_dependencies", []))])
+                          [Dependency.from_dict(item) for item in json_array(data.get("mod_dependencies", []))],
+                          optional_string(data.get("repo_url")))
         info.validate()
         return info
 
@@ -73,6 +76,8 @@ class PluginInfo:
             data["icon_url"] = self.icon_url
         if self.image_urls:
             data["image_urls"] = [url for url in self.image_urls]
+        if self.repo_url is not None:
+            data["repo_url"] = self.repo_url
         return data
 
 
@@ -85,6 +90,10 @@ class DllRelease:
     sha256: str
     size: int
     info: PluginInfo | None = None
+    tag: str | None = None
+    release_date: datetime | None = None
+    release_notes_markdown: str | None = None
+    dll_file_name: str | None = None
 
     def validate(self) -> None:
         if self.info is not None:
@@ -93,6 +102,10 @@ class DllRelease:
             if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
                 raise ValueError("Invalid DLL organization/name")
         Version.parse(self.version)
+        if self.tag is not None and str(Version.parse(self.tag.removeprefix("v"))) != self.version:
+            raise ValueError("DLL tag/version mismatch")
+        if self.info is not None and self.info.repo_url is not None and self.info.repo_url.lower() != f"https://github.com/{self.organization}/{self.name}".lower():
+            raise ValueError("DLL metadata repository mismatch")
         url = urlparse(self.download_url)
         if url.scheme != "https" or not url.hostname or url.username or url.password or not url.path.lower().endswith(".dll") or url.fragment:
             raise ValueError("DLL source must be an HTTPS DLL URL")
@@ -100,6 +113,8 @@ class DllRelease:
             raise ValueError("Invalid DLL SHA-256")
         if isinstance(self.size, bool) or self.size <= 0:
             raise ValueError("Invalid DLL size")
+        if self.dll_file_name is not None and (not self.dll_file_name.lower().endswith(".dll") or "/" in self.dll_file_name or "\\" in self.dll_file_name):
+            raise ValueError("Invalid DLL asset filename")
 
     @property
     def key(self) -> Tuple[str, str, str]:
@@ -109,12 +124,16 @@ class DllRelease:
     def from_dict(value: JsonValue) -> DllRelease:
         data = json_object(value)
         fields = {"organization", "name", "version", "download_url", "sha256", "size"}
-        if set(data) not in (fields, fields | {"info"}):
+        optional = {"info", "tag", "release_date", "release_notes_markdown", "dll_file_name"}
+        if not fields <= set(data) or not set(data) <= fields | optional:
             raise ValueError("Invalid DLL metadata fields")
         release = DllRelease(json_string(data["organization"]), json_string(data["name"]),
                              json_string(data["version"]), json_string(data["download_url"]),
                               json_string(data["sha256"]), json_int(data["size"]),
-                              PluginInfo.from_dict(data["info"]) if "info" in data else None)
+                              PluginInfo.from_dict(data["info"]) if "info" in data else None,
+                              optional_string(data.get("tag")),
+                              datetime.fromisoformat(json_string(data["release_date"])) if data.get("release_date") is not None else None,
+                              optional_string(data.get("release_notes_markdown")), optional_string(data.get("dll_file_name")))
         release.validate()
         return release
 
@@ -123,7 +142,65 @@ class DllRelease:
                             "download_url": self.download_url, "sha256": self.sha256, "size": self.size}
         if self.info is not None:
             data["info"] = self.info.asdict()
+        if self.tag is not None:
+            data["tag"] = self.tag
+        if self.release_date is not None:
+            data["release_date"] = self.release_date.isoformat()
+        if self.release_notes_markdown is not None:
+            data["release_notes_markdown"] = self.release_notes_markdown
+        if self.dll_file_name is not None:
+            data["dll_file_name"] = self.dll_file_name
         return data
+
+    def package_dict(self) -> JsonObject:
+        return {"tag": self.tag or self.version, "hash": self.sha256, "dll_file_name": self.dll_file_name,
+                "download_url": self.download_url, "size": self.size,
+                "release_date": self.release_date.isoformat() if self.release_date is not None else None,
+                "info": self.info.asdict() if self.info is not None else None,
+                "release_notes_markdown": self.release_notes_markdown}
+
+    @staticmethod
+    def from_package_dict(org: str, name: str, value: JsonValue) -> DllRelease:
+        data = json_object(value)
+        if set(data) != {"tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"}:
+            raise ValueError("Invalid plugin release fields")
+        tag = json_string(data["tag"])
+        release = DllRelease(org, name, str(Version.parse(tag.removeprefix("v"))), json_string(data["download_url"]),
+                             json_string(data["hash"]), json_int(data["size"]),
+                             PluginInfo.from_dict(data["info"]) if data["info"] is not None else None,
+                             tag, datetime.fromisoformat(json_string(data["release_date"])) if data["release_date"] is not None else None,
+                             optional_string(data["release_notes_markdown"]), optional_string(data["dll_file_name"]))
+        release.validate()
+        return release
+
+
+@dataclass(frozen=True)
+class Plugin:
+    releases: List[DllRelease]
+
+    def sorted_releases(self) -> List[DllRelease]:
+        def date(release: DllRelease) -> float:
+            return release.release_date.timestamp() if release.release_date is not None else float("-inf")
+        return sorted(self.releases, key=date, reverse=True)
+
+    def asdict(self) -> JsonObject:
+        releases = self.sorted_releases()
+        info = next((release.info for release in releases if release.info is not None), None)
+        if info is None:
+            raise ValueError("Plugin package has no metadata")
+        return {"latest_release_info": info.asdict(), "releases": [release.package_dict() for release in releases]}
+
+    @staticmethod
+    def from_dict(org: str, name: str, value: JsonValue) -> Plugin:
+        data = json_object(value)
+        if set(data) != {"latest_release_info", "releases"}:
+            raise ValueError("Invalid plugin package fields")
+        latest = PluginInfo.from_dict(data["latest_release_info"])
+        releases = [DllRelease.from_package_dict(org, name, item) for item in json_array(data["releases"])]
+        plugin = Plugin(releases)
+        if not releases or latest.asdict() != plugin.asdict()["latest_release_info"]:
+            raise ValueError("Plugin latest-release metadata mismatch")
+        return plugin
 
 
 def validate_dll_entries(value: JsonValue) -> List[DllRelease]:
