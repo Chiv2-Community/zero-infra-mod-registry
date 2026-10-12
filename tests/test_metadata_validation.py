@@ -9,7 +9,7 @@ import pytest
 
 from zero_infra_mod_registry.metadata_validation import main, validate_metadata
 from zero_infra_mod_registry.models import Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo, PluginTarget
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.utils.json_types import JsonObject
 from tests.fakes import FakeRetriever, mod_fixture
@@ -80,7 +80,8 @@ def test_metadata_cli_rejects_no_files(tmp_path: Path, monkeypatch: pytest.Monke
     assert failure.value.code == 2
 
 
-def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPackageRegistry) -> None:
+@pytest.mark.parametrize("target", list(PluginTarget))
+def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPackageRegistry, target: PluginTarget) -> None:
     root = Path(__file__).resolve().parents[1]
     action_directory = root / "actions/validate-metadata"
     action = (action_directory / "action.yml").read_text()
@@ -88,11 +89,17 @@ def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPa
     published = tmp_path / ".metadata-validation-registry"
     shutil.copytree(tmp_path / "package_db", published / "package_db")
     shutil.copytree(tmp_path / "dll_db", published / "dll_db")
-    (tmp_path / "plugin.json").write_text(json.dumps(metadata()))
+    data = metadata()
+    data["target"] = target.value
+    (tmp_path / "plugin.json").write_text(json.dumps(data))
     env = {**os.environ, "GITHUB_WORKSPACE": str(tmp_path), "GITHUB_ACTION_PATH": str(action_directory),
            "MOD_FILE": "", "PLUGIN_FILE": ""}
     valid = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert valid.returncode == 0, valid.stderr
+    data["target"] = "both"
+    (tmp_path / "plugin.json").write_text(json.dumps(data))
+    invalid = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert invalid.returncode != 0
     (tmp_path / "plugin.json").unlink()
     missing = subprocess.run(["bash", "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert missing.returncode != 0

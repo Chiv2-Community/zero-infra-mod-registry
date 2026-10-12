@@ -91,7 +91,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return PluginInfo(info.name, info.description, info.authors, info.plugin_dependencies,
-                          info.icon_url, info.image_urls, info.mod_dependencies, repo.github_url())
+                          info.icon_url, info.image_urls, info.mod_dependencies, repo.github_url(), info.target)
 
     @override
     def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:

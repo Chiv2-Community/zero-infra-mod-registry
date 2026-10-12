@@ -1,6 +1,10 @@
 from dataclasses import replace
 from pathlib import Path
+import json
 
+import pytest
+
+from zero_infra_mod_registry.metadata_validation import validate_metadata
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.models.mod_metadata import Dependency, Mod, ModInfo, Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
@@ -45,3 +49,28 @@ def test_dependency_types_are_checked_against_their_own_registry(tmp_path: Path)
 
     missing = replace(info, plugin_dependencies=[Dependency("https://github.com/Test/Pak", "1.0.0")])
     assert not registry.validate_package_db([Mod(missing, [replace(pak.releases[0], info=missing)])])
+
+
+@pytest.mark.parametrize("kind", ["mod", "plugin"])
+def test_dotted_pak_dependencies_validate_and_register(tmp_path: Path, kind: str) -> None:
+    fake = FakeRetriever()
+    registry = FilesystemPackageRegistry(fake, str(tmp_path / "registry"), str(tmp_path / "package_db"), str(tmp_path / "dll_db"))
+    fake.mods["Test/Pak.Core"] = mod_fixture("Pak.Core")
+    assert registry.add_package([Repo("Test", "Pak.Core")]) == 1
+    data: JsonObject = {"name": "Consumer", "description": "Description", "authors": ["Author"],
+                        "mod_dependencies": [{"repo_url": "https://github.com/Test/Pak.Core", "version": "1.0.0"}]}
+    path = tmp_path / f"{kind}.json"
+    path.write_text(json.dumps(data))
+    validate_metadata(path, kind, registry)
+    if kind == "plugin":
+        fake.dll = DllRelease("Test", "Consumer", "1.0.0", "https://example.com/Consumer.dll", "a" * 64, 1,
+                              PluginInfo.from_dict(data))
+        assert registry.add_dll_release(Repo("Test", "Consumer"), "v1.0.0")
+        assert registry.validate_dll_db()
+    else:
+        pak = mod_fixture("Consumer")
+        data["repo_url"] = "https://github.com/Test/Consumer"
+        info = ModInfo.from_dict(data)
+        fake.mods["Test/Consumer"] = Mod(info, [replace(pak.releases[0], info=info)])
+        assert registry.add_package([Repo("Test", "Consumer")]) == 1
+    assert registry.validate_package_db([])

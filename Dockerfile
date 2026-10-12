@@ -15,6 +15,7 @@ COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY src/ ./src/
 COPY bin/ ./bin/
+COPY schemas/ ./schemas/
 
 # Build wheel package
 RUN uv build --wheel

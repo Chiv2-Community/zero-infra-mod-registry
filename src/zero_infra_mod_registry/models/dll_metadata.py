@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 import re
 from typing import List, Tuple
 from urllib.parse import urlparse
@@ -23,6 +24,14 @@ def dependency_matches(version: str, requirement: str) -> bool:
     return all([candidate.match(part.strip()) for part in requirement.split(",")])
 
 
+class PluginTarget(str, Enum):
+    """Execution side declared by plugin.json, not a pak manifest."""
+
+    SERVER = "server"
+    CLIENT = "client"
+    SHARED = "shared"
+
+
 @dataclass(frozen=True)
 class PluginInfo:
     name: str
@@ -33,8 +42,11 @@ class PluginInfo:
     image_urls: List[str] = field(default_factory=list)
     mod_dependencies: List[Dependency] = field(default_factory=list)
     repo_url: str | None = None
+    target: PluginTarget = PluginTarget.SHARED
 
     def validate(self) -> None:
+        if not isinstance(self.target, PluginTarget):
+            raise ValueError("Plugin target must be server, client or shared")
         if not self.name.strip() or not self.description.strip() or not self.authors or any(not author.strip() for author in self.authors):
             raise ValueError("plugin.json requires a name, description and authors")
         urls = self.image_urls + ([self.icon_url] if self.icon_url is not None else [])
@@ -45,7 +57,8 @@ class PluginInfo:
         repos: set[Tuple[str, str]] = set()
         for kind, dependency in [("mod", dependency) for dependency in self.mod_dependencies] + [("plugin", dependency) for dependency in self.plugin_dependencies]:
             url = urlparse(dependency.repo_url)
-            if url.scheme != "https" or url.netloc != "github.com" or not re.fullmatch(r"/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", url.path) or url.query or url.fragment:
+            repository = r"(?!\.{1,2}$)[A-Za-z0-9_.-]+" if kind == "mod" else r"[A-Za-z0-9_-]+"
+            if url.scheme != "https" or url.netloc != "github.com" or not re.fullmatch(r"/[A-Za-z0-9_-]+/" + repository, url.path) or url.query or url.fragment:
                 raise ValueError("Plugin dependencies must reference a GitHub repository")
             key = kind, dependency.repo_url.lower()
             if key in repos:
@@ -57,7 +70,7 @@ class PluginInfo:
     def from_dict(value: JsonValue) -> PluginInfo:
         data = json_object(value)
         required = {"name", "description", "authors"}
-        if not required <= set(data) or not set(data) <= required | {"$schema", "mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url"}:
+        if not required <= set(data) or not set(data) <= required | {"$schema", "mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url", "target"}:
             raise ValueError("Invalid plugin.json fields")
         if "$schema" in data:
             json_string(data["$schema"])
@@ -65,7 +78,8 @@ class PluginInfo:
                           [Dependency.from_dict(item) for item in json_array(data.get("plugin_dependencies", []))],
                           optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
                           [Dependency.from_dict(item) for item in json_array(data.get("mod_dependencies", []))],
-                          optional_string(data.get("repo_url")))
+                          optional_string(data.get("repo_url")),
+                          PluginTarget(json_string(data.get("target", "shared"))))
         info.validate()
         return info
 
@@ -73,7 +87,8 @@ class PluginInfo:
         data: JsonObject = {"name": self.name, "description": self.description,
                             "authors": [author for author in self.authors],
                             "plugin_dependencies": [dep.asdict() for dep in self.plugin_dependencies],
-                            "mod_dependencies": [dep.asdict() for dep in self.mod_dependencies]}
+                            "mod_dependencies": [dep.asdict() for dep in self.mod_dependencies],
+                            "target": self.target.value}
         if self.icon_url is not None:
             data["icon_url"] = self.icon_url
         if self.image_urls:
