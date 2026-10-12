@@ -33,8 +33,8 @@ def test_dependency_types_are_checked_against_their_own_registry(tmp_path: Path)
     assert registry.add_dll_release(Repo("Test", "Native"), "v1.0.0")
     pak = mod_fixture("Pak")
     info = replace(pak.latest_release_info, plugin_dependencies=[Dependency("https://github.com/Test/Native", ">=1.0.0,<2.0.0")])
-    fake.mods["Test/Pak"] = Mod(info, [replace(pak.releases[0], info=info)])
-    assert registry.add_package([Repo("Test", "Pak")]) == 1
+    fake.releases[("Test/Pak", "v1.0.0")] = replace(pak.releases[0], info=info)
+    assert registry.add_package_release(Repo("Test", "Pak"), "v1.0.0")
     both = PluginInfo("Both", "Description", ["Author"], [Dependency("https://github.com/Test/Native", "1.0.0")],
                       mod_dependencies=[Dependency("https://github.com/Test/Pak", "1.0.0")])
     fake.dll = replace(native, name="Both", info=both)
@@ -55,8 +55,8 @@ def test_dependency_types_are_checked_against_their_own_registry(tmp_path: Path)
 def test_dotted_pak_dependencies_validate_and_register(tmp_path: Path, kind: str) -> None:
     fake = FakeRetriever()
     registry = FilesystemPackageRegistry(fake, str(tmp_path / "registry"), str(tmp_path / "package_db"), str(tmp_path / "dll_db"))
-    fake.mods["Test/Pak.Core"] = mod_fixture("Pak.Core")
-    assert registry.add_package([Repo("Test", "Pak.Core")]) == 1
+    fake.releases[("Test/Pak.Core", "v1.0.0")] = mod_fixture("Pak.Core").releases[0]
+    assert registry.add_package_release(Repo("Test", "Pak.Core"), "v1.0.0")
     data: JsonObject = {"name": "Consumer", "description": "Description", "authors": ["Author"],
                         "mod_dependencies": [{"repo_url": "https://github.com/Test/Pak.Core", "version": "1.0.0"}]}
     path = tmp_path / f"{kind}.json"
@@ -71,6 +71,6 @@ def test_dotted_pak_dependencies_validate_and_register(tmp_path: Path, kind: str
         pak = mod_fixture("Consumer")
         data["repo_url"] = "https://github.com/Test/Consumer"
         info = ModInfo.from_dict(data)
-        fake.mods["Test/Consumer"] = Mod(info, [replace(pak.releases[0], info=info)])
-        assert registry.add_package([Repo("Test", "Consumer")]) == 1
+        fake.releases[("Test/Consumer", "v1.0.0")] = replace(pak.releases[0], info=info)
+        assert registry.add_package_release(Repo("Test", "Consumer"), "v1.0.0")
     assert registry.validate_package_db([])

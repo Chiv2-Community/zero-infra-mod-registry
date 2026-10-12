@@ -302,14 +302,6 @@ def test_no_assets_does_not_request_filename_selection() -> None:
         retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0")
 
 
-@pytest.mark.parametrize("contents", ["", "Existing", "Existing\n"])
-def test_index_append_preserves_newlines(tmp_path: Path, contents: str) -> None:
-    path = tmp_path / "index.txt"
-    path.write_text(contents)
-    FilesystemPackageRegistry._append_index_entry(str(path), "New")
-    assert path.read_text().splitlines() == (["Existing"] if contents else []) + ["New"]
-
-
 def test_cli_passes_dll_options_and_propagates_errors(tmp_path: Path, retriever: FakeRetriever, monkeypatch: pytest.MonkeyPatch) -> None:
     locations: list[str] = []
 

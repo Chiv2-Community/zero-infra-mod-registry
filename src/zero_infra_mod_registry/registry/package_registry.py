@@ -13,27 +13,6 @@ class PackageRegistry(ABC):
     """
 
     @abstractmethod
-    def process_registry_updates(self, dry_run: bool = False) -> bool:
-        """
-        Process updates to the registry.
-
-        Args:
-            dry_run: If True, don't make any actual changes
-        """
-        pass
-    
-    @abstractmethod
-    def add_package(self, repos: List[Repo], dry_run: bool = False) -> int:
-        """
-        Initialize repositories by fetching their metadata and storing it.
-
-        Args:
-            repos: List of repositories to initialize
-            dry_run: If True, don't make any actual changes
-        """
-        pass
-
-    @abstractmethod
     def add_package_release(self, repo: Repo, release_tag: str, dry_run: bool = False) -> bool:
         """
         Add a release to a repository.

@@ -76,20 +76,8 @@ def main() -> None:
     dll_subparser.add_argument("--dll-file", default=os.environ.get("DLL_FILE") or None,
                                help="Exact DLL asset filename (required when a release has multiple DLLs).")
 
-    init_subparser = subparsers.add_parser(
-        "add-package", help="Add to package list and initialize a mod repo."
-    )
-    init_subparser.add_argument(
-        "repo_url", type=str, help="The repo url to add or remove."
-    )
-
-    process_registry_updates_subparser = subparsers.add_parser(
-        "process-registry-updates",
-        help="Find any new package list entries and load all of their releases.",
-    )
-
     add_subparser = subparsers.add_parser(
-        "add-package-release", help="Add a release to a mod repo."
+        "add-package-release", help="Register one pak release, creating the package if needed."
     )
     add_subparser.add_argument(
         "repo_url", type=str, help="The repo url to add or remove."
@@ -124,29 +112,16 @@ def main() -> None:
         dll_db_path=args.dll_db_path,
     )
 
-    if args.command == "add-dll-release":
+    if args.command in {"add-package-release", "add-dll-release"}:
         url = urlparse(args.repo_url)
         parts = url.path.strip("/").split("/")
         if url.scheme != "https" or url.netloc != "github.com" or len(parts) != 2:
-            argparser.error("DLL repo_url must be https://github.com/Organization/Repository")
-        if not registry.add_dll_release(Repo(parts[0], parts[1]), args.release_tag, args.dry_run, args.dll_file):
-            exit(1)
-    elif args.command == "process-registry-updates":
-        if not registry.process_registry_updates(args.dry_run):
-            exit(1)
-    elif args.command == "add-package":
-        [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        num_added = registry.add_package([Repo(org, repoName)], args.dry_run)
-        if num_added == 0:
-            exit(1)
-    elif args.command == "add-package-release":
-        [org, repoName] = args.repo_url.strip().split("/")[-2:]
-        result = registry.add_package_release(
-            Repo(org, repoName),
-            args.release_tag.strip(),
-            args.dry_run,
-        )
-
+            argparser.error("repo_url must be https://github.com/Organization/Repository")
+        repo = Repo(parts[0], parts[1])
+        if args.command == "add-dll-release":
+            result = registry.add_dll_release(repo, args.release_tag, args.dry_run, args.dll_file)
+        else:
+            result = registry.add_package_release(repo, args.release_tag, args.dry_run)
         if not result:
             exit(1)
     elif args.command == "remove":

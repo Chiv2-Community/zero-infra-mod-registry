@@ -46,7 +46,12 @@ def test_find_pak_file(retriever: GithubModMetadataRetriever) -> None:
     assert isinstance(error, str) and "Multiple pak files found" in error
 
 
-def test_fetch_all_releases(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_draft_pak_release_is_rejected_before_downloading(retriever: GithubModMetadataRetriever) -> None:
+    with pytest.raises(ValueError, match="Draft pak releases"):
+        retriever.process_release(Repo("Test", "Plugin"), FakeRelease(draft=True).as_release())
+
+
+def test_first_registration_fetches_only_requested_release(monkeypatch: pytest.MonkeyPatch) -> None:
     client = FakeGithub([FakeRelease(tag_name="v1.0.0"), FakeRelease(tag_name="v1.1.0")])
     retriever = GithubModMetadataRetriever(client.as_github())
     calls: list[str] = []
@@ -58,9 +63,10 @@ def test_fetch_all_releases(monkeypatch: pytest.MonkeyPatch) -> None:
         return mod_fixture(tag=release.tag_name, date=date).releases[0]
 
     monkeypatch.setattr(retriever, "process_release", process)
-    releases = retriever.fetch_all_releases(Repo("Test", "Plugin"))
-    assert [release.tag for release in releases] == ["v1.1.0", "v1.0.0"]
-    assert calls == ["v1.0.0", "v1.1.0"]
+    release = retriever.fetch_release_metadata(Repo("Test", "Plugin"), "v1.0.0")
+    assert release is not None and release.tag == "v1.0.0"
+    assert calls == ["v1.0.0"]
+    assert client.repository.tag_calls == ["v1.0.0"]
     assert client.repo_calls == ["Test/Plugin"]
 
 
@@ -83,6 +89,6 @@ def test_fetch_release_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
         return expected
 
     monkeypatch.setattr(retriever, "process_release", process)
-    assert retriever.fetch_release_metadata(mod_fixture(), "v1.2.0") == expected
+    assert retriever.fetch_release_metadata(Repo("Test", "Plugin"), "v1.2.0") == expected
     assert client.repo_calls == ["Test/Plugin"]
     assert client.repository.tag_calls == ["v1.2.0"]
