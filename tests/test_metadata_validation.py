@@ -19,8 +19,8 @@ from tests.fakes import FakeRetriever, mod_fixture
 def registry(tmp_path: Path) -> FilesystemPackageRegistry:
     fake = FakeRetriever()
     instance = FilesystemPackageRegistry(fake, str(tmp_path / "registry"), str(tmp_path / "package_db"), str(tmp_path / "dll_db"))
-    fake.mods["Test/Pak"] = mod_fixture("Pak")
-    assert instance.add_package([Repo("Test", "Pak")]) == 1
+    fake.releases[("Test/Pak", "v1.0.0")] = mod_fixture("Pak").releases[0]
+    assert instance.add_package_release(Repo("Test", "Pak"), "v1.0.0")
     fake.dll = DllRelease("Test", "Native", "1.0.0", "https://example.com/Native.dll", "a" * 64, 1,
                           PluginInfo("Native", "Description", ["Author"], []))
     assert instance.add_dll_release(Repo("Test", "Native"), "v1.0.0")
@@ -99,8 +99,7 @@ def test_local_registry_construction_does_not_create_directories(tmp_path: Path)
     assert not (tmp_path / "package_db").exists()
     assert not (tmp_path / "registry").exists()
     assert not local.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    with pytest.raises(ValueError, match="no release retriever"):
-        local.add_package([Repo("Test", "Pak")])
+    assert not local.add_package_release(Repo("Test", "Pak"), "v1.0.0")
     assert not (tmp_path / "package_db").exists()
 
 

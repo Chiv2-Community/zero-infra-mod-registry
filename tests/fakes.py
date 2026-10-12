@@ -28,24 +28,17 @@ def mod_fixture(name: str = "Plugin", tag: str = "v1.0.0", date: datetime = date
 
 class FakeRetriever(ModMetadataRetriever):
     def __init__(self) -> None:
-        self.mods: dict[str, Mod] = {}
-        self.releases: dict[str, Release] = {}
+        self.releases: dict[tuple[str, str], Release] = {}
         self.dll: DllRelease | None = None
         self.dll_error: Exception | None = None
         self.dll_calls: list[tuple[Repo, str, str | None]] = []
         self.measurement = ("0" * 64, 1)
-        self.repo_calls: list[Repo] = []
-        self.release_calls: list[tuple[Mod, str]] = []
+        self.release_calls: list[tuple[Repo, str]] = []
 
     @override
-    def fetch_repo_metadata(self, repo: Repo) -> Mod | None:
-        self.repo_calls.append(repo)
-        return self.mods.get(str(repo))
-
-    @override
-    def fetch_release_metadata(self, mod: Mod, release_tag: str) -> Release | None:
-        self.release_calls.append((mod, release_tag))
-        return self.releases.get(release_tag)
+    def fetch_release_metadata(self, repo: Repo, release_tag: str) -> Release | None:
+        self.release_calls.append((repo, release_tag))
+        return self.releases.get((str(repo), release_tag))
 
     @override
     def update_mod_with_release(self, mod: Mod, release: Release) -> Mod:
@@ -117,10 +110,6 @@ class FakeRepository:
     def get_release(self, tag: str) -> GitRelease:
         self.tag_calls.append(tag)
         return next(release.as_release() for release in self.releases if release.tag_name == tag)
-
-    def get_releases(self) -> PaginatedList[GitRelease]:
-        pages = FakePages([release.as_release() for release in self.releases])
-        return cast(PaginatedList[GitRelease], pages)
 
 
 class FakeGithub:

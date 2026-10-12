@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from zero_infra_mod_registry.models import Mod, Release, Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease
@@ -19,25 +19,12 @@ class ModMetadataRetriever(ABC):
         raise NotImplementedError("This retriever does not support DLL downloads")
 
     @abstractmethod
-    def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:
-        """
-        Fetch metadata for all releases in a repository.
-
-        Args:
-            repo: Repository to fetch metadata for
-
-        Returns:
-            Mod object with metadata, or None if the repository has no valid releases
-        """
-        pass
-
-    @abstractmethod
-    def fetch_release_metadata(self, mod: Mod, release_tag: str) -> Optional[Release]:
+    def fetch_release_metadata(self, repo: Repo, release_tag: str) -> Optional[Release]:
         """
         Fetch metadata for a specific release.
 
         Args:
-            mod: Mod object with repository information
+            repo: Repository to fetch the release from
             release_tag: Tag of the release to fetch
 
         Returns:

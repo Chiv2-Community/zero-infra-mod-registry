@@ -55,25 +55,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         
-      # Example: Add a new package to the registry
-      - name: Initialize package repository
-        id: add-package
-        uses: yourusername/zero-infra-mod-registry@main
-        with:
-          command: add-package
-          repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Example: Process registry updates (syncing any missing releases)
-      - name: Process registry updates
-        id: process-updates
-        uses: yourusername/zero-infra-mod-registry@main
-        with:
-          command: process-registry-updates
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          registry_path: "./custom-registry"
-          package_db_path: "./custom-package-db"
-          
       # Example: Validate package registry
       - name: Validate registry
         id: validate-registry
@@ -96,17 +77,17 @@ jobs:
       - name: Display output logs
         if: always()
         run: |
-          echo "Process result: ${{ steps.process-updates.outputs.result }}"
-          echo "Process status: ${{ steps.process-updates.outputs.failed == 'true' && 'Failed' || 'Success' }}"
+          echo "Registration result: ${{ steps.add-release.outputs.result }}"
+          echo "Registration status: ${{ steps.add-release.outputs.failed == 'true' && 'Failed' || 'Success' }}"
 ```
 
 ### Action Inputs
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `command` | Command to execute (process-registry-updates, add-package, add-package-release, remove, validate) | Yes | |
-| `repo_url` | Repository URL (required for init, add, and remove commands) | For some commands | '' |
-| `release_tag` | Release tag (required for add command) | For add command | '' |
+| `command` | Command to execute (add-package-release, add-dll-release, remove, validate) | Yes | |
+| `repo_url` | Repository URL (required for registration and remove commands) | For some commands | '' |
+| `release_tag` | Exact release tag (required for both registration commands) | For registration commands | '' |
 | `dry_run` | Run in dry-run mode without making changes | No | 'false' |
 | `github_token` | GitHub token for API access | Yes | ${{ github.token }} |
 | `log_level` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | No | 'INFO' |
@@ -130,16 +111,6 @@ You can run the mod registry using Docker:
 # Build the Docker image
 docker build -t zero-infra-mod-registry .
 
-# Initialize a repository
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add-package https://github.com/Username/ExampleMod
-
-# Process registry updates with custom paths
-docker run -v $(pwd):/app \
-  -e GITHUB_TOKEN=your_token \
-  -e REGISTRY_PATH=./custom-registry \
-  -e PACKAGE_DB_PATH=./custom-package-db \
-  zero-infra-mod-registry process-registry-updates
-
 # Add a release
 docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add-package-release https://github.com/Username/ExampleMod v1.0.0
 
@@ -150,7 +121,7 @@ docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry rem
 docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry validate
 
 # Run in dry-run mode
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token -e DRY_RUN=true zero-infra-mod-registry process-registry-updates
+docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token -e DRY_RUN=true zero-infra-mod-registry add-package-release https://github.com/Username/ExampleMod v1.0.0
 ```
 
 ### Docker Environment Variables
@@ -167,43 +138,9 @@ docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token -e DRY_RUN=true zero-infra-
 
 The tool provides several CLI commands to manage the mod registry:
 
-### Initialize a Mod Repository
-
-Add a new mod repository to the registry and package list:
-
-```
-uv run python -m zero_infra_mod_registry.main add-package <repo_url>
-```
-
-This command both fetches the repository metadata and adds it to the registry index in a single step.
-
-Example with custom paths:
-```
-uv run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  add-package https://github.com/Chiv2-Community/Chiv2Turbo
-```
-
-### Process Registry Updates
-
-Find new package list entries and load all of their releases:
-
-```
-uv run python -m zero_infra_mod_registry.main process-registry-updates
-```
-
-With custom paths:
-```
-uv run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  process-registry-updates
-```
-
 ### Add a Release
 
-Add a specific release tag to a mod repository:
+Register a specific pak release tag, whether this is the first release or an update:
 
 ```
 uv run python -m zero_infra_mod_registry.main add-package-release <repo_url> <release_tag>
@@ -216,6 +153,10 @@ uv run python -m zero_infra_mod_registry.main \
   --package-db-path ./custom-package-db \
   add-package-release https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
 ```
+
+Only the requested release is retrieved. Other releases are not imported, and existing versions cannot be overwritten. Register DLL plugins with `add-dll-release` instead.
+
+The CLI and Docker action stage local database changes; they do not approve or publish releases. Registry workflows must validate those changes and submit a pull request for approval for every release, including first releases and updates. C2ModRegistry's issue workflow provides this approval flow.
 
 ### Remove a Mod
 

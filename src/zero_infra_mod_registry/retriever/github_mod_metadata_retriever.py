@@ -109,42 +109,17 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         return replace(info, repo_url=repo.github_url())
 
     @override
-    def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:
-        """
-        Fetch metadata for all releases in a GitHub repository.
-
-        Args:
-            repo: Repository to fetch metadata for
-
-        Returns:
-            Mod object with metadata, or None if the repository has no valid releases
-        """
-        try:
-            releases = self.fetch_all_releases(repo)
-
-            if len(releases) == 0:
-                logging.warning(f"Repo {repo} has no valid releases.")
-                return None
-
-            return Mod(latest_release_info=releases[0].info, releases=releases)
-        except Exception as e:
-            logging.error(f"Failed to fetch metadata for repo {repo}: {e}")
-            return None
-
-    @override
-    def fetch_release_metadata(self, mod: Mod, release_tag: str) -> Optional[Release]:
+    def fetch_release_metadata(self, repo: Repo, release_tag: str) -> Optional[Release]:
         """
         Fetch metadata for a specific GitHub release.
 
         Args:
-            mod: Mod object with repository information
+            repo: Repository to fetch the release from
             release_tag: Tag of the release to fetch
 
         Returns:
             Release object with metadata, or None if the release is invalid
         """
-        (org, repoName) = mod.latest_release_info.repo_url.split("/")[-2:]
-        repo = Repo(org, repoName)
         try:
             repoString = str(repo)
 
@@ -181,44 +156,6 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         mod_releases.sort(key=lambda x: x.release_date, reverse=True)
         return Mod(latest_release_info=mod_releases[0].info, releases=mod_releases)
 
-    def fetch_all_releases(self, repo: Repo) -> List[Release]:
-        """
-        Fetch metadata for all releases in a GitHub repository.
-
-        Args:
-            repo: Repository to fetch all releases for
-
-        Returns:
-            List of Release objects with metadata
-        """
-        logging.info(f"Getting all releases for {repo}")
-        github_repo = self.github_client.get_repo(str(repo))
-        git_releases = github_repo.get_releases()
-
-        logging.info(f"Found {git_releases.totalCount} releases for {repo}")
-        results = []
-        has_error = False
-        for release in git_releases:
-            try:
-                logging.info(f"Processing release {release.tag_name} for {repo}")
-                results.append(self.process_release(repo, release))
-            except KeyError as e:
-                has_error = True
-                logging.error(
-                    f"Mod info {repo} {release.tag_name} missing required field: {e}"
-                )
-            except Exception as e:
-                has_error = True
-                logging.error(
-                    f"Failed to process release {repo} {release.tag_name}: {e}"
-                )
-                traceback.print_exc()
-
-        results.sort(key=lambda x: x.release_date, reverse=True)
-
-        logging.info(f"Successfully processed {len(results)} releases for {repo}")
-        return results
-
     def process_release(self, repo: Repo, release: GitRelease) -> Release:
         """
         Process a single GitHub release and return a Release object.
@@ -233,6 +170,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Raises:
             Exception: If the release fails validation
         """
+        if release.draft:
+            raise ValueError("Draft pak releases cannot be registered")
         response_json = self._fetch_release_json(repo, release, "mod.json")
         response_json["repo_url"] = repo.github_url()
         mod_info = ModInfo.from_dict(response_json)

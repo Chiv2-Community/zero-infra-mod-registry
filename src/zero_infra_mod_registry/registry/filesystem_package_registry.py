@@ -5,7 +5,6 @@ import logging
 import os
 import re
 import tempfile
-from datetime import datetime
 from typing import Callable, List, Optional, Tuple, override
 
 from semver import Version
@@ -32,8 +31,7 @@ class PackageManagerJsonEncoder:
 class FilesystemPackageRegistry(PackageRegistry):
     """
     A class that manages the filesystem-based package registry.
-    This handles operations like initializing repos, adding releases,
-    processing registry updates, and removing mods.
+    This handles registering individual releases and removing mods.
     """
 
     def __init__(
@@ -144,7 +142,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             releases = [entry] + [old for old in entries if old.organization.lower() == repo.org.lower() and old.name.lower() == repo.name.lower()]
             paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): json.dumps(Plugin(releases).asdict(), indent=2) + "\n",
                      self.plugin_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n"}
-            self._write_plugin_files(paths)
+            self._write_registry_files(paths)
             return True
         except Exception as error:
             logging.error(f"Failed to register DLL release: {error}")
@@ -164,7 +162,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             if os.path.exists(temp):
                 os.unlink(temp)
 
-    def _write_plugin_files(self, files: dict[str, str]) -> None:
+    def _write_registry_files(self, files: dict[str, str]) -> None:
         originals: dict[str, str | None] = {}
         for path in files:
             if os.path.exists(path):
@@ -215,16 +213,6 @@ class FilesystemPackageRegistry(PackageRegistry):
         except ValueError:
             return False
 
-    @staticmethod
-    def _append_index_entry(path: str, entry: str) -> None:
-        # Existing indexes may have an unterminated final line.
-        with open(path, "a+b") as file:
-            if file.tell() > 0:
-                file.seek(-1, os.SEEK_END)
-                if file.read(1) != b"\n":
-                    file.write(b"\n")
-            file.write((entry + "\n").encode("utf-8"))
-
     def _load_package_list(self, path: str) -> List[str]:
         """
         Load a package list from a file.
@@ -241,449 +229,52 @@ class FilesystemPackageRegistry(PackageRegistry):
         except FileNotFoundError:
             return []
 
-    def _get_all_text_lines_in_directory(self, directory: str) -> List[str]:
-        """
-        Gets all lines from all files, ignoring any empty lines or lines starting with #
-
-        Args:
-            directory: Directory to read files from
-
-        Returns:
-            List of text lines
-        """
-        all_lines: List[str] = []
-
-        # Make sure directory exists
-        if not os.path.exists(directory):
-            return all_lines
-
-        # Get all files in the directory
-        for filename in os.listdir(directory):
-            filepath = os.path.join(directory, filename)
-
-            # Ensure it's a file and not another directory or symbolic link
-            if os.path.isfile(filepath) and filepath.endswith(".txt"):
-                logging.info(f"Reading file: {filepath}")
-                with open(filepath, "r") as file:
-                    for line in file:
-                        line = line.strip()
-                        # Exclude lines that start with '#' or are empty
-                        if not line.startswith("#") and line != "":
-                            all_lines.append(line)
-
-        return all_lines
-
-    def _generate_package_list(self, directory: str) -> List[str]:
-        """
-        Generate a package list from a directory.
-
-        Args:
-            directory: Directory to read files from
-
-        Returns:
-            List of package names
-        """
-        return list(
-            map(repo_to_index_entry, self._get_all_text_lines_in_directory(directory))
-        )
-
-    @override
-    def process_registry_updates(self, dry_run: bool = False) -> bool:
-        """
-        Process updates to the registry by finding new package list entries
-        and loading all of their releases.
-
-        Args:
-            dry_run: If True, don't make any actual changes
-
-        Returns:
-            True if processing was successful, False otherwise
-        """
-        start_time = datetime.now()
-        redirects_dir = os.path.join(self.registry_path, "redirects")
-        redirect_lines = self._get_all_text_lines_in_directory(redirects_dir)
-        redirect_manager = SimpleRedirectManager.parse_redirects(redirect_lines)
-
-        existing_redirect_manager = SimpleRedirectManager.from_file(self.redirects_path)
-
-        logging.info(f"Loaded {len(redirect_manager.redirects)} new redirect entries.")
-        logging.info(
-            f"Found {len(existing_redirect_manager.redirects)} existing redirect entries."
-        )
-
-        # Write new redirects to file (if not dry run)
-        if not dry_run:
-            logging.info("Writing new redirects to file " + self.redirects_path)
-            with open(self.redirects_path, "w") as file:
-                file.write("\n".join(redirect_lines))
-
-            # Update the instance's redirect manager
-            self.redirect_manager = redirect_manager
-
-        logging.info("Loading package list entries...")
-        updated_index_entries = self._generate_package_list(self.registry_path)
-
-        previous_index_entries = self._load_package_list(self.mod_list_index_path)
-
-        new_entries = list(set(updated_index_entries) - set(previous_index_entries))
-        removed_entries = list(set(previous_index_entries) - set(updated_index_entries))
-        failed = False
-
-        if len(new_entries) > 0:
-            logging.info(
-                f"Adding {len(new_entries)} new packages to the package list..."
-            )
-            try:
-                split_entries = [entry.split("/") for entry in new_entries]
-                repo_entries = [Repo(entry[0], entry[1]) for entry in split_entries]
-                if self.add_package(repo_entries, dry_run) != len(repo_entries):
-                    failed = True
-            except Exception as e:
-                # If we fail to initialize a repo, remove it from the package list
-                logging.error(f"Failed to initialize repos: {e}\n")
-                failed = True
-
-        if len(removed_entries) > 0:
-            logging.info(
-                f"Removing {len(removed_entries)} packages from the package list..."
-            )
-            try:
-                split_entries = [entry.split("/") for entry in removed_entries]
-                repo_entries = [Repo(entry[0], entry[1]) for entry in split_entries]
-                self.remove_mods(repo_entries, dry_run)
-            except Exception as e:
-                # If we fail to remove a repo, add it back to the package list
-                logging.error(f"Failed to remove repos: {e}\n")
-                failed = True
-
-        if failed:
-            logging.error(f"Failures occurred while processing the package list.")
-            logging.error("The package list has not been updated.")
-            return False
-
-        if dry_run:
-            logging.warning("Dry run; not writing to package list.")
-            return True
-
-        # Write to mod_list_index_path
-        with open(self.mod_list_index_path, "w") as file:
-            file.write("\n".join(updated_index_entries))
-
-        logging.info("Package list built.")
-
-        finish_time = datetime.now()
-        seconds_elapsed = (finish_time - start_time).total_seconds()
-        logging.info(f"Processed all registry updates in {seconds_elapsed} seconds.")
-
-
-        return True
-
-    @override
-    def add_package(self, repos: List[Repo], dry_run: bool = False) -> int:
-        """
-        Initialize repositories by fetching their metadata and storing it, then add them to the registry index.
-
-        Args:
-            repos: List of repositories to initialize
-            dry_run: If True, don't make any actual changes
-
-        Returns:
-            The number of repositories successfully initialized
-        """
-        logging.info(f"Initializing {len(repos)} repos...")
-        retriever = self._require_retriever()
-        mods = [retriever.fetch_repo_metadata(repo) for repo in repos]
-        filtered_mods = [mod for mod in mods if mod is not None]
-
-        if len(filtered_mods) != len(repos):
-            logging.error("Failed to initialize some repos.")
-            failed_repos = [repo for repo, mod in zip(repos, mods) if mod is None]
-            logging.error(
-                f"Failed repos: {', '.join(str(repo) for repo in failed_repos)}"
-            )
-            return 0  # Return 0 for failure
-
-        if not self.validate_package_db(filtered_mods):
-            return 0
-
-        new_maps = []
-        new_blueprints = []
-        new_markers = []
-        new_assets = []
-        new_replacements = []
-
-        logging.info("=======================================================")
-        logging.info("")
-        logging.info("New packages summary")
-        logging.info("")
-
-        for mod in filtered_mods:
-            logging.debug(f"{mod.latest_release_info.name}:")
-            for release in mod.releases:
-                logging.debug(f"\t{release.tag}:")
-
-                if len(release.manifest.maps) > 0:
-                    logging.debug("\t\tMaps:")
-                    for map in release.manifest.maps:
-                        logging.debug(f"\t\t\t{map.path}")
-                        new_maps.append(map)
-
-                if len(release.manifest.markers) > 0:
-                    logging.debug("\t\tMarkers:")
-                    for marker in release.manifest.markers:
-                        logging.debug(f"\t\t\t{marker.path}")
-                        new_markers.append(marker)
-
-                if len(release.manifest.blueprints) > 0:
-                    logging.debug("\t\tBlueprints:")
-                    for blueprint in release.manifest.blueprints:
-                        logging.debug(f"\t\t\t{blueprint.path}")
-                        new_blueprints.append(blueprint)
-
-                if len(release.manifest.replacements) > 0:
-                    logging.debug("\t\tReplacements:")
-                    for replacement in release.manifest.replacements:
-                        logging.debug(f"\t\t\t{replacement.path}")
-                        new_replacements.append(replacement)
-
-                if len(release.manifest.arbitrary) > 0:
-                    logging.debug("\t\tAssets:")
-                    for asset in release.manifest.arbitrary:
-                        logging.debug(f"\t\t\t{asset.path}")
-                        new_assets.append(asset)
-
-                logging.debug("")
-
-            logging.debug("")
-
-        logging.debug("-------------------------------------------------------")
-        logging.debug("")
-        logging.info(f"New maps: {len(new_maps)}")
-        logging.info(f"New markers: {len(new_markers)}")
-        logging.info(f"New blueprints: {len(new_blueprints)}")
-        logging.info(f"New assets: {len(new_assets)}")
-        logging.info("")
-        logging.info(f"New Mods: {len(filtered_mods)}")
-        logging.info(f"New Releases: {sum([len(mod.releases) for mod in filtered_mods])}")
-        logging.info("")
-        logging.info("=======================================================")
-
-        if dry_run:
-            logging.warning("Dry run; not writing to package dir or registry.")
-            return len(filtered_mods)  # Return count of repos that would be initialized
-
-        # Create registry directory if it doesn't exist
-        if not os.path.exists(self.registry_path):
-            os.makedirs(self.registry_path, exist_ok=True)
-            logging.info(f"Created registry directory: {self.registry_path}")
-
-        # Process each mod
-        for mod in filtered_mods:
-            # Parse and log the URL components
-            url_parts = mod.latest_release_info.repo_url.split("/")
-            logging.debug(f"URL Parts: {url_parts}")
-
-            # Extract org and repo name
-            org = url_parts[-2]
-            repo_name = url_parts[-1]
-            # Handle trailing slash in URL
-            if repo_name == "":
-                repo_name = url_parts[-2]
-                org = url_parts[-3]
-
-            logging.debug(
-                f"Extracted org={org}, repoName={repo_name} from {mod.latest_release_info.repo_url}"
-            )
-
-            # Create org directory if it doesn't exist
-            org_dir = os.path.join(self.packages_dir, org)
-            if not os.path.exists(org_dir):
-                os.makedirs(org_dir, exist_ok=True)
-
-            # Write mod metadata to package db
-            mod_file_path = os.path.join(self.packages_dir, org, f"{repo_name}.json")
-            with open(mod_file_path, "w") as file:
-                file.write(self.json_encoder.encode(mod.asdict()))
-
-            # Add to registry index
-            repo_url = mod.latest_release_info.repo_url
-            index_entry = f"{org}/{repo_name}"
-
-            # Debug URL parsing
-            logging.info(f"Adding {index_entry} to registry, URL: {repo_url}")
-
-            # Create org directory in registry if it doesn't exist
-            registry_org_index = os.path.join(self.registry_path, f"{org}.txt")
-
-            # Check if the entry already exists in any file in the registry
-            found = False
-            for root, _, files in os.walk(self.registry_path):
-                for relative_path in files:
-                    if relative_path.endswith(".txt"):
-                        file_path = os.path.join(root, relative_path)
-                        try:
-                            with open(file_path, "r") as f:
-                                content = f.read()
-                                if repo_url in content or index_entry in content:
-                                    found = True
-                                    logging.debug(
-                                        f"Package {index_entry} already exists in {file_path}"
-                                    )
-                                    break
-                        except Exception as e:
-                            logging.warning(f"Error reading file {file_path}: {e}")
-                if found:
-                    break
-
-            if not found:
-                # Write the repository URL to the file
-                self._append_index_entry(registry_org_index, repo_url)
-                self._append_index_entry(self.mod_list_index_path, index_entry)
-
-                logging.info(
-                    f"Added {index_entry} to the registry index at {registry_org_index}"
-                )
-
-            logging.info(f"Repo {org}/{repo_name} initialized.")
-
-        logging.info("Successfully initialized all repos.")
-        return len(filtered_mods)  # Return the count of successfully initialized repos
-
-    def _is_package_in_index(self, repo: Repo) -> bool:
-        """
-        Check if a package exists in the mod list index.
-
-        Args:
-            repo: Repository to check
-
-        Returns:
-            True if the package exists in the index, False otherwise
-        """
-        try:
-            index_entries = self._load_package_list(self.mod_list_index_path)
-            index_entry = f"{repo.org}/{repo.name}"
-            return index_entry in index_entries
-        except Exception as e:
-            logging.error(f"Failed to check if package {repo} is in index: {e}")
-            return False
-
     @override
     def add_package_release(
         self, repo: Repo, release_tag: str, dry_run: bool = False
     ) -> bool:
-        """
-        Add a release to a repository.
+        """Register only the requested pak release, creating its package if needed."""
+        try:
+            if not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+", str(repo)) or repo.name in {".", ".."}:
+                raise ValueError("Invalid pak repository identity")
+            version = Version.parse(release_tag.removeprefix("v"))
+            packages = self._load_package_list(self.mod_list_index_path)
+            package = next((value for value in packages if value.lower() == str(repo).lower()), str(repo))
+            org, name = package.split("/")
+            mod = self.load_mod(Repo(org, name))
+            if package in packages and mod is None:
+                raise ValueError(f"Missing indexed package: {package}")
+            if mod is not None and any(Version.parse(old.tag.removeprefix("v")) == version for old in mod.releases):
+                raise ValueError(f"Release {release_tag} already exists in repo {repo}")
 
-        Args:
-            repo: Repository to add the release to
-            release_tag: Tag of the release to add
-            dry_run: If True, don't make any actual changes
+            retriever = self._require_retriever()
+            release = retriever.fetch_release_metadata(Repo(org, name), release_tag)
+            if release is None:
+                raise ValueError(f"Failed to fetch metadata for release {release_tag} from {repo}")
+            if release.tag != release_tag or release.info.repo_url.lower() != repo.github_url().lower():
+                raise ValueError("Retrieved pak release does not match the requested repository and tag")
+            updated_mod = Mod(release.info, [release]) if mod is None else retriever.update_mod_with_release(mod, release)
+            if not self.validate_package_db([updated_mod]):
+                return False
+            if dry_run:
+                return True
 
-        Returns:
-            1 if release was added successfully, 0 if skipped or failed, or the result from init if initialization was needed
-
-        Raises:
-            ValueError: If the package is not in the package list
-        """
-        # First check if the package exists in the package list
-        if not self._is_package_in_index(repo):
-            error_msg = f"Package {repo} is not in the package list. Add it first using the 'add-package' command."
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-        logging.info(f"Loading mod metadata for {repo}...")
-        mod = self.load_mod(repo)
-
-        if mod is None:
-            logging.info(f"Mod {repo} not initialized.")
-            # Initialize the repo and return the result
-            return self.add_package([repo], dry_run) > 0
-            # No need to continue. Initialization will get all releases.
-
-        tags = [release.tag for release in mod.releases]
-
-        if release_tag in tags:
-            logging.warning(f"Release {release_tag} already exists in repo {repo}.")
-            return False  # Return 0 for no action taken
-
-        logging.info(f"Adding release {release_tag} to repo {repo}...")
-        retriever = self._require_retriever()
-        release = retriever.fetch_release_metadata(mod, release_tag)
-
-        if release is None:
-            logging.error(
-                f"Failed to fetch metadata for release {release_tag} from {repo}."
-            )
-            return False  # Return 0 for failed release metadata fetch
-
-        new_maps = []
-        new_blueprints = []
-        new_markers = []
-        new_assets = []
-        new_replacements = []
-
-        logging.info("=======================================================")
-        logging.info("")
-        logging.info("New release summary")
-        logging.info("")
-
-        if len(release.manifest.maps) > 0:
-            logging.debug(f"Maps:")
-            for map in release.manifest.maps:
-                logging.debug(f"\t{map.path}")
-                new_maps.append(map)
-
-        if len(release.manifest.markers) > 0:
-            logging.debug(f"Markers:")
-            for marker in release.manifest.markers:
-                logging.debug(f"\t{marker.path}")
-                new_markers.append(marker)
-
-        if len(release.manifest.blueprints) > 0:
-            logging.debug(f"Blueprints:")
-            for blueprint in release.manifest.blueprints:
-                logging.debug(f"\t{blueprint.path}")
-                new_blueprints.append(blueprint)
-
-        if len(release.manifest.replacements) > 0:
-            logging.debug(f"Replacements:")
-            for replacement in release.manifest.replacements:
-                logging.debug(f"\t{replacement.path}")
-                new_replacements.append(replacement)
-
-        if len(release.manifest.arbitrary) > 0:
-            logging.debug(f"Assets:")
-            for asset in release.manifest.arbitrary:
-                logging.debug(f"\t{asset.path}")
-                new_assets.append(asset)
-
-        logging.debug("")
-        logging.debug("-------------------------------------------------------")
-        logging.debug("")
-        logging.info(f"New maps: {len(new_maps)}")
-        logging.info(f"New markers: {len(new_markers)}")
-        logging.info(f"New blueprints: {len(new_blueprints)}")
-        logging.info(f"New assets: {len(new_assets)}")
-        logging.info("")
-        logging.info("=======================================================")
-
-        updated_mod = retriever.update_mod_with_release(mod, release)
-
-        if not self.validate_package_db([updated_mod]):
+            org_index_path = os.path.join(self.registry_path, org + ".txt")
+            urls = self._load_package_list(org_index_path)
+            url = Repo(org, name).github_url()
+            if not any(repo_to_index_entry(value).lower() == package.lower() for value in urls if not value.startswith("#")):
+                urls.append(url)
+            paths = {
+                os.path.join(self.packages_dir, org, name + ".json"): self.json_encoder.encode(updated_mod.asdict()) + "\n",
+                self.mod_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n",
+                org_index_path: "\n".join(urls) + "\n",
+            }
+            self._write_registry_files(paths)
+            logging.info(f"Successfully added release {release_tag} to repo {repo}.")
+            return True
+        except Exception as error:
+            logging.error(f"Failed to register pak release: {error}")
             return False
-
-        if dry_run:
-            logging.warning("Dry run; not writing to mod metadata.")
-            return True  # Return 1 to indicate success in dry run mode
-
-        [org, repoName] = repo.github_url().split("/")[-2:]
-        mod_file_path = os.path.join(self.packages_dir, org, f"{repoName}.json")
-        with open(mod_file_path, "w") as file:
-            logging.info(f"Writing updated mod metadata for {repo}...")
-            file.write(self.json_encoder.encode(updated_mod.asdict()))
-
-        logging.info(f"Successfully added release {release_tag} to repo {repo}.")
-        return True  # Return 1 for successful release addition
 
     @override
     def remove_mods(self, repo_list: List[Repo], dry_run: bool = False) -> bool:
@@ -861,18 +452,3 @@ class FilesystemPackageRegistry(PackageRegistry):
                         continue
 
         return None
-
-    def is_package_initialized(self, org: str, repo_name: str) -> bool:
-        """
-        Check if a package has been initialized in the package database.
-
-        Args:
-            org: The organization name
-            repo_name: The repository name
-
-        Returns:
-            True if the package is initialized, False otherwise
-        """
-        # Check if the package file exists in the package database
-        mod_file_path = os.path.join(self.packages_dir, org, f"{repo_name}.json")
-        return os.path.exists(mod_file_path)
