@@ -289,6 +289,30 @@ Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 See the [LICENSE](LICENSE) file for details.
 
+## Mod and Plugin Dependencies
+
+Both `mod.json` and `plugin.json` support two optional dependency fields:
+
+- `mod_dependencies`: A list of required pak mods, checked against `package_db`.
+- `plugin_dependencies`: A list of required DLL plugins, checked against `dll_db`.
+
+Each list defaults to empty when omitted. Add these fields to your metadata file as needed:
+
+```json
+{
+  "mod_dependencies": [
+    {"repo_url": "https://github.com/MyOrg/MyMod", "version": "1.0.0"}
+  ],
+  "plugin_dependencies": [
+    {"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}
+  ]
+}
+```
+
+Each entry requires `repo_url`, the dependency's GitHub repository URL, and `version`, the required version or range. Exact versions (`1.0.0`), comma-separated comparisons (`>=1.0.0,<2.0.0`) and caret ranges (`^1.0.0`) are supported. Dependencies must have a matching release in the corresponding database, so register them first.
+
+Existing mods' `dependencies` are treated as `mod_dependencies`, including in previously published records. If a mod declares both fields, their entries are combined and duplicate repository/version pairs are removed. New metadata should use the explicit field names. The legacy `dependencies` field is not supported in `plugin.json`.
+
 ## DLL Registry
 
 You can use the registry to manage native DLL plugins separately from pak mods. To register a DLL release:
@@ -314,18 +338,6 @@ You can use the registry to manage native DLL plugins separately from pak mods. 
    uv run zero-infra-mod-registry validate --verify-dll-downloads
    ```
    The registry checks each DLL's size and SHA-256 against its recorded values. Each plugin version can be registered only once and cannot be overwritten by the command.
-
-### Dependencies
-
-Both `mod.json` and `plugin.json` support `mod_dependencies` for pak mods and `plugin_dependencies` for DLL plugins. Existing mods' `dependencies` are treated as `mod_dependencies`, including in previously published records.
-
-Each dependency uses `repo_url` and `version`, for example:
-
-```json
-{"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}
-```
-
-Dependencies must have a matching release in the corresponding database, so register them first. Exact versions, comma-separated comparisons and caret ranges are supported.
 
 ### Database Files
 
