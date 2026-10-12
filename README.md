@@ -11,65 +11,6 @@ A lightweight, infrastructure-free mod registry system for managing mod reposito
 - Support for redirects to handle repository name changes
 - Register native DLL releases separately from pak mods, with download source, SHA-256 and size
 
-## DLL registry
-
-Commit `plugin.json` at the repository root before tagging a DLL release:
-
-```json
-{
-  "name": "My Plugin",
-  "description": "What the plugin does",
-  "authors": ["Author Name"],
-  "mod_dependencies": [],
-  "plugin_dependencies": []
-}
-```
-
-Both `mod.json` and `plugin.json` support `mod_dependencies` for pak mods and
-`plugin_dependencies` for DLL plugins. Existing mods' `dependencies` are read
-as `mod_dependencies`, including previously published registry records.
-Dependencies use the same `repo_url` and `version` fields in both files, for
-example `{"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}`.
-They must refer to releases in the corresponding registry with a matching version; register
-dependencies first. Exact versions, comma-separated comparisons and caret ranges
-are supported. `plugin.json` is read from the release tag, not the default branch.
-Missing or malformed metadata rejects the registration, including dry runs.
-Optional `icon_url` and `image_urls` fields work like those in `mod.json`; use
-HTTPS URLs without embedded credentials. `image_urls` is a list of screenshots.
-
-Use the same registry CLI to register a GitHub release with one DLL asset, or
-select an exact asset filename when a release contains multiple DLLs:
-
-```sh
-uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
-uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0 --dll-file MyPlugin.dll
-uv run zero-infra-mod-registry validate --verify-dll-downloads
-```
-
-`--dll-file` (or the action's `dll_file` input) is an exact, case-sensitive DLL
-asset name, not a pattern. Missing, non-DLL, or ambiguous matches fail without
-falling back to another file. Without it, exactly one DLL asset is required.
-Only the chosen asset is downloaded and hashed; each plugin/version still has
-one immutable registry entry.
-
-DLL metadata is written to `dll_db/packages/<organization>/<repository>.json`,
-with repositories listed in `dll_db/plugin_list_index.txt`, independently of
-`package_db`. Like mods, each plugin file contains `latest_release_info` and
-`releases`. Releases record the tag, release date, GitHub release notes Markdown,
-DLL filename, download URL, SHA-256 (`hash`), byte size and plugin `info`; there is
-no pak manifest. Organization/name come from the package path; version comes
-from the release tag. The retriever streams the DLL without invoking the pak scanner.
-Previously approved entries in `dll_db/index.json` remain readable and unchanged.
-Registering another version includes those releases in the plugin file; conflicting
-legacy and per-plugin records fail validation. All new registrations require `plugin.json`.
-
-`validate` checks both databases; `--verify-dll-downloads` also checks downloaded
-DLL content against registered metadata. `--dll-db-path` (or `DLL_DB_PATH`) changes
-the DLL database location. `--dry-run` validates an addition without writing it.
-Existing DLL versions cannot be registered again or overwritten by the command.
-Registry operators should require review of each DLL version before publishing it.
-Hashes establish integrity, not a sandbox or proof that native code is harmless.
-
 ## Installation
 
 This project uses uv for dependency management. To set up the project:
@@ -347,3 +288,51 @@ Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ## License
 
 See the [LICENSE](LICENSE) file for details.
+
+## DLL Registry
+
+You can use the registry to manage native DLL plugins separately from pak mods. To register a DLL release:
+
+1. Add `plugin.json` to the repository root before tagging the release:
+   ```json
+   {
+     "name": "My Plugin",
+     "description": "What the plugin does",
+     "authors": ["Author Name"],
+     "mod_dependencies": [],
+     "plugin_dependencies": []
+   }
+   ```
+   The registry reads this file from the release tag, not the default branch. Missing or invalid metadata prevents registration, including in dry-run mode. You can also include `icon_url` and `image_urls` for an icon and a list of screenshots. These URLs must use HTTPS without embedded credentials.
+2. Register a GitHub release containing one DLL asset:
+   ```sh
+   uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
+   ```
+   If the release contains multiple DLLs, select one with `--dll-file MyPlugin.dll` (or the action's `dll_file` input). The filename must match exactly, including case. Missing, non-DLL, or ambiguous matches prevent registration; the registry does not select another file.
+3. Validate the database and downloaded DLL content:
+   ```sh
+   uv run zero-infra-mod-registry validate --verify-dll-downloads
+   ```
+   The registry checks each DLL's size and SHA-256 against its recorded values. Each plugin version can be registered only once and cannot be overwritten by the command.
+
+### Dependencies
+
+Both `mod.json` and `plugin.json` support `mod_dependencies` for pak mods and `plugin_dependencies` for DLL plugins. Existing mods' `dependencies` are treated as `mod_dependencies`, including in previously published records.
+
+Each dependency uses `repo_url` and `version`, for example:
+
+```json
+{"repo_url": "https://github.com/MyOrg/OtherPlugin", "version": ">=1.0.0,<2.0.0"}
+```
+
+Dependencies must have a matching release in the corresponding database, so register them first. Exact versions, comma-separated comparisons and caret ranges are supported.
+
+### Database Files
+
+Plugin files are stored in `dll_db/packages/<organization>/<repository>.json` and listed in `dll_db/plugin_list_index.txt`. Like mod files, they contain `latest_release_info` and `releases`. Each release includes its tag, release date, GitHub release notes Markdown, DLL filename, download URL, SHA-256 (`hash`), byte size and plugin `info`, but no pak manifest. The organization and repository name come from the package path, and the version comes from the release tag. DLL downloads do not use the pak scanner.
+
+Previously approved entries in `dll_db/index.json` remain readable and unchanged. When you register another version, those releases are also included in the plugin file. Conflicting legacy and per-plugin records fail validation.
+
+The `validate` command checks both databases. Use `--dll-db-path` (or `DLL_DB_PATH`) to change the DLL database location, and `--dry-run` to validate an addition without writing it.
+
+Registry operators should review each DLL version before publishing it. Hashes verify integrity; they do not sandbox native code or establish that a DLL is harmless.
