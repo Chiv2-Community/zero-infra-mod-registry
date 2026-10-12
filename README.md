@@ -298,9 +298,7 @@ Use the JSON schemas to check your release metadata:
 
 The schemas document required fields, optional media, mod and plugin dependencies, version requirements and legacy compatibility. You can reference a schema using the metadata file's `$schema` property or your editor's JSON schema settings.
 
-You can upload `mod.json` or `plugin.json` as an asset on the GitHub release. The registry uses an uploaded file with that exact name first, then falls back to the repository-root file at the release tag if no matching asset exists. An invalid or unreadable upload prevents registration; it does not trigger a fallback.
-
-Replacing the uploaded metadata lets you revise descriptions or dependencies without changing the Git tag or release binary. Existing registry records remain snapshots: replacing an upload does not automatically update an indexed release, and DLL versions cannot be registered again to overwrite their approved bytes.
+Place `mod.json` for mods or `plugin.json` for plugins at the repository root before tagging a release. If you forget to create or update it for a particular release, upload the corrected file to that release's assets. The uploaded file overrides the tagged copy.
 
 Schema validation checks the file's structure. The registry also checks version requirements and matching releases in the corresponding database, so register dependencies first.
 
@@ -329,7 +327,7 @@ Use `mod_file` and `plugin_file` for metadata stored elsewhere. Set `registry_re
 
 You can use the registry to manage native DLL plugins separately from pak mods. To register a DLL release:
 
-1. Prepare `plugin.json` using the [plugin metadata schema](schemas/plugin.schema.json). Upload it as a release asset, or commit it to the repository root before tagging the release. Missing or invalid metadata prevents registration, including in dry-run mode.
+1. Add `plugin.json` to the repository root using the [plugin metadata schema](schemas/plugin.schema.json), then tag the release.
 2. Register a GitHub release containing one DLL asset:
    ```sh
    uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
