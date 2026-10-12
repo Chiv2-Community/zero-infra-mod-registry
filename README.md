@@ -298,7 +298,7 @@ Use the JSON schemas to check your release metadata:
 
 The schemas document required fields, optional media, mod and plugin dependencies, version requirements and legacy compatibility. You can reference a schema using the metadata file's `$schema` property or your editor's JSON schema settings.
 
-Place `mod.json` for mods or `plugin.json` for plugins at the repository root before tagging a release. If you forget to create or update it for a particular release, upload the corrected file to that release's assets. The uploaded file overrides the tagged copy.
+Place `mod.json` for mods or `plugin.json` for plugins at the repository root before tagging a release. If you forget to create or update it for a particular release, upload the corrected file to that release's assets. The file in the release assets takes precedence over the file in the repo.
 
 Schema validation checks the file's structure. The registry also checks version requirements and matching releases in the corresponding database, so register dependencies first.
 
