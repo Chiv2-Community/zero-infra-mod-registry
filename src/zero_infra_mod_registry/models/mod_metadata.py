@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, override
 
@@ -37,6 +37,19 @@ class Dependency:
         return {"repo_url": self.repo_url, "version": self.version}
 
 
+def dependencies_from_dict(data: JsonObject, field_name: str) -> List[Dependency]:
+    return [Dependency.from_dict(item) for item in json_array(data.get(field_name, []))]
+
+
+def mod_dependencies_from_dict(data: JsonObject) -> List[Dependency]:
+    # Preserve legacy declarations even if both spellings appear in one record.
+    dependencies = dependencies_from_dict(data, "mod_dependencies") + dependencies_from_dict(data, "dependencies")
+    unique: dict[tuple[str, str], Dependency] = {}
+    for dependency in dependencies:
+        unique[(dependency.repo_url.lower(), dependency.version)] = dependency
+    return list(unique.values())
+
+
 @dataclass(frozen=True)
 class ModInfo:
     repo_url: str
@@ -45,7 +58,13 @@ class ModInfo:
     icon_url: str | None
     image_urls: List[str]
     authors: List[str]
-    dependencies: List[Dependency]
+    mod_dependencies: List[Dependency]
+    plugin_dependencies: List[Dependency] = field(default_factory=list)
+
+    @property
+    def dependencies(self) -> List[Dependency]:
+        """Legacy Python accessor; JSON output uses the explicit field names."""
+        return self.mod_dependencies
 
     @staticmethod
     def from_dict(value: JsonValue) -> ModInfo:
@@ -54,13 +73,15 @@ class ModInfo:
             repo_url=json_string(data["repo_url"]), name=json_string(data["name"]),
             description=json_string(data["description"]), icon_url=optional_string(data.get("icon_url")),
             image_urls=string_array(data.get("image_urls", [])), authors=string_array(data["authors"]),
-            dependencies=[Dependency.from_dict(item) for item in json_array(data["dependencies"])],
+            mod_dependencies=mod_dependencies_from_dict(data),
+            plugin_dependencies=dependencies_from_dict(data, "plugin_dependencies"),
         )
 
     def asdict(self) -> JsonObject:
         return {"repo_url": self.repo_url, "name": self.name, "description": self.description,
                 "icon_url": self.icon_url, "image_urls": [url for url in self.image_urls],
-                "authors": [author for author in self.authors], "dependencies": [dep.asdict() for dep in self.dependencies]}
+                "authors": [author for author in self.authors], "mod_dependencies": [dep.asdict() for dep in self.mod_dependencies],
+                "plugin_dependencies": [dep.asdict() for dep in self.plugin_dependencies]}
 
 
 @dataclass(frozen=True)

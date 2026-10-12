@@ -174,7 +174,7 @@ def test_validation_rejects_missing_indexed_package(registry: FilesystemPackageR
 
 def test_validation_rejects_missing_dependency(registry: FilesystemPackageRegistry, retriever: FakeRetriever) -> None:
     original = mod_fixture()
-    info = replace(original.latest_release_info, dependencies=[Dependency("https://github.com/Missing/Plugin", ">=1.0.0")])
+    info = replace(original.latest_release_info, mod_dependencies=[Dependency("https://github.com/Missing/Plugin", ">=1.0.0")])
     retriever.mods["Test/Plugin"] = Mod(info, [replace(original.releases[0], info=info)])
     assert registry.add_package([Repo("Test", "Plugin")]) == 0
     assert not Path(registry.mod_list_index_path).exists()

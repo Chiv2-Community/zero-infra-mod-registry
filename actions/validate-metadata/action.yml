@@ -1,0 +1,53 @@
+name: Validate mod and plugin metadata
+description: Validate mod.json/plugin.json schemas and dependencies against a published registry
+inputs:
+  mod_file:
+    description: Path to mod.json; leave empty to auto-detect mod.json at the repository root
+    default: ''
+  plugin_file:
+    description: Path to plugin.json; leave empty to auto-detect plugin.json at the repository root
+    default: ''
+  registry_repository:
+    description: GitHub repository containing package_db and dll_db
+    default: Chiv2-Community/C2ModRegistry
+  registry_ref:
+    description: Registry branch, tag, or commit to validate against
+    default: main
+  registry_token:
+    description: Token with read access to the registry repository
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - name: Checkout dependency registry
+      uses: actions/checkout@v6
+      with:
+        repository: ${{ inputs.registry_repository }}
+        ref: ${{ inputs.registry_ref }}
+        token: ${{ inputs.registry_token }}
+        path: .metadata-validation-registry
+        persist-credentials: false
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: '3.14'
+    - name: Validate metadata and dependencies
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        MOD_FILE: ${{ inputs.mod_file }}
+        PLUGIN_FILE: ${{ inputs.plugin_file }}
+      run: |
+        set -euo pipefail
+        args=(--registry-directory "$GITHUB_WORKSPACE/.metadata-validation-registry")
+        if [[ -n "$MOD_FILE" ]]; then
+          args+=(--mod-file "$MOD_FILE")
+        elif [[ -f mod.json ]]; then
+          args+=(--mod-file mod.json)
+        fi
+        if [[ -n "$PLUGIN_FILE" ]]; then
+          args+=(--plugin-file "$PLUGIN_FILE")
+        elif [[ -f plugin.json ]]; then
+          args+=(--plugin-file plugin.json)
+        fi
+        uv run --project "$GITHUB_ACTION_PATH/../.." --frozen python -m zero_infra_mod_registry.metadata_validation "${args[@]}"

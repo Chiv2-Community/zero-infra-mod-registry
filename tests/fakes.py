@@ -87,6 +87,7 @@ class FakeRelease:
     draft: bool = False
     body: str = "Release notes"
     assets: list[FakeAsset] = field(default_factory=list)
+    published_at: datetime = datetime(2023, 1, 1)
 
     def get_assets(self) -> PaginatedList[GitReleaseAsset]:
         pages = FakePages([asset.as_asset() for asset in self.assets])

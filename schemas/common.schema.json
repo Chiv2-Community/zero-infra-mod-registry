@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/common.schema.json",
+  "title": "Shared metadata definitions",
+  "$defs": {
+    "pakRepository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/(?!\\.{1,2}$)[A-Za-z0-9_.-]+$"},
+    "pluginRepository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$"},
+    "versionRequirement": {
+      "type": "string",
+      "not": {"pattern": "^v?\\^.*,"},
+      "pattern": "^(?:v?\\^|v?(?:>=|<=|==|!=|>|<)?)[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?(?:,\\s*(?:>=|<=|==|!=|>|<)?[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?)*$",
+      "description": "Semantic version, caret range, or comma-separated comparisons. Registry validation also parses SemVer and checks matching registered releases. Caret ranges cannot be combined with comparisons.",
+      "examples": ["1.0.0", ">=1.0.0,<2.0.0", "^1.0.0"]
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["repo_url", "version"],
+      "properties": {
+        "repo_url": {"$ref": "#/$defs/pakRepository"},
+        "version": {"$ref": "#/$defs/versionRequirement"}
+      }
+    },
+    "pluginDependency": {
+      "allOf": [
+        {"$ref": "#/$defs/dependency"},
+        {"properties": {"repo_url": {"$ref": "#/$defs/pluginRepository"}}}
+      ]
+    },
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "pluginDependencies": {"type": "array", "items": {"$ref": "#/$defs/pluginDependency"}}
+  }
+}

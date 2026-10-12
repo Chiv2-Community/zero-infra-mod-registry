@@ -10,15 +10,21 @@ from zero_infra_mod_registry.utils.json_types import JsonObject
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 
-def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("uploaded", [False, True])
+def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool) -> None:
     repo = Repo("Test", "Plugin")
     release = FakeRelease(assets=[FakeAsset(name="test.pak")])
+    metadata_url = "https://example.com/mod.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/mod.json"
+    if uploaded:
+        release.assets.append(FakeAsset(name="mod.json", browser_download_url=metadata_url))
     retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
     calls: list[str] = []
     metadata: JsonObject = {"name": "Test Mod", "description": "Description", "authors": ["Author"], "dependencies": []}
 
-    def get(url: str, *, stream: bool = False) -> requests.Response:
+    def get(url: str, *, stream: bool = False, timeout: int = 60) -> requests.Response:
         calls.append(url)
+        if not stream:
+            assert url == metadata_url and timeout == 60
         return response_fixture(b"pak content" if stream else json.dumps(metadata).encode(), url)
 
     def scan(args: list[str], *, check: bool, capture_output: bool, text: bool) -> subprocess.CompletedProcess[str]:
@@ -40,13 +46,14 @@ def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert result.info.name == "Test Mod" and result.info.repo_url == repo.github_url()
     assert result.release_notes_markdown == "Release notes"
     assert len(calls) == 2
+    assert calls[0] == metadata_url
 
 
 def test_process_release_no_mod_json(monkeypatch: pytest.MonkeyPatch) -> None:
     release = FakeRelease()
     retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
 
-    def get(url: str) -> requests.Response:
+    def get(url: str, *, timeout: int) -> requests.Response:
         return response_fixture(b"not found", url, status=404)
 
     monkeypatch.setattr(requests, "get", get)

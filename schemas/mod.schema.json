@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/mod.schema.json",
+  "title": "Pak mod metadata (mod.json)",
+  "type": "object",
+  "required": ["name", "description", "authors"],
+  "properties": {
+    "$schema": {"type": "string", "format": "uri"},
+    "repo_url": {"$ref": "common.schema.json#/$defs/pakRepository", "description": "Optional in mod.json; the registry supplies the source repository URL."},
+    "name": {"type": "string"},
+    "description": {"type": "string"},
+    "authors": {"type": "array", "items": {"type": "string"}},
+    "icon_url": {"type": ["string", "null"], "description": "Optional icon URL."},
+    "image_urls": {"type": "array", "items": {"type": "string"}, "default": [], "description": "Optional screenshot URLs."},
+    "mod_dependencies": {"$ref": "common.schema.json#/$defs/dependencies", "default": [], "description": "Required pak mods, validated against package_db."},
+    "plugin_dependencies": {"$ref": "common.schema.json#/$defs/pluginDependencies", "default": [], "description": "Required DLL plugins, validated against dll_db. The launcher requires explicit enablement and Unchained launch."},
+    "dependencies": {"$ref": "common.schema.json#/$defs/dependencies", "deprecated": true, "description": "Legacy spelling of mod_dependencies. Both lists are combined on read, deduplicating repository/version pairs. Use mod_dependencies in new metadata."}
+  },
+  "additionalProperties": true
+}

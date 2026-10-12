@@ -11,36 +11,6 @@ A lightweight, infrastructure-free mod registry system for managing mod reposito
 - Support for redirects to handle repository name changes
 - Register native DLL releases separately from pak mods, with download source, SHA-256 and size
 
-## DLL registry
-
-Use the same registry CLI to register a GitHub release with one DLL asset, or
-select an exact asset filename when a release contains multiple DLLs:
-
-```sh
-uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
-uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0 --dll-file MyPlugin.dll
-uv run zero-infra-mod-registry validate --verify-dll-downloads
-```
-
-`--dll-file` (or the action's `dll_file` input) is an exact, case-sensitive DLL
-asset name, not a pattern. Missing, non-DLL, or ambiguous matches fail without
-falling back to another file. Without it, exactly one DLL asset is required.
-Only the chosen asset is downloaded and hashed; each plugin/version still has
-one immutable registry entry.
-
-DLL metadata is written to `dll_db/index.json`, independently of `package_db` and
-the mod index. Each entry records organization, name, semantic version, download
-URL, SHA-256 and byte size. Organization/name come from the repository; version
-comes from the release tag. The GitHub retriever streams the DLL to calculate its
-hash and size without invoking the pak scanner or requiring `mod.json`.
-
-`validate` checks both databases; `--verify-dll-downloads` also checks downloaded
-DLL content against registered metadata. `--dll-db-path` (or `DLL_DB_PATH`) changes
-the DLL database location. `--dry-run` validates an addition without writing it.
-Existing DLL versions cannot be registered again or overwritten by the command.
-Registry operators should require review of each DLL version before publishing it.
-Hashes establish integrity, not a sandbox or proof that native code is harmless.
-
 ## Installation
 
 This project uses uv for dependency management. To set up the project:
@@ -318,3 +288,63 @@ Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ## License
 
 See the [LICENSE](LICENSE) file for details.
+
+## Metadata Schemas
+
+Use the JSON schemas to check your release metadata:
+
+- [mod.json schema](schemas/mod.schema.json) for pak mods.
+- [plugin.json schema](schemas/plugin.schema.json) for DLL plugins.
+
+The schemas document required fields, optional media, mod and plugin dependencies, version requirements and legacy compatibility. You can reference a schema using the metadata file's `$schema` property or your editor's JSON schema settings.
+
+Place `mod.json` for mods or `plugin.json` for plugins at the repository root before tagging a release. If you forget to create or update it for a particular release, upload the corrected file to that release's assets. The file in the release assets takes precedence over the file in the repo.
+
+Schema validation checks the file's structure. The registry also checks version requirements and matching releases in the corresponding database, so register dependencies first.
+
+### Validate Metadata in GitHub Actions
+
+Add a workflow to your mod or plugin repository to validate release metadata and dependencies:
+
+```yaml
+name: Validate metadata
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: Chiv2-Community/zero-infra-mod-registry/actions/validate-metadata@prepare-v1
+```
+
+The action checks `mod.json` and `plugin.json` at the repository root when present, and fails if neither file exists. It validates their schemas and checks dependency versions against the published C2ModRegistry databases without downloading release assets.
+
+Use `mod_file` and `plugin_file` for metadata stored elsewhere. Set `registry_repository` and `registry_ref` to validate against another registry or revision. For a private registry, provide `registry_token` with read access to that repository. Pin the action to a commit SHA for reproducible workflows.
+
+## DLL Registry
+
+You can use the registry to manage native DLL plugins separately from pak mods. To register a DLL release:
+
+1. Add `plugin.json` to the repository root using the [plugin metadata schema](schemas/plugin.schema.json), then tag the release.
+2. Register a GitHub release containing one DLL asset:
+   ```sh
+   uv run zero-infra-mod-registry add-dll-release https://github.com/MyOrg/MyPlugin v1.0.0
+   ```
+   If the release contains multiple DLLs, select one with `--dll-file MyPlugin.dll` (or the action's `dll_file` input). The filename must match exactly, including case. Missing, non-DLL, or ambiguous matches prevent registration; the registry does not select another file.
+3. Validate the database and downloaded DLL content:
+   ```sh
+   uv run zero-infra-mod-registry validate --verify-dll-downloads
+   ```
+   The registry checks each DLL's size and SHA-256 against its recorded values. Each plugin version can be registered only once and cannot be overwritten by the command.
+
+### Database Files
+
+Plugin files are stored in `dll_db/packages/<organization>/<repository>.json` and listed in `dll_db/plugin_list_index.txt`. They use a mod-style package layout with release metadata and GitHub release notes, but no pak manifest. DLL downloads do not use the pak scanner.
+
+Previously approved entries in `dll_db/index.json` remain readable and unchanged. When you register another version, those releases are also included in the plugin file. Conflicting legacy and per-plugin records fail validation.
+
+The `validate` command checks both databases. Use `--dll-db-path` (or `DLL_DB_PATH`) to change the DLL database location, and `--dry-run` to validate an addition without writing it.
+
+Registry operators should review each DLL version before publishing it. Hashes verify integrity; they do not sandbox native code or establish that a DLL is harmless.
