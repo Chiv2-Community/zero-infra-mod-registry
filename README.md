@@ -140,7 +140,7 @@ The tool provides several CLI commands to manage the mod registry:
 
 ### Add a Release
 
-Register a specific pak release tag, whether this is the first release or an update:
+For adding a pak release:
 
 ```
 uv run python -m zero_infra_mod_registry.main add-package-release <repo_url> <release_tag>
@@ -155,8 +155,6 @@ uv run python -m zero_infra_mod_registry.main \
 ```
 
 Only the requested release is retrieved. Other releases are not imported, and existing versions cannot be overwritten. Register DLL plugins with `add-dll-release` instead.
-
-The CLI and Docker action stage local database changes; they do not approve or publish releases. Registry workflows must validate those changes and submit a pull request for approval for every release, including first releases and updates. C2ModRegistry's issue workflow provides this approval flow.
 
 ### Remove a Mod
 
