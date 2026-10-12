@@ -25,7 +25,7 @@ def test_plugin_json_is_fetched_from_exact_release_tag(monkeypatch: pytest.Monke
         return response_fixture(json.dumps(INFO.asdict()).encode(), url)
 
     monkeypatch.setattr(requests, "get", get)
-    result = GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), "v1.0.0-RC2")
+    result = GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), FakeRelease(tag_name="v1.0.0-RC2").as_release())
     assert result == replace(INFO, repo_url="https://github.com/Test/Plugin")
     assert calls == ["https://raw.githubusercontent.com/Test/Plugin/v1.0.0-RC2/plugin.json"]
 
@@ -36,7 +36,7 @@ def test_missing_or_invalid_plugin_json_is_rejected(monkeypatch: pytest.MonkeyPa
         return response_fixture(body, url, status)
     monkeypatch.setattr(requests, "get", get)
     with pytest.raises((ValueError, requests.HTTPError)):
-        GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), "v1.0.0")
+        GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), FakeRelease().as_release())
 
 
 @pytest.mark.parametrize("field,value", [("name", ""), ("description", None), ("authors", "Author"),
@@ -88,8 +88,9 @@ def test_invalid_plugin_target_is_rejected(target: JsonValue) -> None:
 
 
 @pytest.mark.parametrize("target", [None, *list(PluginTarget)])
+@pytest.mark.parametrize("uploaded", [False, True])
 def test_retrieval_and_registration_preserve_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: PluginTarget | None,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: PluginTarget | None, uploaded: bool,
 ) -> None:
     binary = b"DLL bytes"
     data = INFO.asdict()
@@ -97,7 +98,7 @@ def test_retrieval_and_registration_preserve_target(
         del data["target"]
     else:
         data["target"] = target.value
-    metadata_url = "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/plugin.json"
+    metadata_url = "https://example.com/plugin.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/plugin.json"
     calls: list[str] = []
 
     def get(url: str, *, timeout: int, stream: bool = False) -> requests.Response:
@@ -110,7 +111,10 @@ def test_retrieval_and_registration_preserve_target(
         return response_fixture(binary, url)
 
     monkeypatch.setattr(requests, "get", get)
-    client = FakeGithub([FakeRelease(assets=[FakeAsset(size=len(binary))])])
+    assets = [FakeAsset(size=len(binary))]
+    if uploaded:
+        assets.append(FakeAsset(name="plugin.json", browser_download_url=metadata_url))
+    client = FakeGithub([FakeRelease(assets=assets)])
     retriever = GithubModMetadataRetriever(client.as_github())
     registry = FilesystemPackageRegistry(retriever, str(tmp_path / "registry"), str(tmp_path / "packages"), str(tmp_path / "dlls"))
     assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")

@@ -17,7 +17,7 @@ from semver import Version
 from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
 from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
-from zero_infra_mod_registry.utils.json_types import decode_json, json_array, json_object
+from zero_infra_mod_registry.utils.json_types import JsonObject, decode_json, json_array, json_object
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
@@ -70,7 +70,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             raise ValueError("A DLL release must contain exactly one DLL asset unless --dll-file selects one")
         url = assets[0].browser_download_url
         DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
-        info = self.fetch_plugin_info(repo, release.tag_name)
+        info = self.fetch_plugin_info(repo, release)
         digest, size = self.measure_dll(url)
         entry = DllRelease(repo.org, repo.name, version, url, digest, size, info,
                            release.tag_name, release.published_at, release.body, assets[0].name)
@@ -79,15 +79,29 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             raise ValueError("Downloaded DLL size differs from release asset")
         return entry
 
-    def fetch_plugin_info(self, repo: Repo, release_tag: str) -> PluginInfo:
-        url = f"https://raw.githubusercontent.com/{repo}/{release_tag}/plugin.json"
-        response = requests.get(url, timeout=60)
-        if response.status_code == 404:
-            raise ValueError("plugin.json does not exist at the release tag; commit it before tagging the release")
-        response.raise_for_status()
-        if urlparse(response.url).scheme != "https":
-            raise ValueError("Insecure plugin.json redirect")
-        info = PluginInfo.from_dict(decode_json(response.text))
+    def _fetch_release_json(self, repo: Repo, release: GitRelease, filename: str) -> JsonObject:
+        """Prefer an exact release asset; use the tagged file only if no asset exists."""
+        if filename not in {"mod.json", "plugin.json"}:
+            raise ValueError("Unsupported release metadata filename")
+        assets = [asset for asset in release.get_assets() if asset.name == filename]
+        if len(assets) > 1:
+            raise ValueError(f"Release contains multiple {filename} assets")
+        url = assets[0].browser_download_url if assets else f"https://raw.githubusercontent.com/{repo}/{release.tag_name}/{filename}"
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError(f"{filename} source must use HTTPS without credentials")
+        logging.info(f"Downloading {filename} from {url}")
+        with requests.get(url, timeout=60) as response:
+            if response.status_code == 404 and not assets:
+                raise ValueError(f"{filename} does not exist in the release assets or at the release tag")
+            response.raise_for_status()
+            redirected = urlparse(response.url)
+            if redirected.scheme != "https" or not redirected.hostname or redirected.username or redirected.password:
+                raise ValueError(f"Insecure {filename} redirect")
+            return json_object(decode_json(response.text))
+
+    def fetch_plugin_info(self, repo: Repo, release: GitRelease) -> PluginInfo:
+        info = PluginInfo.from_dict(self._fetch_release_json(repo, release, "plugin.json"))
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return PluginInfo(info.name, info.description, info.authors, info.plugin_dependencies,
@@ -218,24 +232,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Raises:
             Exception: If the release fails validation
         """
-        # Download the mod json
-        mod_json_url = (
-            f"https://raw.githubusercontent.com/{repo}/{release.tag_name}/mod.json"
-        )
-
-        logging.info(f"Downloading mod.json from {mod_json_url}")
-        response = requests.get(mod_json_url)
-
-        if response.status_code == 404:
-            raise Exception(f"mod.json does not exist for this release.")
-        elif response.status_code != 200:
-            raise Exception(
-                f"Failed to download mod.json from {mod_json_url} with status code {response.status_code}"
-            )
-
-        logging.info(f"Successfully downloaded mod.json")
-        response_json = json_object(decode_json(response.text))
-
+        response_json = self._fetch_release_json(repo, release, "mod.json")
         response_json["repo_url"] = repo.github_url()
         mod_info = ModInfo.from_dict(response_json)
         pak = self.find_pak_file(release)

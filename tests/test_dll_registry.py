@@ -1,6 +1,7 @@
 import hashlib
 from dataclasses import replace
 from datetime import datetime
+from github.GitRelease import GitRelease
 import json
 import os
 from pathlib import Path
@@ -27,7 +28,7 @@ ENTRY: JsonObject = DLL.asdict()
 
 @pytest.fixture(autouse=True)
 def plugin_info_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fetch(self: GithubModMetadataRetriever, repo: Repo, release_tag: str) -> PluginInfo:
+    def fetch(self: GithubModMetadataRetriever, repo: Repo, release: GitRelease) -> PluginInfo:
         return INFO
     monkeypatch.setattr(GithubModMetadataRetriever, "fetch_plugin_info", fetch)
 
