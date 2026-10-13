@@ -1,4 +1,4 @@
-from .models import Dependency, Manifest, Mod, Release, Repo
+from .models import Dependency, ModInfo, Mod, Release, Repo
 from .registry import FilesystemPackageRegistry, PackageRegistry
 from .retriever import GithubModMetadataRetriever, ModMetadataRetriever
 from .utils.hashes import sha512_sum

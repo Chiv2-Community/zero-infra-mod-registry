@@ -1,21 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Optional, Tuple
 
 from zero_infra_mod_registry.models import Mod, Release, Repo
-
-VALID_TAGS = [
-    "Mutator",
-    "Map",
-    "Cosmetic",
-    "Audio",
-    "Model",
-    "Weapon",
-    "Doodad",
-    "Explicit",
-]
-
-VALID_MOD_TYPES = ["Client", "Server", "Shared"]
-
+from zero_infra_mod_registry.models.dll_metadata import DllRelease
 
 class ModMetadataRetriever(ABC):
     """
@@ -23,26 +10,21 @@ class ModMetadataRetriever(ABC):
     This is the base abstract class that all metadata retrievers should extend.
     """
 
-    @abstractmethod
-    def fetch_repo_metadata(self, repo: Repo) -> Optional[Mod]:
-        """
-        Fetch metadata for all releases in a repository.
+    def fetch_dll_release(self, repo: Repo, release_tag: str, dll_file: str | None = None) -> DllRelease:
+        """Retrieve metadata and calculated integrity information for a native DLL."""
+        raise NotImplementedError("This retriever does not support DLL releases")
 
-        Args:
-            repo: Repository to fetch metadata for
-
-        Returns:
-            Mod object with metadata, or None if the repository has no valid releases
-        """
-        pass
+    def measure_dll(self, url: str) -> Tuple[str, int]:
+        """Download a DLL and return its SHA-256 and byte size."""
+        raise NotImplementedError("This retriever does not support DLL downloads")
 
     @abstractmethod
-    def fetch_release_metadata(self, mod: Mod, release_tag: str) -> Optional[Release]:
+    def fetch_release_metadata(self, repo: Repo, release_tag: str) -> Optional[Release]:
         """
         Fetch metadata for a specific release.
 
         Args:
-            mod: Mod object with repository information
+            repo: Repository to fetch the release from
             release_tag: Tag of the release to fetch
 
         Returns:

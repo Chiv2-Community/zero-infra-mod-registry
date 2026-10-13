@@ -15,5 +15,7 @@ def repo_to_index_entry(repo: str) -> str:
     Returns:
         Index entry in the format "org/repo"
     """
-    repo = repo.strip().rstrip(os.path.sep)
-    return os.path.sep.join(repo.split(os.path.sep)[-2:])
+    # split on / or \, recombine with /
+    repo = repo.replace("\\", "/")
+    repo = repo.strip().rstrip("/")
+    return "/".join(repo.split("/")[-2:])

@@ -1,276 +1,148 @@
 # Zero Infra Mod Registry
 
-A lightweight, infrastructure-free mod registry system for managing mod repositories, dependencies, and releases. This project provides a simple CLI to maintain a registry of mods, track their releases, and validate dependencies between different mods.
+A Git-backed registry for pak mods and native DLL plugins. GitHub releases host
+the assets; a registry repository stores metadata, dependency versions, download
+URLs, hashes and sizes. GitHub Actions validate registration requests and open
+approval pull requests. Clients read the committed indexes and package files.
 
-## Features
+## Architecture
 
-- Manage mod repositories with their metadata
-- Track mod releases and version information
-- Handle dependencies between mods
-- Validate the package database to ensure all dependencies are satisfied
-- Support for redirects to handle repository name changes
-
-## Installation
-
-This project uses Poetry for dependency management. To set up the project:
-
-1. Make sure you have Python 3.10 or newer installed
-2. Install Poetry if you don't have it already:
-   ```
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
-3. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/zero-infra-mod-registry.git
-   cd zero-infra-mod-registry
-   ```
-4. Install dependencies:
-   ```
-   poetry install
-   ```
-
-## Using as a GitHub Action
-
-You can use this project as a GitHub Action in your workflows. The action is implemented as a Docker container, so you don't need to install any dependencies to use it.
-
-```yaml
-jobs:
-  mod-registry:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        
-      # Example: Add a new package to the registry
-      - name: Initialize package repository
-        id: add-package
-        uses: yourusername/zero-infra-mod-registry@main
-        with:
-          command: add_package
-          repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Example: Process registry updates (syncing any missing releases)
-      - name: Process registry updates
-        id: process-updates
-        uses: yourusername/zero-infra-mod-registry@main
-        with:
-          command: process-registry-updates
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          registry_path: "./custom-registry"
-          package_db_path: "./custom-package-db"
-          
-      # Example: Validate package registry
-      - name: Validate registry
-        id: validate-registry
-        uses: yourusername/zero-infra-mod-registry@main
-        with:
-          command: validate
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Example: Add a release
-      - name: Add a release
-        id: add-release
-        uses: yourusername/zero-infra-mod-registry@main
-        with:
-          command: add_package_release
-          repo_url: https://github.com/Chiv2-Community/Chiv2Turbo
-          release_tag: v1.0.0
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          
-      # Example: Use the action outputs
-      - name: Display output logs
-        if: always()
-        run: |
-          echo "Process result: ${{ steps.process-updates.outputs.result }}"
-          echo "Process status: ${{ steps.process-updates.outputs.failed == 'true' && 'Failed' || 'Success' }}"
+```mermaid
+flowchart LR
+    Publisher[Mod or plugin repository] --> Release[Tagged GitHub release]
+    Release -->|Manual request| Request[Registration issue]
+    Release -. Optional automated-publish action .-> Gateway[automated-registry-gateway]
+    Gateway --> Request
+    Request --> Action[Registry workflow]
+    Release --> Action
+    Action --> PR[Validated pull request]
+    PR --> Approval[Maintainer merge]
+    Approval --> Registry[Registry files]
+    Registry --> Client[Launcher or mod browser]
 ```
 
-### Action Inputs
+Publishers commit `mod.json` or `plugin.json` before tagging. A metadata file
+uploaded as a release asset overrides the file at the tag. Registration retrieves
+only the requested release, checks dependencies, and generates database entries.
+Pak assets are scanned for manifests; DLL assets are downloaded for SHA-256 and
+size checks. Existing versions cannot be overwritten.
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `command` | Command to execute (process-registry-updates, add_package, add_package_release, remove, validate) | Yes | |
-| `repo_url` | Repository URL (required for init, add, and remove commands) | For some commands | '' |
-| `release_tag` | Release tag (required for add command) | For add command | '' |
-| `dry_run` | Run in dry-run mode without making changes | No | 'false' |
-| `github_token` | GitHub token for API access | Yes | ${{ github.token }} |
-| `log_level` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | No | 'INFO' |
-| `registry_path` | Path to the registry directory | No | './registry' |
-| `package_db_path` | Path to the package database directory | No | './package_db' |
+Registry layout:
 
-### Action Outputs
-
-| Output | Description |
-|--------|-------------|
-| `result` | The complete output log from the command execution |
-| `failed` | Whether the command failed or not ('true' or 'false') |
-
-These outputs can be used in subsequent steps to capture logs, make decisions based on command success/failure, or display results in comments or summaries.
-
-## Using with Docker
-
-You can run the mod registry using Docker:
-
-```bash
-# Build the Docker image
-docker build -t zero-infra-mod-registry .
-
-# Initialize a repository
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add_package https://github.com/Username/ExampleMod
-
-# Process registry updates with custom paths
-docker run -v $(pwd):/app \
-  -e GITHUB_TOKEN=your_token \
-  -e REGISTRY_PATH=./custom-registry \
-  -e PACKAGE_DB_PATH=./custom-package-db \
-  zero-infra-mod-registry process-registry-updates
-
-# Add a release
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry add_package_release https://github.com/Username/ExampleMod v1.0.0
-
-# Remove a mod
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry remove https://github.com/Username/ExampleMod
-
-# Validate the package registry database
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token zero-infra-mod-registry validate
-
-# Run in dry-run mode
-docker run -v $(pwd):/app -e GITHUB_TOKEN=your_token -e DRY_RUN=true zero-infra-mod-registry process-registry-updates
+```text
+registry/                                  repository records and redirects
+package_db/mod_list_index.txt              pak package index (owner/repository)
+package_db/packages/<owner>/<repo>.json     pak releases and manifests
+dll_db/plugin_list_index.txt               plugin index (owner/repository)
+dll_db/packages/<owner>/<repo>.json         plugin releases and DLL metadata
 ```
 
-### Docker Environment Variables
+The registry processes issues into pull requests. Maintainers approve each
+release by merging. Optional publishing workflows merge validated snapshots into
+consumer branches such as `db`. Clients fetch indexes, then individual package
+files and assets from their recorded URLs. DLL approval requires code review;
+hashes only verify download integrity.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `GITHUB_TOKEN` | GitHub token for API access | Required |
-| `DRY_RUN` | Run in dry-run mode without making changes | false |
-| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) | INFO |
-| `REGISTRY_PATH` | Path to the registry directory | ./registry |
-| `PACKAGE_DB_PATH` | Path to the package database directory | ./package_db |
+The optional Python `automated-registry-gateway` authenticates publisher Actions
+with GitHub OIDC and creates issues through a GitHub App. Its private key stays on
+your HTTPS server; `/data` stores request and rate-limit records. Publishers can
+open issues manually or use the optional `automated-publish` action.
+See [gateway setup](docs/registry/automated-registry-gateway.md).
 
-## Manual Usage
+## GitHub automation
 
-The tool provides several CLI commands to manage the mod registry:
+| Action or reusable workflow | Purpose | Setup |
+|---|---|---|
+| Root action | Register, remove, or validate registry entries in Docker | [Registry actions](docs/registry/actions.md) |
+| `actions/validate-metadata` | Check metadata schemas and registered dependency versions | [Plugins](docs/plugin/README.md), [mods](docs/mod/README.md) |
+| `actions/automated-publish` (optional) | Submit a release through OIDC or a direct issue token | [Automated publish](docs/plugin/release-requests.md) |
+| `actions/publish-branch` | Prepare an immutable merge candidate for validated publication | [Publishing](docs/registry/publishing.md) |
+| `.github/workflows/register-release.yml` | Parse issues, register releases, validate, open approval PRs | [Registry setup](docs/registry/README.md) |
+| `.github/workflows/validate-registry.yml` | Validate registry PRs, including DLL downloads | [Registry setup](docs/registry/README.md) |
+| `.github/workflows/publish-registry.yml` | Validate and publish to a consumer branch | [Publishing](docs/registry/publishing.md) |
+| `.github/workflows/publish-automated-registry-gateway.yml` | Test and publish the optional Python gateway image to GHCR | [Gateway setup](docs/registry/automated-registry-gateway.md#image-publication) |
 
-### Initialize a Mod Repository
+Start with [registry setup](docs/registry/README.md), [plugin setup](docs/plugin/README.md),
+or [mod setup](docs/mod/README.md). Examples use branch references; pin production
+references to a commit SHA. The new automated components target `prepare-v1`.
+For reusable workflows, pin `tool_ref` to the same SHA.
 
-Add a new mod repository to the registry and package list:
+## GitHub App setup (optional gateway)
 
-```
-poetry run python -m zero_infra_mod_registry.main init <repo_url>
-```
+Manual registration needs no App. For `automated-registry-gateway`, create an App
+under your registry owner's **Settings → Developer settings → GitHub Apps → New
+GitHub App**. The App creates issues; publishers authenticate with GitHub OIDC,
+not OAuth. Publisher repositories do not install the App.
 
-This command both fetches the repository metadata and adds it to the registry index in a single step.
+| Setting | Value |
+|---|---|
+| GitHub App name | A unique name, such as `my-registry-gateway` |
+| Homepage URL | Your registry repository or project website |
+| Callback URL / redirect URI | Empty |
+| Expire user authorization tokens | Disabled; user tokens are unused |
+| Request user authorization (OAuth) during installation | Disabled |
+| Enable Device Flow | Disabled |
+| Setup URL | Empty |
+| Redirect on update | Disabled |
+| Webhook → Active | Disabled |
+| Webhook URL and secret | Empty |
+| Repository permissions → Issues | Read and write |
+| Repository permissions → Metadata | Read-only; automatic |
+| All other repository, organization and account permissions | No access |
+| Subscribe to events | None |
+| Where can this GitHub App be installed? | Only on this account |
 
-Example with custom paths:
-```
-poetry run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  init https://github.com/Chiv2-Community/Chiv2Turbo
-```
+Then:
 
-### Process Registry Updates
+1. Create the App and record its **App ID** as `GITHUB_APP_ID` (not its Client ID).
+2. Select **Install App**, install on the registry owner, choose **Only select
+   repositories**, and select only the registry repository.
+3. Record the installation ID from the installation settings URL
+   (`.../installations/<id>`) as `GITHUB_INSTALLATION_ID`.
+4. Under the App's **Private keys**, generate an RSA key. Store the downloaded PEM
+   only on the gateway server; never commit it or share it with publishers. Mount
+   it using `GITHUB_PRIVATE_KEY_FILE`, readable by container UID 10001.
+5. Enable Issues and the [registration workflow](docs/registry/README.md#process-issues)
+   on the registry. Under **Settings → Actions → General**, enable
+   **Allow GitHub Actions to create and approve pull requests**. Maintainers still
+   review and merge approval PRs.
+6. Configure the gateway with those IDs, `REGISTRY_REPOSITORY`, and
+   `GATEWAY_AUDIENCE=https://YOUR-HOST/registrations`. The audience is the public
+   HTTPS endpoint, not an OAuth callback or webhook. Follow
+   [server configuration and deployment](docs/registry/automated-registry-gateway.md#server-configuration).
 
-Find new package list entries and load all of their releases:
+App-created issues trigger the registry workflow without webhook subscriptions.
+The gateway requests installation tokens restricted to Issues write on the fixed
+registry repository. Issues write does not grant code push or PR merge access,
+but issue-triggered workflows must still treat requests as untrusted input.
 
-```
-poetry run python -m zero_infra_mod_registry.main process-registry-updates
-```
+**Protect the private key:** it can mint tokens for every installation of the
+App. Choosing **Any account** permits other owners to install it; it does not
+grant automatic access, but each installation expands the impact of key theft.
+Use **Only on this account** unless other registry owners need the App. Restrict
+each installation to its registry repository. Rotate a compromised key and
+revoke existing installation tokens; key rotation alone does not revoke them.
 
-With custom paths:
-```
-poetry run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  process-registry-updates
-```
+App installation scope and publisher enrollment are independent. Set
+`ALLOWED_REPOSITORY_IDS` to permitted public publisher IDs; empty allows any
+public repository to request registration. Maintainer approval remains required.
 
-### Add a Release
+## Local development
 
-Add a specific release tag to a mod repository:
+The uv workspace builds three packages: the registry, gateway, and shared core.
+See [package layout](docs/development.md).
 
-```
-poetry run python -m zero_infra_mod_registry.main add <repo_url> <release_tag>
-```
-
-Example with custom paths:
-```
-poetry run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  add_package_release https://github.com/Chiv2-Community/Chiv2Turbo v1.0.0
-```
-
-### Remove a Mod
-
-Remove a mod from the registry:
-
-```
-poetry run python -m zero_infra_mod_registry.main remove <repo_url>
-```
-
-Example with custom paths:
-```
-poetry run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  remove https://github.com/Chiv2-Community/Chiv2Turbo
-```
-
-### Validate Package Registry
-
-Validate the package registry database to ensure all dependencies are satisfied:
-
-```
-poetry run python -m zero_infra_mod_registry.main validate
-```
-
-Example with custom paths:
-```
-poetry run python -m zero_infra_mod_registry.main \
-  --registry-path ./custom-registry \
-  --package-db-path ./custom-package-db \
-  validate
-```
-
-
-
-### Dry Run Mode
-
-All commands support a `--dry-run` flag to preview changes without actually applying them:
-
-```
-poetry run python -m zero_infra_mod_registry.main --dry-run <command> <args>
+```sh
+uv sync --all-groups
+uv build --all-packages
+uv run mypy .
+uv run pytest .
+node --test actions/automated-publish/*.test.cjs
+bash tests/actions/test-publish-branch.sh
 ```
 
-## Testing
+Python 3.12+ is required. Docker and CI use Python 3.14. Pak registration also
+requires [UnchainedScanner](https://github.com/Chiv2-Community/UnchainedLauncher);
+the Docker image includes it. See [CLI usage](docs/registry/actions.md#cli).
 
-This project uses pytest for testing. To run the tests:
-
-```bash
-poetry run pytest
-```
-
-## Logging
-
-You can control the log level by setting the `LOG_LEVEL` environment variable:
-
-```
-LOG_LEVEL=DEBUG poetry run python -m zero_infra_mod_registry.main <command> <args>
-```
-
-Available log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
-
-## Dependencies
-
-- Python 3.10+
-- PyGithub: GitHub API integration
-- requests: HTTP client
-- semantic-version: Semantic versioning support
-- argparse: Command-line parsing
-
-## License
-
-See the [LICENSE](LICENSE) file for details.
+[License](LICENSE)

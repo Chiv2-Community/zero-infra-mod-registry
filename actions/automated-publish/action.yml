@@ -1,0 +1,80 @@
+name: Automated publish
+description: Submit a release through OIDC or an issue token
+inputs:
+  endpoint:
+    description: HTTPS gateway URL and OIDC audience
+    default: ''
+  registry_repository:
+    description: Registry owner/repository
+    default: Chiv2-Community/C2ModRegistry
+  registry_token:
+    description: Token with Issues write access to the registry
+    default: ''
+  source_token:
+    description: Token with read access to the release repository
+    default: ${{ github.token }}
+  source_repository:
+    description: Release owner/repository
+    default: ${{ github.repository }}
+  release_tag:
+    description: Published semantic version tag
+    default: ${{ github.ref_name }}
+  kind:
+    description: plugin for DLLs or mod for pak releases
+    required: true
+  asset_name:
+    description: Exact release asset filename; required for multiple DLLs
+    default: ''
+outputs:
+  issue_url:
+    description: Created or existing approval issue URL
+    value: ${{ steps.submit.outputs.issue_url }}
+runs:
+  using: composite
+  steps:
+    - name: Verify release and prepare request
+      if: inputs.endpoint == ''
+      id: prepare
+      uses: actions/github-script@v7
+      env:
+        REQUEST_ACTION_PATH: ${{ github.action_path }}
+        SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+        RELEASE_TAG: ${{ inputs.release_tag }}
+        KIND: ${{ inputs.kind }}
+        ASSET_NAME: ${{ inputs.asset_name }}
+        REGISTRY_TOKEN: ${{ inputs.registry_token }}
+      with:
+        github-token: ${{ inputs.source_token }}
+        script: |
+          if (!process.env.REGISTRY_TOKEN) throw new Error('Provide registry_token with Issues write access to the registry.');
+          const { prepareRequest, repositoryParts } = require(`${process.env.REQUEST_ACTION_PATH}/request.cjs`);
+          return await prepareRequest(github, repositoryParts(process.env.SOURCE_REPOSITORY), process.env.RELEASE_TAG, {kind: process.env.KIND, asset: process.env.ASSET_NAME});
+    - name: Submit registration request
+      id: submit
+      uses: actions/github-script@v7
+      env:
+        REQUEST_ACTION_PATH: ${{ github.action_path }}
+        REGISTRY_REPOSITORY: ${{ inputs.registry_repository }}
+        REQUEST: ${{ steps.prepare.outputs.result }}
+        ENDPOINT: ${{ inputs.endpoint }}
+        SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+        RELEASE_TAG: ${{ inputs.release_tag }}
+        KIND: ${{ inputs.kind }}
+        ASSET_NAME: ${{ inputs.asset_name }}
+        REGISTRY_TOKEN: ${{ inputs.registry_token }}
+      with:
+        github-token: ${{ inputs.registry_token || inputs.source_token }}
+        script: |
+          let url;
+          if (process.env.ENDPOINT) {
+            if (process.env.REGISTRY_TOKEN) throw new Error('Use endpoint or registry_token, not both.');
+            if (process.env.SOURCE_REPOSITORY !== `${context.repo.owner}/${context.repo.repo}`) throw new Error('OIDC requests must use the workflow repository.');
+            const { submitGateway } = require(`${process.env.REQUEST_ACTION_PATH}/gateway.cjs`);
+            url = await submitGateway(core, process.env.ENDPOINT, {kind: process.env.KIND, release_tag: process.env.RELEASE_TAG, asset_name: process.env.ASSET_NAME});
+          } else {
+            const { submitRequest, repositoryParts } = require(`${process.env.REQUEST_ACTION_PATH}/request.cjs`);
+            const issue = await submitRequest(github, repositoryParts(process.env.REGISTRY_REPOSITORY), JSON.parse(process.env.REQUEST));
+            url = issue.html_url;
+          }
+          core.setOutput('issue_url', url);
+          await core.summary.addLink('Registry release request', url).write();
