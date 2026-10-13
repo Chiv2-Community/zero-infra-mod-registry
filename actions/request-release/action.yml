@@ -1,0 +1,61 @@
+name: Request release registration
+description: Verify a published release and create or reuse a registry approval issue
+inputs:
+  registry_repository:
+    description: Registry owner/repository
+    default: Chiv2-Community/C2ModRegistry
+  registry_token:
+    description: Token with Issues write access to the registry
+    required: true
+  source_token:
+    description: Token with read access to the release repository
+    default: ${{ github.token }}
+  source_repository:
+    description: Release owner/repository
+    default: ${{ github.repository }}
+  release_tag:
+    description: Published semantic version tag
+    default: ${{ github.ref_name }}
+  kind:
+    description: plugin for DLLs or mod for pak releases
+    required: true
+  asset_name:
+    description: Exact release asset filename; required for multiple DLLs
+    default: ''
+outputs:
+  issue_url:
+    description: Created or existing approval issue URL
+    value: ${{ steps.submit.outputs.issue_url }}
+runs:
+  using: composite
+  steps:
+    - name: Verify release and prepare request
+      id: prepare
+      uses: actions/github-script@v7
+      env:
+        REQUEST_ACTION_PATH: ${{ github.action_path }}
+        SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+        RELEASE_TAG: ${{ inputs.release_tag }}
+        KIND: ${{ inputs.kind }}
+        ASSET_NAME: ${{ inputs.asset_name }}
+        REGISTRY_TOKEN: ${{ inputs.registry_token }}
+      with:
+        github-token: ${{ inputs.source_token }}
+        script: |
+          if (!process.env.REGISTRY_TOKEN) throw new Error('Provide registry_token with Issues write access to the registry.');
+          const { prepareRequest, repositoryParts } = require(`${process.env.REQUEST_ACTION_PATH}/request.cjs`);
+          return await prepareRequest(github, repositoryParts(process.env.SOURCE_REPOSITORY), process.env.RELEASE_TAG, {kind: process.env.KIND, asset: process.env.ASSET_NAME});
+    - name: Submit registration request
+      id: submit
+      uses: actions/github-script@v7
+      env:
+        REQUEST_ACTION_PATH: ${{ github.action_path }}
+        REGISTRY_REPOSITORY: ${{ inputs.registry_repository }}
+        REQUEST: ${{ steps.prepare.outputs.result }}
+      with:
+        github-token: ${{ inputs.registry_token }}
+        script: |
+          const { submitRequest, repositoryParts } = require(`${process.env.REQUEST_ACTION_PATH}/request.cjs`);
+          const issue = await submitRequest(github, repositoryParts(process.env.REGISTRY_REPOSITORY), JSON.parse(process.env.REQUEST));
+          core.setOutput('issue_url', issue.html_url);
+          await core.summary.addLink('Registry release request', issue.html_url).write();

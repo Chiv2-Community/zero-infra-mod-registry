@@ -1,0 +1,21 @@
+name: Publish registry branch
+description: Merge an immutable source snapshot into a consumer branch without force pushing
+inputs:
+  source_branch:
+    description: Branch containing the approved registry
+    default: main
+  source_sha:
+    description: Immutable source commit
+    required: true
+  target_branch:
+    description: Existing consumer branch
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        SOURCE_BRANCH: ${{ inputs.source_branch }}
+        SOURCE_SHA: ${{ inputs.source_sha }}
+        TARGET_BRANCH: ${{ inputs.target_branch }}
+      run: bash "$GITHUB_ACTION_PATH/publish.sh"

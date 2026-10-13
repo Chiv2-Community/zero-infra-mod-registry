@@ -1,0 +1,43 @@
+name: Validate and publish registry branch
+on:
+  workflow_call:
+    inputs:
+      tool_ref:
+        type: string
+        default: main
+      source_branch:
+        type: string
+        default: main
+      source_sha:
+        type: string
+        default: ''
+      target_branch:
+        type: string
+        required: true
+jobs:
+  publish:
+    if: github.ref == format('refs/heads/{0}', inputs.source_branch)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: Chiv2-Community/zero-infra-mod-registry
+          ref: ${{ inputs.tool_ref }}
+          path: .registry-tool
+          persist-credentials: false
+      - uses: ./.registry-tool
+        with:
+          command: validate
+          verify_dll_downloads: 'true'
+      - name: Merge validated snapshot
+        uses: ./.registry-tool/actions/publish-branch
+        with:
+          source_branch: ${{ inputs.source_branch }}
+          source_sha: ${{ inputs.source_sha || github.sha }}
+          target_branch: ${{ inputs.target_branch }}

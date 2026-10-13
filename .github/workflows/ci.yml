@@ -7,6 +7,16 @@ on:
     branches: [ main, prepare-v1 ]
 
 jobs:
+  test-actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test actions/request-release/*.test.cjs
+      - run: bash tests/actions/test-publish-branch.sh
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -53,6 +63,9 @@ jobs:
       - name: Validate program in built image
         run: |
           docker run --rm zero-infra-mod-registry:${{ github.run_number }} --help
+
+      - name: Test action argument handling and failure outputs
+        run: bash tests/actions/test-registry-action.sh zero-infra-mod-registry:${{ github.run_number }}
 
       - name: Validate .net installation
         run: |

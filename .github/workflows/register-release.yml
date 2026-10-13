@@ -1,0 +1,84 @@
+name: Register release from an issue
+on:
+  workflow_call:
+    inputs:
+      tool_ref:
+        type: string
+        default: main
+      registry_branch:
+        type: string
+        default: main
+jobs:
+  register:
+    if: >-
+      !github.event.issue.pull_request &&
+      (github.event_name == 'issues' ||
+      (github.event_name == 'issue_comment' && github.event.comment.body == 'retry'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.registry_branch }}
+      - name: Checkout workflow implementation
+        uses: actions/checkout@v4
+        with:
+          repository: Chiv2-Community/zero-infra-mod-registry
+          ref: ${{ inputs.tool_ref }}
+          path: .registry-tool
+          persist-credentials: false
+      - name: Parse registration request
+        id: request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { parseRequest } = require('./.registry-tool/actions/request-release/issue.cjs');
+            const { data: issue } = await github.rest.issues.get({...context.repo, issue_number: context.issue.number});
+            const payload = parseRequest(issue.body);
+            for (const [key, value] of Object.entries(payload)) core.setOutput(key, value);
+      - name: Register requested release
+        id: register
+        uses: ./.registry-tool
+        with:
+          command: ${{ steps.request.outputs.action }}
+          repo_url: ${{ steps.request.outputs.repo_url }}
+          release_tag: ${{ steps.request.outputs.release_tag }}
+          dll_file: ${{ steps.request.outputs.dll_file }}
+      - name: Validate updated registry
+        uses: ./.registry-tool
+        with:
+          command: validate
+          verify_dll_downloads: 'true'
+      - name: Create approval pull request
+        id: pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          base: ${{ inputs.registry_branch }}
+          branch: issue-${{ github.event.issue.number }}-${{ steps.request.outputs.action }}
+          add-paths: |
+            registry/
+            package_db/
+            dll_db/
+          commit-message: Register ${{ steps.request.outputs.repo_url }} ${{ steps.request.outputs.release_tag }}
+          title: '${{ steps.request.outputs.action }}: ${{ steps.request.outputs.repo_url }} ${{ steps.request.outputs.release_tag }}'
+          body: |
+            Register `${{ steps.request.outputs.release_tag }}` from ${{ steps.request.outputs.repo_url }}.
+
+            Registry validation and DLL download verification passed. Review before merging.
+
+            Resolves #${{ github.event.issue.number }}
+      - name: Report result
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          FAILED: ${{ job.status == 'failure' }}
+          PR_URL: ${{ steps.pr.outputs.pull-request-url }}
+        with:
+          script: |
+            const body = process.env.FAILED === 'true'
+              ? `Registration failed. Check [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}), correct the issue or release, then reply retry. Requests require a fenced JSON object with action (add-package-release or add-dll-release), repo_url and release_tag. For multiple DLL assets, set dll_file to the exact asset filename.`
+              : process.env.PR_URL ? `Approval request: ${process.env.PR_URL}` : 'No registry changes; this release is already registered.';
+            await github.rest.issues.createComment({...context.repo, issue_number: context.issue.number, body});
