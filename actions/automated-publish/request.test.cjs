@@ -53,6 +53,25 @@ test('creates a request in a configurable registry', async () => {
   };
   assert.equal((await submitRequest(github, target, request)).html_url, 'created');
 });
+test('mod preflight rejects multiple paks even with an explicit selection or unfinished second asset', async () => {
+  for (const second of [{state: 'uploaded', size: 123}, {state: 'new', size: 0}]) {
+    const data = {...release, assets: [{name: 'Client.pak', state: 'uploaded', size: 123}, {name: 'Server.pak', ...second}]};
+    for (const asset of [undefined, 'Client.pak']) {
+      await assert.rejects(prepareRequest(source(data), repository, release.tag_name, {kind: 'mod', asset}), /exactly one/);
+    }
+  }
+  const data = {...release, assets: [{name: 'Client.pak', state: 'uploaded', size: 123}]};
+  const request = await prepareRequest(source(data), repository, release.tag_name, {kind: 'mod', asset: 'Client.pak'});
+  assert.equal(parseRequest(request.body).dll_file, '');
+  await assert.rejects(prepareRequest(source({...data, assets: [{...data.assets[0], name: 'Client.PAK'}]}), repository, release.tag_name, {kind: 'mod'}));
+});
+test('direct recovery rejects conflicting or malformed fenced payloads rather than returning the wrong issue', async () => {
+  const request = await prepareRequest(source(release), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'});
+  for (const body of [request.body.replace('add-dll-release', 'add-package-release'), request.body.replace('v1.0.0-RC3"', 'v2.0.0"'), request.body.replace('https://github.com/Chiv2-Community/UnchainedPlugin', 'https://github.com/Other/Plugin'), request.body.replace('UnchainedPlugin.dll', 'Other.dll'), `${request.marker}\n\n\`\`\`json\n{bad}\n\`\`\``]) {
+    const github = {rest: {issues: {listForRepo: 'list', create: async () => {throw new Error('Unexpected duplicate');}}}, paginate: async () => [{body, html_url: 'wrong'}]};
+    await assert.rejects(submitRequest(github, registry, request));
+  }
+});
 test('reruns reuse open and closed issues but never pull requests', async () => {
   const request = await prepare(release);
   for (const state of ['open', 'closed']) {

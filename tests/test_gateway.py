@@ -262,9 +262,24 @@ def test_parallel_requests_create_one_issue(harness: Harness) -> None:
 
 def test_reuses_existing_closed_issue_after_lost_local_state(harness: Harness) -> None:
     first = harness.service.register(harness.token(), BODY)
+    harness.transport.issues[0]["state"] = "closed"
     next(harness.config.state_directory.joinpath("requests").glob("*.json")).unlink()
     assert harness.service.register(harness.token({"jti": "token-2"}), BODY) == first
     assert len(harness.transport.issues) == 1
+
+
+@pytest.mark.parametrize("state", ["open", "closed"])
+@pytest.mark.parametrize("asset", ["", "Plugin.dll"])
+def test_recovers_compatible_manual_or_direct_payload(harness: Harness, state: str, asset: str) -> None:
+    payload: JsonObject = {"action": "add-dll-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG, "description": "manual notes"}
+    if asset:
+        payload["dll_file"] = asset
+    harness.transport.issues = [{"html_url": "https://github.com/RegistryOrg/Registry/issues/99", "state": state,
+        "body": f"<!-- c2modregistry:{REPO}:{TAG} -->\nManual request\n```\n{json.dumps(payload)}\n```\n"}]
+    result = harness.service.register(harness.token(), {"kind": "plugin", "release_tag": TAG, "asset_name": asset})
+    assert result.url.endswith("/99")
+    assert len(harness.transport.issues) == 1
+    assert len(list((harness.config.state_directory / "requests").glob("*.json"))) == 1
 
 
 def test_creation_failure_is_retryable_with_fresh_token(harness: Harness) -> None:
@@ -277,6 +292,79 @@ def test_creation_failure_is_retryable_with_fresh_token(harness: Harness) -> Non
         harness.service.register(harness.token(), BODY)
     assert replay.value.status == 409
     assert harness.service.register(harness.token({"jti": "fresh-token"}), BODY).url
+
+
+def test_conflicting_recovery_does_not_poison_request_ledger(harness: Harness) -> None:
+    first = harness.service.register(harness.token(), BODY)
+    next((harness.config.state_directory / "requests").glob("*.json")).unlink()
+    harness.transport.release["assets"] = [
+        {"name": name, "state": "uploaded", "size": 123} for name in ("Plugin.dll", "Other.dll")
+    ]
+    restarted = Service(harness.config, harness.verifier, harness.app, harness.clock)
+    with pytest.raises(GatewayError) as error:
+        restarted.register(harness.token({"jti": "different-selection"}), BODY | {"asset_name": "Other.dll"})
+    assert error.value.status == 409
+    assert not list((harness.config.state_directory / "requests").glob("*.json"))
+    assert restarted.register(harness.token({"jti": "original-selection"}), BODY) == first
+    record = json_object(decode_json(next((harness.config.state_directory / "requests").glob("*.json")).read_text()))
+    assert record["asset"] == "Plugin.dll"
+    assert len(harness.transport.issues) == 1
+
+
+@pytest.mark.parametrize("changes", [
+    {"action": "add-package-release"}, {"repo_url": "https://github.com/Other/Plugin"},
+    {"release_tag": "v2.0.0"}, {"dll_file": "Other.dll"}, {"dll_file": None},
+])
+def test_recovered_manual_payload_must_match_before_persistence(harness: Harness, changes: JsonObject) -> None:
+    payload: JsonObject = {"action": "add-dll-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG, "dll_file": "Plugin.dll"}
+    payload.update(changes)
+    harness.transport.issues = [{"html_url": "existing", "body": f"<!-- c2modregistry:{REPO}:{TAG} -->\n\n```json\n{json.dumps(payload)}\n```\n"}]
+    with pytest.raises(GatewayError) as error:
+        harness.service.register(harness.token(), BODY)
+    assert error.value.status == 409
+    assert not list((harness.config.state_directory / "requests").glob("*.json"))
+
+
+@pytest.mark.parametrize("body", ["marker only", "```json\n{bad}\n```", "```\nnull\n```", "```\n[]\n```"])
+def test_recovered_malformed_payload_fails_closed(harness: Harness, body: str) -> None:
+    harness.transport.issues = [{"html_url": "existing", "body": f"<!-- c2modregistry:{REPO}:{TAG} -->\n{body}"}]
+    with pytest.raises(GatewayError) as error:
+        harness.service.register(harness.token(), BODY)
+    assert error.value.status == 409
+    assert not list((harness.config.state_directory / "requests").glob("*.json"))
+
+
+@pytest.mark.parametrize("asset", ["", "Client.pak"])
+@pytest.mark.parametrize("second_state,second_size", [("uploaded", 123), ("new", 0)])
+def test_gateway_rejects_ambiguous_paks_before_issue_creation(harness: Harness, asset: str, second_state: str, second_size: int) -> None:
+    harness.transport.release["assets"] = [
+        {"name": "Client.pak", "state": "uploaded", "size": 123},
+        {"name": "Server.pak", "state": second_state, "size": second_size},
+    ]
+    with pytest.raises(GatewayError, match="Multiple pak files") as error:
+        harness.service.register(harness.token(), {"kind": "mod", "release_tag": TAG, "asset_name": asset})
+    assert error.value.status == 422
+    assert not harness.transport.issues
+    assert not list((harness.config.state_directory / "requests").glob("*.json"))
+
+
+@pytest.mark.parametrize("asset", ["", "Client.pak"])
+def test_gateway_preserves_single_pak_wire_contract(harness: Harness, asset: str) -> None:
+    harness.transport.release["assets"] = [{"name": "Client.pak", "state": "uploaded", "size": 123}]
+    harness.service.register(harness.token(), {"kind": "mod", "release_tag": TAG, "asset_name": asset})
+    from mod_registry_core.registration import parse_registration_payload
+    assert parse_registration_payload(str(harness.transport.issues[0]["body"])) == {
+        "action": "add-package-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG,
+    }
+
+
+@pytest.mark.parametrize("asset", ["", "Client.PAK"])
+def test_gateway_preserves_registry_case_sensitive_pak_rule(harness: Harness, asset: str) -> None:
+    harness.transport.release["assets"] = [{"name": "Client.PAK", "state": "uploaded", "size": 123}]
+    with pytest.raises(GatewayError, match="No pak file") as error:
+        harness.service.register(harness.token(), {"kind": "mod", "release_tag": TAG, "asset_name": asset})
+    assert error.value.status == 422
+    assert not harness.transport.issues
 
 
 def test_rate_limit_persists_and_expires(harness: Harness) -> None:

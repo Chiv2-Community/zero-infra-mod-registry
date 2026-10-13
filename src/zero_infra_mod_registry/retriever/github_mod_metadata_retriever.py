@@ -20,6 +20,7 @@ from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
 from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
+from mod_registry_core.registration import single_pak_name
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
@@ -278,17 +279,12 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Returns:
             Asset object representing the .pak file, or an error string if not found or multiple found
         """
-        paks = [asset for asset in release.get_assets() if asset.name.endswith(".pak")]
-
-        if len(paks) == 0:
-            return f"No pak file found for release {release.tag_name}."
-
-        if len(paks) > 1:
-            return f"Multiple pak files found for release {release.tag_name}."
-
-        pak = paks[0]
-
-        return pak
+        assets = list(release.get_assets())
+        try:
+            name = single_pak_name((asset.name for asset in assets), release.tag_name)
+        except ValueError as error:
+            return str(error)
+        return next(asset for asset in assets if asset.name == name)
 
     def validate_version_tag_name(self, tag_name: str) -> Optional[str]:
         """

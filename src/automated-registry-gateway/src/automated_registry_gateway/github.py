@@ -15,6 +15,7 @@ from automated_registry_gateway.models import Config, GatewayError, Identity, Is
 from automated_registry_gateway.oidc import base64url
 from automated_registry_gateway.transport import Transport
 from mod_registry_core.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
+from mod_registry_core.registration import parse_registration_payload, registration_payload, single_pak_name
 
 API = "https://api.github.com"
 
@@ -71,22 +72,29 @@ class GithubApp:
         if json_bool(release.get("draft")) or release.get("tag_name") != request.tag:
             raise GatewayError(422, "Release must be published with the requested tag")
         suffix = ".dll" if request.kind == "plugin" else ".pak"
+        release_assets = [json_object(value) for value in json_array(release.get("assets"))]
+        if request.kind == "mod":
+            try:
+                single_pak_name((json_string(asset.get("name")) for asset in release_assets), request.tag)
+            except ValueError as error:
+                raise GatewayError(422, str(error)) from error
         assets: list[str] = []
-        for value in json_array(release.get("assets")):
-            asset = json_object(value)
+        for asset in release_assets:
             name = json_string(asset.get("name"))
-            if name.lower().endswith(suffix) and asset.get("state") == "uploaded" and json_int(asset.get("size")) > 0:
+            matches = name.lower().endswith(suffix) if request.kind == "plugin" else name.endswith(suffix)
+            if matches and asset.get("state") == "uploaded" and json_int(asset.get("size")) > 0:
                 assets.append(name)
         if request.asset:
             valid = request.asset in assets
         else:
-            valid = bool(assets) and (request.kind == "mod" or len(assets) == 1)
+            valid = len(assets) == 1
         if not valid:
             raise GatewayError(422, "Select an uploaded, nonempty release asset; multiple DLLs require asset_name")
 
     def create_issue(self, identity: Identity, request: Registration) -> Issue:
         token = self.installation_token()
         marker = f"<!-- c2modregistry:{identity.repository}:{request.tag} -->"
+        payload = registration_payload(request.kind, identity.repository, request.tag, request.asset)
         path = f"{API}/repos/{self.config.registry}/issues"
         # Recover after a process crash between GitHub creation and local commit.
         # GitHub timestamps order pages consistently for an unchanged issue list.
@@ -95,18 +103,17 @@ class GithubApp:
             for value in issues:
                 issue = json_object(value)
                 if "pull_request" not in issue and marker in json_string(issue.get("body") or ""):
+                    try:
+                        recovered = parse_registration_payload(json_string(issue.get("body")))
+                    except ValueError as error:
+                        raise GatewayError(409, "Existing registry issue has an invalid registration payload; edit its registry issue") from error
+                    if recovered != payload:
+                        raise GatewayError(409, "This tag already has a different request; edit its registry issue")
                     return Issue(json_string(issue.get("html_url")))
             if len(issues) < 100:
                 break
         else:
             raise GatewayError(503, "Registry issue history is too large for safe duplicate detection")
-        payload: JsonObject = {
-            "action": "add-dll-release" if request.kind == "plugin" else "add-package-release",
-            "repo_url": f"https://github.com/{identity.repository}",
-            "release_tag": request.tag,
-        }
-        if request.kind == "plugin" and request.asset:
-            payload["dll_file"] = request.asset
         body = f"{marker}\n\n```json\n{json.dumps(payload, indent=2)}\n```\n"
         kind = "DLL" if request.kind == "plugin" else "PAK"
         result = json_object(self.transport.request("POST", path, token, {

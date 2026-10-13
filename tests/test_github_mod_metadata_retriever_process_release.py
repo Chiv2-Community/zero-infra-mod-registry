@@ -59,3 +59,20 @@ def test_process_release_no_mod_json(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(requests, "get", get)
     with pytest.raises(Exception, match="mod.json does not exist"):
         retriever.process_release(Repo("Test", "Plugin"), release.as_release())
+
+
+@pytest.mark.parametrize("names,message", [
+    (["Client.pak", "Server.pak"], "Multiple pak files"),
+    (["Client.PAK"], "No pak file"),
+])
+def test_process_release_preserves_pak_cardinality_and_case_boundary(monkeypatch: pytest.MonkeyPatch, names: list[str], message: str) -> None:
+    release = FakeRelease(assets=[FakeAsset(name=name) for name in names])
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+    metadata: JsonObject = {"name": "Test Mod", "description": "Description", "authors": ["Author"], "dependencies": []}
+
+    def get(url: str, *, timeout: int) -> requests.Response:
+        return response_fixture(json.dumps(metadata).encode(), url)
+
+    monkeypatch.setattr(requests, "get", get)
+    with pytest.raises(Exception, match=message):
+        retriever.process_release(Repo("Test", "Plugin"), release.as_release())

@@ -1,3 +1,5 @@
+const { parseRequest } = require('./issue.cjs');
+
 function repositoryParts(value) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$(?![\s\S])/.test(value)) throw new Error('Repository must be owner/name.');
   const [owner, repo] = value.split('/');
@@ -11,9 +13,11 @@ async function prepareRequest(github, repository, tag, options) {
   const { data: release } = await github.rest.repos.getReleaseByTag({ ...repository, tag });
   if (release.draft || release.tag_name !== tag) throw new Error('The tagged release must be published before requesting registration.');
   const suffix = kind === 'plugin' ? '.dll' : '.pak';
-  const assets = release.assets.filter(a => a.name.toLowerCase().endsWith(suffix) && a.state === 'uploaded' && a.size > 0);
+  const matches = name => kind === 'plugin' ? name.toLowerCase().endsWith(suffix) : name.endsWith(suffix);
+  if (kind === 'mod' && release.assets.filter(a => matches(a.name)).length !== 1) throw new Error('A mod release must contain exactly one .pak file.');
+  const assets = release.assets.filter(a => matches(a.name) && a.state === 'uploaded' && a.size > 0);
   if (asset && !asset.toLowerCase().endsWith(suffix)) throw new Error(`Asset must end in ${suffix}.`);
-  if (asset ? !assets.some(a => a.name === asset) : !assets.length || (kind === 'plugin' && assets.length !== 1)) throw new Error('Select an uploaded, nonempty release asset; multiple DLLs require asset_name.');
+  if (asset ? !assets.some(a => a.name === asset) : assets.length !== 1) throw new Error('Select an uploaded, nonempty release asset; multiple DLLs require asset_name.');
   const payload = {
     action: kind === 'plugin' ? 'add-dll-release' : 'add-package-release',
     repo_url: `https://github.com/${repository.owner}/${repository.repo}`,
@@ -32,7 +36,12 @@ async function prepareRequest(github, repository, tag, options) {
 async function submitRequest(github, registry, request) {
   const issues = await github.paginate(github.rest.issues.listForRepo, { ...registry, state: 'all', per_page: 100 });
   const existing = issues.find(issue => !issue.pull_request && issue.body?.includes(request.marker));
-  if (existing) return existing;
+  if (existing) {
+    const recovered = parseRequest(existing.body);
+    const incoming = parseRequest(request.body);
+    if (Object.keys(incoming).some(key => recovered[key] !== incoming[key])) throw new Error('This tag already has a different request; edit its registry issue.');
+    return existing;
+  }
   const { data: issue } = await github.rest.issues.create({ ...registry, title: request.title, body: request.body });
   return issue;
 }
