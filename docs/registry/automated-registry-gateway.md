@@ -210,14 +210,23 @@ checks configuration and key format. Test App permissions with a real tagged req
 | `400` / `413` / `415` | Invalid payload, oversized body or content type | Use the shared action |
 | `401` | Invalid, expired or unauthorized OIDC identity | Check `id-token: write`, exact audience, public visibility, tag event and enrollment |
 | `403` | Tag, repository owner/ID or commit mismatch | Run from the publisher's published tag; do not move release tags |
-| `409` | Conflicting request or reused token after a failed attempt | Edit the existing issue or rerun the action for a fresh token |
+| `409` | Conflicting request or reused token for a new attempt | Edit the existing issue or rerun in a separate job for a fresh token |
 | `422` | Missing/unpublished release or invalid asset selection | Publish/upload the asset; select its exact filename |
 | `429` | Persistent gateway rate limit reached | Wait for the rolling hour window or adjust server limits |
 | `502` / `503` | GitHub API, App configuration or state storage failure | Check permissions, API quotas, outbound access and writable persistent storage |
 
+Deduplication is by repository ID/tag/kind. A mixed DLL+PAK release can create
+one plugin and one mod issue; invoke the action once per filename (see the
+[two-job example](../plugin/release-requests.md#releases-containing-both-a-dll-and-a-pak)).
+The gateway serializes its ledger writes; direct-token callers must serialize
+requests for each repository/tag/kind. Legacy unscoped ledger entries and issue
+markers remain recoverable, with the fenced payload checked before reuse.
+
 Duplicates return the original issue URL, including closed issues. Failed attempts
 count toward limits and consume the token; rerun for a fresh token. GitHub issue
 history recovers requests lost between issue creation and local persistence.
+Replay protection remains token-wide, not per kind; two new registrations count
+as two rate-limit events and require distinct tokens.
 
 Back up `/data` and the App configuration. Keep the App key separately protected.
 Rotate it by generating a new key, replacing the mounted file, recreating the

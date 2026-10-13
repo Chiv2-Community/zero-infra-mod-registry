@@ -56,3 +56,17 @@ test('malformed responses return clear guidance rather than raw parse errors', a
   await assert.rejects(submitGateway({getIDToken: async () => 'token', setSecret: () => {}}, endpoint, request,
     async () => ({ok: true, json: async () => {throw new Error('parse error with sensitive body');}})), /invalid JSON response/);
 });
+
+test('two filename invocations request separate OIDC tokens without caching', async () => {
+  let tokens = 0;
+  const core = {getIDToken: async audience => {assert.equal(audience, endpoint); return `token-${++tokens}`;}, setSecret: () => {}};
+  for (const [kind, asset_name] of [['plugin', 'Plugin.dll'], ['mod', 'Mod.pak']]) {
+    const body = {kind, asset_name, release_tag: request.release_tag};
+    await submitGateway(core, endpoint, body, async (target, options) => {
+      assert.equal(options.headers.Authorization, `Bearer token-${tokens}`);
+      assert.deepEqual(JSON.parse(options.body), body);
+      return {ok: true, json: async () => ({issue_url: `https://github.com/Org/Registry/issues/${tokens}`})};
+    });
+  }
+  assert.equal(tokens, 2);
+});

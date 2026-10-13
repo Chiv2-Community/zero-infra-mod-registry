@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import json
+import hashlib
 from pathlib import Path
 from threading import Thread
 from urllib.parse import quote
@@ -192,7 +193,7 @@ def test_registration_creates_exact_issue_with_limited_app_token(harness: Harnes
     body = creates[1][2]
     assert body is not None
     assert body["title"] == "[DLL RELEASE] Plugin Version v1.0.0"
-    assert body["body"] == '<!-- c2modregistry:Publisher/Plugin:v1.0.0 -->\n\n```json\n{\n  "action": "add-dll-release",\n  "repo_url": "https://github.com/Publisher/Plugin",\n  "release_tag": "v1.0.0",\n  "dll_file": "Plugin.dll"\n}\n```\n'
+    assert body["body"] == '<!-- c2modregistry:Publisher/Plugin:v1.0.0:plugin -->\n\n```json\n{\n  "action": "add-dll-release",\n  "repo_url": "https://github.com/Publisher/Plugin",\n  "release_tag": "v1.0.0",\n  "dll_file": "Plugin.dll"\n}\n```\n'
 
 
 @pytest.mark.parametrize("field", ["id", "owner", "private", "sha", "draft", "tag_name", "assets"])
@@ -415,6 +416,14 @@ def test_http_registration_and_health(harness: Harness) -> None:
             response = requests.post(f"{endpoint}/registrations", headers={"Authorization": f"Bearer {harness.token()}"}, json=BODY, timeout=5)
             assert response.status_code == 200
             assert json_object(decode_json(response.text))["issue_url"] == "https://github.com/RegistryOrg/Registry/issues/1"
+            harness.transport.release["assets"] = [
+                {"name": name, "state": "uploaded", "size": 123} for name in ("Plugin.dll", "Mod.pak")
+            ]
+            mod: JsonObject = {"kind": "mod", "release_tag": TAG, "asset_name": "Mod.pak"}
+            assert requests.post(f"{endpoint}/registrations", headers={"Authorization": f"Bearer {harness.token()}"}, json=mod, timeout=5).status_code == 409
+            response = requests.post(f"{endpoint}/registrations", headers={"Authorization": f"Bearer {harness.token({'jti': 'mod-token'})}"}, json=mod, timeout=5)
+            assert response.status_code == 200
+            assert json_object(decode_json(response.text))["issue_url"] == "https://github.com/RegistryOrg/Registry/issues/2"
             assert requests.post(f"{endpoint}/registrations", json=BODY, timeout=5).status_code == 401
             assert requests.post(f"{endpoint}/other", json=BODY, timeout=5).status_code == 404
             assert requests.post(f"{endpoint}/registrations", data="{}", timeout=5).status_code == 415
@@ -422,3 +431,65 @@ def test_http_registration_and_health(harness: Harness) -> None:
         finally:
             server.shutdown()
             thread.join(timeout=5)
+
+
+@pytest.mark.parametrize("first_kind", ["plugin", "mod"])
+@pytest.mark.parametrize("legacy", [False, True])
+def test_mixed_release_dual_registration_restart_and_recovery(harness: Harness, first_kind: str, legacy: bool) -> None:
+    from mod_registry_core.registration import parse_registration_payload
+    harness.transport.release["assets"] = [
+        {"name": name, "state": "uploaded", "size": 123} for name in ("Plugin.dll", "Other.dll", "Mod.pak")
+    ]
+    requests_by_kind: dict[str, JsonObject] = {
+        "plugin": BODY, "mod": {"kind": "mod", "release_tag": TAG, "asset_name": "Mod.pak"},
+    }
+    second_kind = "mod" if first_kind == "plugin" else "plugin"
+    first = harness.service.register(harness.token(), requests_by_kind[first_kind])
+    if legacy:
+        path = next((harness.config.state_directory / "requests").glob("*.json"))
+        legacy_key = hashlib.sha256(f"321:{TAG}".encode()).hexdigest()
+        path.rename(path.with_name(f"{legacy_key}.json"))
+        harness.transport.issues[0]["body"] = str(harness.transport.issues[0]["body"]).replace(f":{first_kind} -->", " -->")
+    restarted = Service(harness.config, harness.verifier, harness.app, harness.clock)
+    assert restarted.register(harness.token(), requests_by_kind[first_kind]) == first
+    # Token-wide replay protection also applies across kinds.
+    with pytest.raises(GatewayError, match="OIDC token already used"):
+        restarted.register(harness.token(), requests_by_kind[second_kind])
+    second = restarted.register(harness.token({"jti": "second-kind"}), requests_by_kind[second_kind])
+    assert first != second
+    assert len(harness.transport.issues) == 2
+    payloads = [parse_registration_payload(str(issue["body"])) for issue in harness.transport.issues]
+    assert {str(payload["action"]) for payload in payloads} == {"add-dll-release", "add-package-release"}
+    assert next(payload for payload in payloads if payload["action"] == "add-dll-release")["dll_file"] == "Plugin.dll"
+    assert "dll_file" not in next(payload for payload in payloads if payload["action"] == "add-package-release")
+    for path in (harness.config.state_directory / "requests").glob("*.json"):
+        path.unlink()
+    if legacy:
+        for issue in harness.transport.issues:
+            issue["body"] = str(issue["body"]).replace(":plugin -->", " -->").replace(":mod -->", " -->")
+    harness.transport.issues.reverse()  # Recovery must not depend on issue order.
+    for kind, expected in [(first_kind, first), (second_kind, second)]:
+        assert restarted.register(harness.token({"jti": f"recover-{kind}"}), requests_by_kind[kind]) == expected
+    assert len(harness.transport.issues) == 2
+
+
+def test_legacy_ledger_conflicting_asset_remains_rejected(harness: Harness) -> None:
+    harness.service.register(harness.token(), BODY)
+    path = next((harness.config.state_directory / "requests").glob("*.json"))
+    legacy_key = hashlib.sha256(f"321:{TAG}".encode()).hexdigest()
+    path.rename(path.with_name(f"{legacy_key}.json"))
+    with pytest.raises(GatewayError, match="different request"):
+        harness.service.register(harness.token({"jti": "other"}), BODY | {"asset_name": "Other.dll"})
+
+
+def test_parallel_mixed_requests_create_one_issue_per_kind(harness: Harness) -> None:
+    harness.transport.release["assets"] = [
+        {"name": name, "state": "uploaded", "size": 123} for name in ("Plugin.dll", "Mod.pak")
+    ]
+    mod: JsonObject = {"kind": "mod", "release_tag": TAG, "asset_name": "Mod.pak"}
+    requests_by_kind = [(harness.token(), BODY), (harness.token({"jti": "parallel-mod"}), mod)] * 3
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(lambda item: harness.service.register(*item), requests_by_kind))
+    assert len({issue.url for issue in results}) == 2
+    assert len(harness.transport.issues) == 2
+    assert len(list((harness.config.state_directory / "requests").glob("*.json"))) == 2

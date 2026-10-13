@@ -93,7 +93,8 @@ class GithubApp:
 
     def create_issue(self, identity: Identity, request: Registration) -> Issue:
         token = self.installation_token()
-        marker = f"<!-- c2modregistry:{identity.repository}:{request.tag} -->"
+        legacy_marker = f"<!-- c2modregistry:{identity.repository}:{request.tag} -->"
+        marker = f"<!-- c2modregistry:{identity.repository}:{request.tag}:{request.kind} -->"
         payload = registration_payload(request.kind, identity.repository, request.tag, request.asset)
         path = f"{API}/repos/{self.config.registry}/issues"
         # Recover after a process crash between GitHub creation and local commit.
@@ -102,11 +103,19 @@ class GithubApp:
             issues = json_array(self.transport.request("GET", f"{path}?state=all&sort=created&direction=desc&per_page=100&page={page}", token))
             for value in issues:
                 issue = json_object(value)
-                if "pull_request" not in issue and marker in json_string(issue.get("body") or ""):
+                body = json_string(issue.get("body") or "")
+                if "pull_request" not in issue and (marker in body or legacy_marker in body):
                     try:
                         recovered = parse_registration_payload(json_string(issue.get("body")))
                     except ValueError as error:
                         raise GatewayError(409, "Existing registry issue has an invalid registration payload; edit its registry issue") from error
+                    # Legacy markers cover both kinds. Only skip the other kind
+                    # after checking its repository/tag and valid wire shape.
+                    if (marker not in body and recovered.get("repo_url") == payload["repo_url"]
+                            and recovered.get("release_tag") == payload["release_tag"]
+                            and recovered.get("action") != payload["action"]
+                            and not (recovered.get("action") == "add-package-release" and "dll_file" in recovered)):
+                        continue
                     if recovered != payload:
                         raise GatewayError(409, "This tag already has a different request; edit its registry issue")
                     return Issue(json_string(issue.get("html_url")))

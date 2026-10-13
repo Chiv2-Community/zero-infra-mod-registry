@@ -11,10 +11,11 @@ const source = data => ({ rest: { repos: { getReleaseByTag: async args => {
 } } } });
 const prepare = data => prepareRequest(source(data), repository, release.tag_name, { kind: 'plugin' });
 
-test('preserves existing plugin request markers and exact prerelease tags', async () => {
+test('kind-scoped markers retain legacy recovery and exact prerelease tags', async () => {
   const request = await prepare(release);
   assert.equal(request.title, '[DLL RELEASE] UnchainedPlugin Version v1.0.0-RC3');
-  assert.equal(request.marker, '<!-- c2modregistry:Chiv2-Community/UnchainedPlugin:v1.0.0-RC3 -->');
+  assert.equal(request.marker, '<!-- c2modregistry:Chiv2-Community/UnchainedPlugin:v1.0.0-RC3:plugin -->');
+  assert.equal(request.legacyMarker, '<!-- c2modregistry:Chiv2-Community/UnchainedPlugin:v1.0.0-RC3 -->');
   assert.deepEqual(parseRequest(request.body), { action: 'add-dll-release', repo_url: 'https://github.com/Chiv2-Community/UnchainedPlugin', release_tag: release.tag_name, dll_file: '' });
 });
 test('invalid tags and kinds are rejected without contacting GitHub', async () => {
@@ -96,4 +97,41 @@ test('issue parsing rejects malformed or incomplete requests', () => {
 test('repository inputs reject URLs and control characters', () => {
   assert.deepEqual(repositoryParts('Org/Repo'), {owner: 'Org', repo: 'Repo'});
   for (const value of ['', 'a', 'a/b/c', 'https://github.com/a/b', 'a/b\n']) assert.throws(() => repositoryParts(value));
+});
+
+test('mixed DLL and single PAK release creates two independent requests in either order, including legacy recovery', async () => {
+  const data = {...release, assets: [...release.assets, {name: 'Other.dll', state: 'uploaded', size: 123}, {name: 'Mod.pak', state: 'uploaded', size: 123}]};
+  const requests = {
+    plugin: await prepareRequest(source(data), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'}),
+    mod: await prepareRequest(source(data), repository, release.tag_name, {kind: 'mod', asset: 'Mod.pak'}),
+  };
+  for (const order of [['plugin', 'mod'], ['mod', 'plugin']]) {
+    for (const legacy of [false, true]) {
+      const issues = [];
+      const github = {rest: {issues: {listForRepo: 'list', create: async args => {
+        const issue = {body: args.body, html_url: `issue-${issues.length}`};
+        issues.push(issue);
+        return {data: issue};
+      }}}, paginate: async () => [...issues].reverse()};
+      const first = await submitRequest(github, registry, requests[order[0]]);
+      if (legacy) first.body = first.body.replace(requests[order[0]].marker, requests[order[0]].legacyMarker);
+      const second = await submitRequest(github, registry, requests[order[1]]);
+      assert.notEqual(first.html_url, second.html_url);
+      if (legacy) second.body = second.body.replace(requests[order[1]].marker, requests[order[1]].legacyMarker);
+      assert.equal(await submitRequest(github, registry, requests[order[0]]), first);
+      assert.equal(await submitRequest(github, registry, requests[order[1]]), second);
+      assert.equal(issues.length, 2);
+      assert.equal(parseRequest(issues.find(issue => parseRequest(issue.body).action === 'add-dll-release').body).dll_file, 'UnchainedPlugin.dll');
+      assert.equal(parseRequest(issues.find(issue => parseRequest(issue.body).action === 'add-package-release').body).dll_file, '');
+    }
+  }
+});
+
+test('legacy recovery still rejects malformed and conflicting identity and DLL selection', async () => {
+  const request = await prepareRequest(source(release), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'});
+  const legacy = request.body.replace(request.marker, request.legacyMarker);
+  for (const body of [legacy.replace('UnchainedPlugin.dll', 'Other.dll'), legacy.replace('v1.0.0-RC3"', 'v2.0.0"'), legacy.replace('https://github.com/Chiv2-Community/UnchainedPlugin', 'https://github.com/Other/Plugin'), legacy.replace('add-dll-release', 'add-package-release'), `${request.legacyMarker}\n\n\`\`\`json\n{bad}\n\`\`\``]) {
+    const github = {rest: {issues: {listForRepo: 'list'}}, paginate: async () => [{body, html_url: 'wrong'}]};
+    await assert.rejects(submitRequest(github, registry, request));
+  }
 });

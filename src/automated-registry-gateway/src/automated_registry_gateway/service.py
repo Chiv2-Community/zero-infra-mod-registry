@@ -74,14 +74,24 @@ class Service:
             raise GatewayError(400, str(error)) from error
         if request.tag != identity.tag:
             raise GatewayError(403, "Requested release must match the authenticated workflow tag")
-        key = hashlib.sha256(f"{identity.repository_id}:{request.tag}".encode()).hexdigest()
+        key = hashlib.sha256(f"{identity.repository_id}:{request.tag}:{request.kind}".encode()).hexdigest()
         path = self.config.state_directory / "requests" / f"{key}.json"
         with self._exclusive():
-            if path.exists():
-                record = json_object(decode_json(path.read_text()))
+            legacy_key = hashlib.sha256(f"{identity.repository_id}:{request.tag}".encode()).hexdigest()
+            legacy_path = path.with_name(f"{legacy_key}.json")
+            record = json_object(decode_json(path.read_text())) if path.exists() else None
+            if record is None and legacy_path.exists():
+                legacy = json_object(decode_json(legacy_path.read_text()))
+                if legacy.get("kind") not in {"plugin", "mod"}:
+                    raise GatewayError(409, "Invalid legacy request state; repair the registry ledger")
+                if legacy.get("kind") == request.kind:
+                    record = legacy
+            if record is not None:
                 # Do not silently change selected assets on an already-created request.
                 if record.get("kind") != request.kind or record.get("asset") != request.asset:
                     raise GatewayError(409, "This tag already has a different request; edit its registry issue")
+                if not path.exists():
+                    atomic_write(path, record)
                 return Issue(json_string(record.get("issue_url")))
             self._rate_limit(identity)
             self.github.verify_release(identity, request)

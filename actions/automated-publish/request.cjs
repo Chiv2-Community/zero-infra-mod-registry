@@ -24,21 +24,26 @@ async function prepareRequest(github, repository, tag, options) {
     release_tag: tag,
   };
   if (kind === 'plugin' && asset) payload.dll_file = asset;
-  // Preserve the original marker so existing plugin requests remain idempotent.
-  const marker = `<!-- c2modregistry:${repository.owner}/${repository.repo}:${tag} -->`;
+  const legacyMarker = `<!-- c2modregistry:${repository.owner}/${repository.repo}:${tag} -->`;
+  const marker = `<!-- c2modregistry:${repository.owner}/${repository.repo}:${tag}:${kind} -->`;
   return {
     title: `[${kind === 'plugin' ? 'DLL' : 'PAK'} RELEASE] ${repository.repo} Version ${tag}`,
     body: `${marker}\n\n\`\`\`json\n${JSON.stringify(payload, null, 2)}\n\`\`\`\n`,
     marker,
+    legacyMarker,
   };
 }
 
 async function submitRequest(github, registry, request) {
   const issues = await github.paginate(github.rest.issues.listForRepo, { ...registry, state: 'all', per_page: 100 });
-  const existing = issues.find(issue => !issue.pull_request && issue.body?.includes(request.marker));
-  if (existing) {
+  const incoming = parseRequest(request.body);
+  for (const existing of issues) {
+    if (existing.pull_request || !(existing.body?.includes(request.marker) || existing.body?.includes(request.legacyMarker))) continue;
     const recovered = parseRequest(existing.body);
-    const incoming = parseRequest(request.body);
+    // Legacy markers were shared by both kinds; verify identity before skipping
+    // the other kind. A PAK request carrying DLL selection is not compatible.
+    if (!existing.body.includes(request.marker) && recovered.repo_url === incoming.repo_url && recovered.release_tag === incoming.release_tag
+        && recovered.action !== incoming.action && !(recovered.action === 'add-package-release' && recovered.dll_file)) continue;
     if (Object.keys(incoming).some(key => recovered[key] !== incoming[key])) throw new Error('This tag already has a different request; edit its registry issue.');
     return existing;
   }
