@@ -15,11 +15,9 @@ git config user.name 'github-actions[bot]'
 git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 if git merge-base --is-ancestor "$SOURCE_SHA" HEAD; then
   echo 'Destination already contains the source snapshot.'
-  exit 0
-fi
-if ! git merge --no-edit "$SOURCE_SHA"; then
+elif ! git merge --no-edit "$SOURCE_SHA"; then
   git merge --abort
   echo 'Merge conflicted; destination was not pushed.' >&2
   exit 1
 fi
-git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"

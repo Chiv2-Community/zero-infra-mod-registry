@@ -1,5 +1,5 @@
-name: Publish registry branch
-description: Merge an immutable source snapshot into a consumer branch without force pushing
+name: Prepare registry publication
+description: Merge an immutable source snapshot into a consumer branch for validation before pushing
 inputs:
   source_branch:
     description: Branch containing the approved registry
@@ -10,10 +10,15 @@ inputs:
   target_branch:
     description: Existing consumer branch
     required: true
+outputs:
+  candidate_sha:
+    description: Immutable merge candidate to validate and publish
+    value: ${{ steps.merge.outputs.candidate_sha }}
 runs:
   using: composite
   steps:
-    - shell: bash
+    - id: merge
+      shell: bash
       env:
         SOURCE_BRANCH: ${{ inputs.source_branch }}
         SOURCE_SHA: ${{ inputs.source_sha }}

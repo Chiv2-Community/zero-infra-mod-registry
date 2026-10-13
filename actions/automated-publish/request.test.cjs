@@ -22,6 +22,18 @@ test('invalid tags and kinds are rejected without contacting GitHub', async () =
   for (const tag of ['main', 'v1', 'v1.0.0\nmalicious', 'v1.0.0"']) await assert.rejects(prepareRequest({}, repository, tag, { kind: 'plugin' }), /semantic version/);
   await assert.rejects(prepareRequest({}, repository, release.tag_name, { kind: 'other' }), /kind/);
 });
+test('DLL cardinality precedes upload eligibility; explicit selection remains exact', async () => {
+  for (const [state, size] of [['starter', 0], ['uploaded', 0], ['starter', 1], ['uploaded', 1]]) {
+    const data = {...release, assets: [...release.assets, {name: 'Other.DLL', state, size}]};
+    await assert.rejects(prepare(data), /exactly one/);
+    const request = await prepareRequest(source(data), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'});
+    assert.equal(JSON.parse(request.body.split('```json\n')[1].split('\n```')[0]).dll_file, 'UnchainedPlugin.dll');
+    if (state !== 'uploaded' || size === 0) {
+      await assert.rejects(prepareRequest(source(data), repository, release.tag_name, {kind: 'plugin', asset: 'Other.DLL'}), /uploaded, nonempty/);
+    }
+  }
+});
+
 test('unpublished, mismatched, missing, empty, unfinished or ambiguous assets fail', async () => {
   for (const data of [
     { ...release, draft: true }, { ...release, tag_name: 'v1.0.0' }, { ...release, assets: [] },

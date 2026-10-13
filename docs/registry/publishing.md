@@ -1,7 +1,8 @@
 # Publish a consumer branch
 
 The workflow checks out and validates an approved snapshot, including DLL
-downloads, then merges it into the destination branch. Conflicts and
+downloads, then merges it into the destination branch and validates that exact
+candidate before pushing. Conflicts, invalid merged registries and
 non-fast-forward push races fail without forcing changes. Repeated delivery is
 a no-op. This publishes the full Git tree.
 
@@ -41,10 +42,11 @@ jobs:
 
 ## Branch action
 
-`actions/publish-branch` provides only the merge operation. For custom workflows,
-checkout with `fetch-depth: 0` and validate the source snapshot first. The
-checked-out HEAD must equal `source_sha`. Git credentials must already allow
-pushing. Use the reusable workflow to include validation automatically.
+`actions/publish-branch` prepares the merge without pushing and returns
+`candidate_sha`. Custom workflows must validate both source and merged candidate,
+then call `push.sh` with that SHA. Use the reusable workflow for these gates and
+non-force publication. Checkout with `fetch-depth: 0`; HEAD must equal
+`source_sha` before preparation. Git credentials must already allow pushing.
 
 | Input | Example | Default | Description |
 |---|---|---|---|
@@ -61,8 +63,23 @@ steps:
     with:
       command: validate
       verify_dll_downloads: 'true'
-  - uses: Chiv2-Community/zero-infra-mod-registry/actions/publish-branch@main
+  - uses: actions/checkout@v4
+    with:
+      repository: Chiv2-Community/zero-infra-mod-registry
+      path: .registry-tool
+      persist-credentials: false
+  - id: merge
+    uses: ./.registry-tool/actions/publish-branch
     with:
       source_sha: ${{ github.sha }}
       target_branch: db
+  - uses: ./.registry-tool
+    with:
+      command: validate
+      verify_dll_downloads: 'true'
+  - shell: bash
+    env:
+      CANDIDATE_SHA: ${{ steps.merge.outputs.candidate_sha }}
+      TARGET_BRANCH: db
+    run: bash .registry-tool/actions/publish-branch/push.sh
 ```

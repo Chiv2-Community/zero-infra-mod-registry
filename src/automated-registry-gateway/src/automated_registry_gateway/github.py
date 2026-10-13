@@ -15,7 +15,7 @@ from automated_registry_gateway.models import Config, GatewayError, Identity, Is
 from automated_registry_gateway.oidc import base64url
 from automated_registry_gateway.transport import Transport
 from mod_registry_core.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
-from mod_registry_core.registration import parse_registration_payload, registration_payload, single_pak_name
+from mod_registry_core.registration import parse_registration_payload, registration_payload, selected_dll_name, single_pak_name
 
 API = "https://api.github.com"
 
@@ -73,11 +73,13 @@ class GithubApp:
             raise GatewayError(422, "Release must be published with the requested tag")
         suffix = ".dll" if request.kind == "plugin" else ".pak"
         release_assets = [json_object(value) for value in json_array(release.get("assets"))]
-        if request.kind == "mod":
-            try:
+        try:
+            if request.kind == "mod":
                 single_pak_name((json_string(asset.get("name")) for asset in release_assets), request.tag)
-            except ValueError as error:
-                raise GatewayError(422, str(error)) from error
+            else:
+                selected_dll_name((json_string(asset.get("name")) for asset in release_assets), request.asset or None)
+        except ValueError as error:
+            raise GatewayError(422, str(error)) from error
         assets: list[str] = []
         for asset in release_assets:
             name = json_string(asset.get("name"))

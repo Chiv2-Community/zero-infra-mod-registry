@@ -36,8 +36,20 @@ jobs:
           command: validate
           verify_dll_downloads: 'true'
       - name: Merge validated snapshot
+        id: merge
         uses: ./.registry-tool/actions/publish-branch
         with:
           source_branch: ${{ inputs.source_branch }}
           source_sha: ${{ inputs.source_sha || github.sha }}
           target_branch: ${{ inputs.target_branch }}
+      - name: Validate merge candidate
+        uses: ./.registry-tool
+        with:
+          command: validate
+          verify_dll_downloads: 'true'
+      - name: Publish validated candidate
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ steps.merge.outputs.candidate_sha }}
+          TARGET_BRANCH: ${{ inputs.target_branch }}
+        run: bash .registry-tool/actions/publish-branch/push.sh

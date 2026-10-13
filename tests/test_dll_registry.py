@@ -310,6 +310,23 @@ def test_explicit_selection_never_falls_back(monkeypatch: pytest.MonkeyPatch, fi
         retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", filename)
 
 
+def test_unfinished_second_dll_requires_selection_before_download(monkeypatch: pytest.MonkeyPatch) -> None:
+    release = FakeRelease(assets=[FakeAsset(size=len(BINARY)), FakeAsset(name="Other.DLL", size=0)])
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+    downloaded: list[str] = []
+
+    def measure(url: str) -> tuple[str, int]:
+        downloaded.append(url)
+        return DLL.sha256, DLL.size
+
+    monkeypatch.setattr(retriever, "measure_dll", measure)
+    with pytest.raises(ValueError, match="exactly one DLL"):
+        retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    assert not downloaded
+    assert retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", "Plugin.dll") == DLL
+    assert downloaded == [DLL.download_url]
+
+
 def test_duplicate_asset_names_are_ambiguous() -> None:
     retriever = GithubModMetadataRetriever(FakeGithub([FakeRelease(assets=[FakeAsset(), FakeAsset()])]).as_github())
     with pytest.raises(ValueError, match="Requested DLL asset"):

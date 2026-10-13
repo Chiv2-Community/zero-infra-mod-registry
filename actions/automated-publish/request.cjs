@@ -15,7 +15,9 @@ async function prepareRequest(github, repository, tag, options) {
   const suffix = kind === 'plugin' ? '.dll' : '.pak';
   const matches = name => kind === 'plugin' ? name.toLowerCase().endsWith(suffix) : name.endsWith(suffix);
   if (kind === 'mod' && release.assets.filter(a => matches(a.name)).length !== 1) throw new Error('A mod release must contain exactly one .pak file.');
-  const assets = release.assets.filter(a => matches(a.name) && a.state === 'uploaded' && a.size > 0);
+   const candidates = release.assets.filter(a => matches(a.name) && (!asset || a.name === asset));
+   if (candidates.length !== 1) throw new Error('Select exactly one release asset; multiple DLLs require asset_name.');
+   const assets = candidates.filter(a => a.state === 'uploaded' && a.size > 0);
   if (asset && !asset.toLowerCase().endsWith(suffix)) throw new Error(`Asset must end in ${suffix}.`);
   if (asset ? !assets.some(a => a.name === asset) : assets.length !== 1) throw new Error('Select an uploaded, nonempty release asset; multiple DLLs require asset_name.');
   const payload = {

@@ -56,7 +56,7 @@ See [gateway setup](docs/registry/automated-registry-gateway.md).
 | Root action | Register, remove, or validate registry entries in Docker | [Registry actions](docs/registry/actions.md) |
 | `actions/validate-metadata` | Check metadata schemas and registered dependency versions | [Plugins](docs/plugin/README.md), [mods](docs/mod/README.md) |
 | `actions/automated-publish` (optional) | Submit a release through OIDC or a direct issue token | [Automated publish](docs/plugin/release-requests.md) |
-| `actions/publish-branch` | Merge an immutable approved snapshot into an existing branch | [Publishing](docs/registry/publishing.md) |
+| `actions/publish-branch` | Prepare an immutable merge candidate for validated publication | [Publishing](docs/registry/publishing.md) |
 | `.github/workflows/register-release.yml` | Parse issues, register releases, validate, open approval PRs | [Registry setup](docs/registry/README.md) |
 | `.github/workflows/validate-registry.yml` | Validate registry PRs, including DLL downloads | [Registry setup](docs/registry/README.md) |
 | `.github/workflows/publish-registry.yml` | Validate and publish to a consumer branch | [Publishing](docs/registry/publishing.md) |

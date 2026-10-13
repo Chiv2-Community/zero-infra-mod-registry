@@ -228,6 +228,23 @@ def test_rejects_incomplete_empty_or_mismatched_assets(harness: Harness, asset: 
         harness.service.register(harness.token(), BODY)
 
 
+@pytest.mark.parametrize("state,size", [("starter", 0), ("uploaded", 0), ("starter", 1), ("uploaded", 1)])
+def test_dll_cardinality_precedes_upload_filtering(harness: Harness, state: str, size: int) -> None:
+    harness.transport.release["assets"] = [
+        {"name": "Plugin.dll", "state": "uploaded", "size": 123},
+        {"name": "Other.DLL", "state": state, "size": size},
+    ]
+    with pytest.raises(GatewayError, match="exactly one DLL"):
+        harness.service.register(harness.token(), {"kind": "plugin", "release_tag": TAG})
+    assert not harness.transport.issues
+    # Preflight failure consumes the token, but not issue deduplication.
+    with pytest.raises(GatewayError, match="OIDC token already used"):
+        harness.service.register(harness.token(), BODY)
+    issue = harness.service.register(harness.token({"jti": "explicit-selection"}), BODY)
+    assert issue.url
+    assert '"dll_file": "Plugin.dll"' in str(harness.transport.issues[0]["body"])
+
+
 def test_ambiguous_dll_selection_and_pak_request(harness: Harness) -> None:
     harness.transport.release["assets"] = [
         {"name": "Plugin.dll", "state": "uploaded", "size": 1},
