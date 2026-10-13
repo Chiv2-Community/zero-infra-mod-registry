@@ -764,6 +764,7 @@ version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "argparse" },
+    { name = "cryptography" },
     { name = "jsonschema" },
     { name = "pygithub" },
     { name = "requests" },
@@ -784,6 +785,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
+    { name = "cryptography", specifier = ">=46.0.0" },
     { name = "jsonschema", specifier = ">=4.26.0" },
     { name = "pygithub", specifier = ">=2.8.1" },
     { name = "requests", specifier = ">=2.32.5" },

@@ -101,3 +101,11 @@ jobs:
 Clients can read `main` directly. To maintain a separate consumer branch, use
 [the publishing workflow](publishing.md). See [action inputs and CLI](actions.md)
 for manual registry operations.
+
+## Optional automated publishing
+
+The registry works with manually opened registration issues. To automate them,
+deploy [automated-registry-gateway](automated-registry-gateway.md) on an HTTPS
+server and let publishers use `actions/automated-publish`. Both are optional.
+The gateway authenticates publishers with GitHub OIDC and creates issues using
+your GitHub App. The issue workflow above processes those requests unchanged.

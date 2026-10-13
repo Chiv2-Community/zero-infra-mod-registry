@@ -37,18 +37,21 @@ jobs:
           mod_file: mod.json
 ```
 
-## Release request
+## Automated publish (optional)
 
-The action checks the published pak asset and opens or reuses a registry issue.
-Registry processing creates an approval PR. Configure `REGISTRY_ISSUE_TOKEN` with
-Issues write access to the registry. See [all release-request inputs and retry
-behavior](../plugin/release-requests.md).
+The action authenticates to your registry's gateway using GitHub OIDC. The gateway
+checks the published pak asset and opens or reuses a registry issue. Registry
+processing creates an approval PR. No custom publisher secret is required. See
+[all release-request inputs and retry behavior](../plugin/release-requests.md).
+
+This action and `automated-registry-gateway` are optional. Publishers can open
+registration issues manually instead.
 
 | Input | Example | Default | Description |
 |---|---|---|---|
 | `kind` | `mod` | Required | Select pak registration |
-| `registry_token` | `${{ secrets.REGISTRY_ISSUE_TOKEN }}` | Required | Token with Issues write access to the registry |
-| `release_tag` | `v1.0.0` | `github.ref_name` | Exact published semantic version tag |
+| `endpoint` | `https://registry.example.com/registrations` | Empty | Your registry's HTTPS gateway URL |
+| `release_tag` | `v1.0.0` | `github.ref_name` | Published semantic version tag; must match the workflow tag |
 
 Add this job to your release workflow. Use your publishing job name in `needs`:
 
@@ -58,14 +61,15 @@ request-registration:
   runs-on: ubuntu-latest
   permissions:
     contents: read
+    id-token: write
   concurrency:
     group: registry-release-${{ github.ref }}
     cancel-in-progress: false
   steps:
-    - uses: Chiv2-Community/zero-infra-mod-registry/actions/request-release@main
+    - uses: Chiv2-Community/zero-infra-mod-registry/actions/automated-publish@prepare-v1
       with:
+        endpoint: https://registry.example.com/registrations
         kind: mod
-        registry_token: ${{ secrets.REGISTRY_ISSUE_TOKEN }}
 ```
 
 For manual requests, use the [registry issue payload](../registry/README.md#issue-payload).

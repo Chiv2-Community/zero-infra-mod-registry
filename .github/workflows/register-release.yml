@@ -35,7 +35,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { parseRequest } = require('./.registry-tool/actions/request-release/issue.cjs');
+            const { parseRequest } = require('./.registry-tool/actions/automated-publish/issue.cjs');
             const { data: issue } = await github.rest.issues.get({...context.repo, issue_number: context.issue.number});
             const payload = parseRequest(issue.body);
             for (const [key, value] of Object.entries(payload)) core.setOutput(key, value);

@@ -6,7 +6,8 @@
 2. Validate metadata before publishing.
 3. Tag a semantic version release and upload the DLL. A release-asset
    `plugin.json` overrides metadata committed at the tag.
-4. [Request registration](release-requests.md). Each version requires registry
+4. Open a registration issue manually or use [automated publish](release-requests.md).
+   The automated action and gateway are optional. Each version requires registry
    maintainer approval. Publish a new version when DLL contents change.
 
 ## Metadata workflow
