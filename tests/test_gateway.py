@@ -315,6 +315,43 @@ def workflow_payload(body: str) -> JsonValue:
 
 
 @pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])
+@pytest.mark.parametrize("nested", [False, True])
+def test_recovery_rejects_non_json_constants_before_projection(harness: Harness, legacy: bool, constant: str, nested: bool) -> None:
+    payload: JsonObject = {"action": "add-dll-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG, "dll_file": "Plugin.dll"}
+    # Write raw JSON: json.dumps would quote the invalid constant.
+    extra = f'[{{"value":{constant}}}]' if nested else constant
+    text = json.dumps(payload)[:-1] + ',"notes":' + extra + '}'
+    marker = f"<!-- c2modregistry:{REPO}:{TAG}{'' if legacy else ':plugin'} -->"
+    # A later valid fence must not hide the malformed first request.
+    body = f"{marker}\n\n```json\n{text}\n```\n\n```json\n{json.dumps(payload)}\n```\n"
+    assert workflow_payload(body) is None
+    with pytest.raises(ValueError, match="Invalid JSON constant"):
+        parse_registration_payload(body)
+    harness.transport.issues = [{"html_url": "https://github.com/RegistryOrg/Registry/issues/99", "body": body}]
+    with pytest.raises(GatewayError) as error:
+        harness.service.register(harness.token(), BODY)
+    assert error.value.status == 409
+    assert not list((harness.config.state_directory / "requests").glob("*.json"))
+    assert len(harness.transport.issues) == 1
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("extra", ['[null, true, false, 123, -1.5, {"value":"NaN"}]', '1e400', '{"value":1,"value":2}'])
+def test_recovery_preserves_valid_ignored_json_fields(harness: Harness, legacy: bool, extra: str) -> None:
+    payload: JsonObject = {"action": "add-dll-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG, "dll_file": "Plugin.dll"}
+    text = json.dumps(payload)[:-1] + ',"notes":' + extra + '}'
+    marker = f"<!-- c2modregistry:{REPO}:{TAG}{'' if legacy else ':plugin'} -->"
+    body = f"{marker}\n\n```json\n{text}\n```\n"
+    assert workflow_payload(body) == payload
+    assert parse_registration_payload(body) == payload
+    harness.transport.issues = [{"html_url": "https://github.com/RegistryOrg/Registry/issues/99", "body": body}]
+    assert harness.service.register(harness.token(), BODY).url.endswith("/99")
+    record = json_object(decode_json(next((harness.config.state_directory / "requests").glob("*.json")).read_text()))
+    assert record["asset"] == "Plugin.dll"
+
+
+@pytest.mark.parametrize("legacy", [False, True])
 @pytest.mark.parametrize("placement", ["both", "opening", "closing"])
 @pytest.mark.parametrize("spacing", ["", " \t", "\r", "\ufeff", "\x1c", "\x85", "\u00a0", "\u2028", "\u2029", "\v", "\f"])
 def test_recovery_and_workflow_use_identical_fence_whitespace(harness: Harness, legacy: bool, placement: str, spacing: str) -> None:

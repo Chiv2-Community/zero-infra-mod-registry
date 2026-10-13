@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Union, TypeAlias, cast
+from typing import Dict, List, Never, Union, TypeAlias, cast
 
 JsonValue: TypeAlias = Union[str, int, float, bool, None, List["JsonValue"], Dict[str, "JsonValue"]]
 JsonObject: TypeAlias = Dict[str, JsonValue]
 
 
+def _reject_constant(value: str) -> Never:
+    raise ValueError(f"Invalid JSON constant: {value}")
+
+
 def decode_json(text: str) -> JsonValue:
-    # The standard decoder only produces the JSON value types declared above.
+    # Reject Python's non-JSON constants, including in ignored/nested fields.
     # This is the sole cast at that external deserialization boundary.
-    return cast(JsonValue, json.loads(text))
+    return cast(JsonValue, json.loads(text, parse_constant=_reject_constant))
 
 
 def json_object(value: JsonValue) -> JsonObject:
