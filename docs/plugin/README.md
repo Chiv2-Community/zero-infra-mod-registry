@@ -20,13 +20,13 @@ The action installs Python through uv and reads dependency records from a
 checkout at `.metadata-validation-registry`. It fails if neither metadata file
 exists.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `plugin_file` | `plugin.json` | Auto-detect root `plugin.json` | Plugin metadata path |
-| `mod_file` | `mod.json` | Auto-detect root `mod.json` | Pak metadata path; also validated when present |
-| `registry_repository` | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Dependency registry owner/repository |
-| `registry_ref` | `main` | `main` | Registry branch, tag or commit SHA |
-| `registry_token` | `${{ secrets.REGISTRY_READ_TOKEN }}` | `github.token` | Read access token; supply one for private registries |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `plugin_file` | string | Auto-detect root `plugin.json` | `plugin.json` | Plugin metadata path |
+| `mod_file` | string | Auto-detect root `mod.json` | `mod.json` | Pak metadata path; also validated when present |
+| `registry_repository` | string | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Dependency registry owner/repository |
+| `registry_ref` | string | `main` | `main` | Registry branch, tag or commit SHA |
+| `registry_token` | string | `github.token` | `${{ secrets.REGISTRY_READ_TOKEN }}` | Read access token; supply one for private registries |
 
 Save as `.github/workflows/metadata.yml`:
 

@@ -7,19 +7,19 @@ reviewed PR. Failures fail the step.
 Outputs: `result` (command log), `failed` (`true` or `false`). Read log outputs
 through environment variables, not inline shell interpolation.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `command` | `add-dll-release` | Required | `add-package-release`, `add-dll-release`, `remove`, or `validate` |
-| `repo_url` | `https://github.com/Owner/Plugin` | Empty | Required for registration and removal |
-| `release_tag` | `v1.0.0` | Empty | Exact published tag; required for registration |
-| `dll_file` | `Plugin.dll` | Empty | Exact DLL asset name; required for ambiguous DLL releases |
-| `github_token` | `${{ secrets.GITHUB_TOKEN }}` | `github.token` | Token with read access to source repositories |
-| `dry_run` | `'true'` | `false` | Check an operation without writing files |
-| `verify_dll_downloads` | `'true'` | `false` | Download DLLs and check recorded hashes/sizes on `validate` |
-| `log_level` | `DEBUG` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
-| `registry_path` | `./registry` | `./registry` | Repository records directory |
-| `package_db_path` | `./package_db` | `./package_db` | Pak database directory |
-| `dll_db_path` | `./dll_db` | `./dll_db` | Plugin database directory |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `command` | enum (`add-package-release`, `add-dll-release`, `remove`, `validate`) | Required | `add-dll-release` | Registry operation |
+| `repo_url` | string | Empty | `https://github.com/Owner/Plugin` | Required for registration and removal |
+| `release_tag` | string | Empty | `v1.0.0` | Exact published tag; required for registration |
+| `release_asset_name` | string | Empty | `Plugin.dll` | Exact DLL asset name; required for ambiguous DLL releases |
+| `github_token` | string | `github.token` | `${{ secrets.GITHUB_TOKEN }}` | Token with read access to source repositories |
+| `dry_run` | boolean | `false` | `'true'` | Check an operation without writing files |
+| `verify_dll_downloads` | boolean | `false` | `'true'` | Download DLLs and check recorded hashes/sizes on `validate` |
+| `log_level` | enum (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) | `INFO` | `DEBUG` | Logging verbosity |
+| `registry_path` | string | `./registry` | `./registry` | Repository records directory |
+| `package_db_path` | string | `./package_db` | `./package_db` | Pak database directory |
+| `dll_db_path` | string | `./dll_db` | `./dll_db` | Plugin database directory |
 
 Checkout the registry before calling the action:
 
@@ -31,7 +31,7 @@ steps:
       command: add-dll-release
       repo_url: https://github.com/Owner/Plugin
       release_tag: v1.0.0
-      dll_file: Plugin.dll
+      release_asset_name: Plugin.dll
 ```
 
 ## CLI

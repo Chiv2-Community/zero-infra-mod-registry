@@ -13,12 +13,12 @@ group for each destination, including temporary compatibility branches.
 The event must run from the source branch. Pin both the workflow reference and
 `tool_ref` to the same commit for reproducibility.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `target_branch` | `db` | Required | Existing destination branch |
-| `source_branch` | `main` | `main` | Branch containing the approved registry |
-| `source_sha` | `${{ github.sha }}` | Event SHA | Full 40-character commit SHA reachable from the source branch |
-| `tool_ref` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | `main` | Upstream implementation branch, tag or commit |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `target_branch` | string | Required | `db` | Existing destination branch |
+| `source_branch` | string | `main` | `main` | Branch containing the approved registry |
+| `source_sha` | string | Event SHA | `${{ github.sha }}` | Full 40-character commit SHA reachable from the source branch |
+| `tool_ref` | string | `main` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | Upstream implementation branch, tag or commit |
 
 Save this workflow in the registry:
 
@@ -48,11 +48,11 @@ then call `push.sh` with that SHA. Use the reusable workflow for these gates and
 non-force publication. Checkout with `fetch-depth: 0`; HEAD must equal
 `source_sha` before preparation. Git credentials must already allow pushing.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `target_branch` | `db` | Required | Existing destination branch |
-| `source_branch` | `main` | `main` | Approved source branch; must match the event branch |
-| `source_sha` | `${{ github.sha }}` | Required | Full 40-character source commit SHA; must match HEAD and be reachable from the source branch |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `target_branch` | string | Required | `db` | Existing destination branch |
+| `source_branch` | string | `main` | `main` | Approved source branch; must match the event branch |
+| `source_sha` | string | Required | `${{ github.sha }}` | Full 40-character source commit SHA; must match HEAD and be reachable from the source branch |
 
 ```yaml
 steps:

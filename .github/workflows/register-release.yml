@@ -46,7 +46,7 @@ jobs:
           command: ${{ steps.request.outputs.action }}
           repo_url: ${{ steps.request.outputs.repo_url }}
           release_tag: ${{ steps.request.outputs.release_tag }}
-          dll_file: ${{ steps.request.outputs.dll_file }}
+          release_asset_name: ${{ steps.request.outputs.dll_file }}
       - name: Validate updated registry
         uses: ./.registry-tool
         with:

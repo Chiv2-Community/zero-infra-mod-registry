@@ -19,10 +19,10 @@ issue. PR comments are ignored.
 
 The workflow uses the caller's `GITHUB_TOKEN`; no additional secrets are required.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `registry_branch` | `main` | `main` | Registry branch used as the registration PR base |
-| `tool_ref` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | `main` | Upstream implementation revision; pin to the same SHA as the workflow reference |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `registry_branch` | string | `main` | `main` | Registry branch used as the registration PR base |
+| `tool_ref` | string | `main` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | Upstream implementation revision; pin to the same SHA as the workflow reference |
 
 Save as `.github/workflows/register.yml`:
 
@@ -76,9 +76,9 @@ hashes/sizes. Require this check for human-created PRs. PRs created using
 `GITHUB_TOKEN` do not trigger another workflow run; the issue workflow validates
 them before opening the PR.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `tool_ref` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | `main` | Upstream implementation revision; pin to the same SHA as the workflow reference |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `tool_ref` | string | `main` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | Upstream implementation revision; pin to the same SHA as the workflow reference |
 
 Save as `.github/workflows/validate.yml`:
 

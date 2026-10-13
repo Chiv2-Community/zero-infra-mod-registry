@@ -143,12 +143,12 @@ and `token.actions.githubusercontent.com`.
 The action obtains an OIDC token for the exact endpoint, masks it, and submits
 release details. Configure `id-token: write` and run from the published tag.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `endpoint` | `https://registry.example.com/registrations` | Empty | Exact gateway URL and OIDC audience |
-| `kind` | `plugin` | Required | `plugin` for DLLs or `mod` for pak assets |
-| `release_tag` | `${{ github.ref_name }}` | `github.ref_name` | Published semantic version tag; must match the workflow tag |
-| `asset_name` | `Plugin.dll` | Empty | Exact asset filename; required for multiple DLLs |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `endpoint` | string | Empty | `https://registry.example.com/registrations` | Exact gateway URL and OIDC audience |
+| `kind` | enum (`plugin`, `mod`) | Required | `plugin` | DLL or pak registration |
+| `release_tag` | string | `github.ref_name` | `${{ github.ref_name }}` | Published semantic version tag; must match the workflow tag |
+| `asset_name` | string | Empty | `Plugin.dll` | Exact asset filename; required for multiple DLLs |
 
 ```yaml
 request-registration:

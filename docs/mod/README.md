@@ -14,11 +14,11 @@ The action validates metadata schemas and registered dependency versions. Make
 the publishing job depend on validation. For all options, see the
 [metadata action inputs](../plugin/README.md#metadata-workflow).
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `mod_file` | `mod.json` | Auto-detect root `mod.json` | Pak metadata path |
-| `registry_repository` | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Dependency registry owner/repository |
-| `registry_ref` | `main` | `main` | Registry branch, tag or commit SHA |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `mod_file` | string | Auto-detect root `mod.json` | `mod.json` | Pak metadata path |
+| `registry_repository` | string | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Dependency registry owner/repository |
+| `registry_ref` | string | `main` | `main` | Registry branch, tag or commit SHA |
 
 Save as `.github/workflows/metadata.yml`:
 
@@ -47,11 +47,11 @@ processing creates an approval PR. No custom publisher secret is required. See
 This action and `automated-registry-gateway` are optional. Publishers can open
 registration issues manually instead.
 
-| Input | Example | Default | Description |
-|---|---|---|---|
-| `kind` | `mod` | Required | Select pak registration |
-| `endpoint` | `https://registry.example.com/registrations` | Empty | Your registry's HTTPS gateway URL |
-| `release_tag` | `v1.0.0` | `github.ref_name` | Published semantic version tag; must match the workflow tag |
+| Input | Type | Default | Example | Description |
+|---|---|---|---|---|
+| `kind` | enum (`plugin`, `mod`) | Required | `mod` | Select pak registration |
+| `endpoint` | string | Empty | `https://registry.example.com/registrations` | Your registry's HTTPS gateway URL |
+| `release_tag` | string | `github.ref_name` | `v1.0.0` | Published semantic version tag; must match the workflow tag |
 
 Add this job to your release workflow. Use your publishing job name in `needs`:
 
