@@ -1,5 +1,7 @@
 function parseRequest(body) {
-  const block = body?.match(/^```(?:json)?\s*\n([\s\S]*?)^```\s*$/m);
+  // Keep identical to registration.py: ASCII fence spacing and LF/CRLF boundaries.
+  // Unicode whitespace and multiline anchors differ between Python and JS.
+  const block = body?.match(/(?:^|\n)```(?:json)?[ \t\r]*\n([\s\S]*?)\n```[ \t\r]*(?=\n|(?![\s\S]))/);
   if (!block) throw new Error('Include a fenced JSON registration request.');
   const payload = JSON.parse(block[1]);
   if (!payload || Array.isArray(payload) || typeof payload !== 'object') throw new Error('Request must be an object.');

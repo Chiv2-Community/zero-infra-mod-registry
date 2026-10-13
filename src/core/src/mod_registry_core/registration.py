@@ -42,7 +42,9 @@ def registration_payload(kind: str, repository: str, tag: str, asset: str) -> Js
 
 def parse_registration_payload(body: str) -> JsonObject:
     """Read the same first fenced request consumed by the issue workflow."""
-    block = re.search(r"^```(?:json)?\s*\n([\s\S]*?)^```\s*$", body, re.MULTILINE)
+    # Keep identical to issue.cjs: ASCII fence spacing and LF/CRLF boundaries.
+    # Unicode whitespace and multiline anchors differ between Python and JS.
+    block = re.search(r"(?:^|\n)```(?:json)?[ \t\r]*\n([\s\S]*?)\n```[ \t\r]*(?=\n|(?![\s\S]))", body)
     if block is None:
         raise ValueError("Include a fenced JSON registration request")
     value = json_object(decode_json(block[1]))

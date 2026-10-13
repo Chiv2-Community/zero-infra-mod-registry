@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import json
 import hashlib
+import subprocess
 from pathlib import Path
 from threading import Thread
 from urllib.parse import quote
@@ -21,6 +22,7 @@ from automated_registry_gateway.oidc import ISSUER, JWKS_URL, Verifier, base64ur
 from automated_registry_gateway.server import GatewayServer
 from automated_registry_gateway.service import Service
 from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, json_object
+from mod_registry_core.registration import parse_registration_payload
 
 NOW = 1800000000
 REPO = "Publisher/Plugin"
@@ -298,6 +300,81 @@ def test_recovers_compatible_manual_or_direct_payload(harness: Harness, state: s
     assert result.url.endswith("/99")
     assert len(harness.transport.issues) == 1
     assert len(list((harness.config.state_directory / "requests").glob("*.json"))) == 1
+
+
+def workflow_payload(body: str) -> JsonValue:
+    # Call the actual issue-workflow parser, not a second test-only regex.
+    result = subprocess.run([
+        "node", "-e",
+        "const {parseRequest}=require('./actions/automated-publish/issue.cjs');"
+        "let body='';process.stdin.on('data',x=>body+=x);"
+        "process.stdin.on('end',()=>{try{console.log(JSON.stringify(parseRequest(body)))}"
+        "catch{console.log('null')}});",
+    ], cwd=Path(__file__).resolve().parents[1], input=body, text=True, capture_output=True, check=True)
+    return decode_json(result.stdout)
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("placement", ["both", "opening", "closing"])
+@pytest.mark.parametrize("spacing", ["", " \t", "\r", "\ufeff", "\x1c", "\x85", "\u00a0", "\u2028", "\u2029", "\v", "\f"])
+def test_recovery_and_workflow_use_identical_fence_whitespace(harness: Harness, legacy: bool, placement: str, spacing: str) -> None:
+    wanted: JsonObject = {"action": "add-dll-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG, "dll_file": "Plugin.dll"}
+    wrong = wanted | {"dll_file": "Other.dll"}
+    marker = f"<!-- c2modregistry:{REPO}:{TAG}{'' if legacy else ':plugin'} -->"
+    opening = spacing if placement != "closing" else ""
+    closing = spacing if placement != "opening" else ""
+    body = (f"{marker}\n\n```json{opening}\n{json.dumps(wrong)}\n```{closing}\n\n"
+            f"```json\n{json.dumps(wanted)}\n```\n")
+    parsed = workflow_payload(body)
+    ascii_spacing = spacing in {"", " \t", "\r"}
+    if ascii_spacing:
+        assert json_object(parsed)["dll_file"] == "Other.dll"
+    elif placement != "both":
+        # A lone valid fence encloses malformed content; do not skip it.
+        assert parsed is None
+    else:
+        assert json_object(parsed)["dll_file"] == "Plugin.dll"
+    if parsed is None:
+        with pytest.raises(ValueError):
+            parse_registration_payload(body)
+    else:
+        assert parse_registration_payload(body) == json_object(parsed)
+    harness.transport.release["assets"] = [
+        {"name": name, "state": "uploaded", "size": 123} for name in ("Plugin.dll", "Other.dll")
+    ]
+    harness.transport.issues = [{"html_url": "https://github.com/RegistryOrg/Registry/issues/99", "body": body}]
+    if parsed is None or ascii_spacing:
+        with pytest.raises(GatewayError) as error:
+            harness.service.register(harness.token(), BODY)
+        assert error.value.status == 409
+        assert not list((harness.config.state_directory / "requests").glob("*.json"))
+    else:
+        assert harness.service.register(harness.token(), BODY).url.endswith("/99")
+        record = json_object(decode_json(next((harness.config.state_directory / "requests").glob("*.json")).read_text()))
+        assert record["asset"] == json_object(parsed)["dll_file"]
+    assert len(harness.transport.issues) == 1
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("label", ["", "json"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n", "\r", "\u2028", "\u2029"])
+def test_recovery_and_workflow_use_identical_line_boundaries(harness: Harness, legacy: bool, label: str, newline: str) -> None:
+    payload: JsonObject = {"action": "add-dll-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG, "dll_file": "Plugin.dll"}
+    marker = f"<!-- c2modregistry:{REPO}:{TAG}{'' if legacy else ':plugin'} -->"
+    body = newline.join([marker, "", f"```{label} \t", json.dumps(payload), "``` \t"])
+    harness.transport.issues = [{"html_url": "https://github.com/RegistryOrg/Registry/issues/99", "body": body}]
+    if newline in {"\n", "\r\n"}:
+        assert workflow_payload(body) == payload
+        assert parse_registration_payload(body) == payload
+        assert harness.service.register(harness.token(), BODY).url.endswith("/99")
+    else:
+        assert workflow_payload(body) is None
+        with pytest.raises(ValueError):
+            parse_registration_payload(body)
+        with pytest.raises(GatewayError) as error:
+            harness.service.register(harness.token(), BODY)
+        assert error.value.status == 409
+        assert not list((harness.config.state_directory / "requests").glob("*.json"))
 
 
 def test_creation_failure_is_retryable_with_fresh_token(harness: Harness) -> None:
