@@ -12,7 +12,7 @@ from semver import Version
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_entries, validate_dll_releases
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
-from zero_infra_mod_registry.utils.json_types import JsonValue, decode_json
+from mod_registry_core.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
     ModMetadataRetriever,

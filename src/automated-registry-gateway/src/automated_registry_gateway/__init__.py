@@ -1,0 +1,1 @@
+"""Optional OIDC registration gateway."""

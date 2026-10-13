@@ -11,7 +11,7 @@ from zero_infra_mod_registry.metadata_validation import main, validate_metadata
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo, PluginTarget
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
-from zero_infra_mod_registry.utils.json_types import JsonObject
+from mod_registry_core.json_types import JsonObject
 from tests.fakes import FakeRetriever, mod_fixture
 
 

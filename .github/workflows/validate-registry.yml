@@ -1,0 +1,24 @@
+name: Validate registry
+on:
+  workflow_call:
+    inputs:
+      tool_ref:
+        type: string
+        default: main
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Chiv2-Community/zero-infra-mod-registry
+          ref: ${{ inputs.tool_ref }}
+          path: .registry-tool
+          persist-credentials: false
+      - uses: ./.registry-tool
+        with:
+          command: validate
+          verify_dll_downloads: 'true'

@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, override
 
-from zero_infra_mod_registry.utils.json_types import (
+from mod_registry_core.json_types import (
     JsonObject, JsonValue, json_array, json_bool, json_object, json_string,
     optional_string, string_array,
 )

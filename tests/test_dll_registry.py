@@ -16,8 +16,8 @@ from zero_infra_mod_registry.models import DllRelease, Repo
 from zero_infra_mod_registry.models.dll_metadata import Plugin, PluginInfo, validate_dll_entries, validate_dll_releases
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
-from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, response_fixture
+from mod_registry_core.json_types import JsonObject, JsonValue, decode_json
+from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, mod_fixture, response_fixture
 
 BINARY = b"registered DLL bytes"
 INFO = PluginInfo("Plugin", "A native plugin", ["Author"], [])
@@ -73,6 +73,26 @@ def test_registry_loading_validates_without_json_round_trip(registry: Filesystem
 
     monkeypatch.setattr(DllRelease, "asdict", serialize)
     assert registry._load_dll_index() == [DLL]
+
+
+@pytest.mark.parametrize("plugin_first", [True, False])
+def test_same_repository_and_tag_registers_both_kinds_without_overwriting(
+    registry: FilesystemPackageRegistry, retriever: FakeRetriever, plugin_first: bool,
+) -> None:
+    repo = Repo("Test", "Plugin")
+    retriever.releases[(str(repo), "v1.0.0")] = mod_fixture().releases[0]
+    if plugin_first:
+        assert registry.add_dll_release(repo, "v1.0.0", dll_file="Plugin.dll")
+        assert registry.add_package_release(repo, "v1.0.0")
+    else:
+        assert registry.add_package_release(repo, "v1.0.0")
+        assert registry.add_dll_release(repo, "v1.0.0", dll_file="Plugin.dll")
+    assert registry.load_mod(repo) == mod_fixture()
+    assert registry._load_dll_index() == [DLL]
+    assert Path(registry.mod_list_index_path).read_text() == "Test/Plugin\n"
+    assert Path(registry.plugin_list_index_path).read_text() == "Test/Plugin\n"
+    assert registry.validate_package_db([])
+    assert registry.validate_dll_db(verify_downloads=True)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -288,6 +308,23 @@ def test_explicit_selection_never_falls_back(monkeypatch: pytest.MonkeyPatch, fi
     monkeypatch.setattr(retriever, "measure_dll", measure)
     with pytest.raises(ValueError, match="Requested DLL asset"):
         retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", filename)
+
+
+def test_unfinished_second_dll_requires_selection_before_download(monkeypatch: pytest.MonkeyPatch) -> None:
+    release = FakeRelease(assets=[FakeAsset(size=len(BINARY)), FakeAsset(name="Other.DLL", size=0)])
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+    downloaded: list[str] = []
+
+    def measure(url: str) -> tuple[str, int]:
+        downloaded.append(url)
+        return DLL.sha256, DLL.size
+
+    monkeypatch.setattr(retriever, "measure_dll", measure)
+    with pytest.raises(ValueError, match="exactly one DLL"):
+        retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    assert not downloaded
+    assert retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0", "Plugin.dll") == DLL
+    assert downloaded == [DLL.download_url]
 
 
 def test_duplicate_asset_names_are_ambiguous() -> None:

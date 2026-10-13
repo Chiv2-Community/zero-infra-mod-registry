@@ -21,7 +21,7 @@ inputs:
     description: 'Run in dry-run mode without making changes'
     required: false
     default: 'false'
-  dll_file:
+  release_asset_name:
     description: 'Exact DLL asset filename for add-dll-release (required for multiple DLL assets)'
     required: false
     default: ''
@@ -71,4 +71,4 @@ runs:
     DLL_DB_PATH: ${{ inputs.dll_db_path }}
     VERIFY_DLL_DOWNLOADS: ${{ inputs.verify_dll_downloads }}
     DRY_RUN: ${{ inputs.dry_run }}
-    DLL_FILE: ${{ inputs.dll_file }}
+    DLL_FILE: ${{ inputs.release_asset_name }}

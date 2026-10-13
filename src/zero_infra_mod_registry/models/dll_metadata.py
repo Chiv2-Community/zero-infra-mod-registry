@@ -11,7 +11,7 @@ from semver import Version
 from zero_infra_mod_registry.models.mod_metadata import Dependency, dependencies_from_dict
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches as dependency_matches, parse_version_requirement
 
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, optional_string, string_array
+from mod_registry_core.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, optional_string, string_array
 
 
 class PluginTarget(str, Enum):

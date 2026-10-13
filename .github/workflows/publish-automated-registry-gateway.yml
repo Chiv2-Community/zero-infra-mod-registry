@@ -1,0 +1,62 @@
+name: Publish automated-registry-gateway image
+on:
+  push:
+    branches: [main, prepare-v1]
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish-automated-registry-gateway-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test Python gateway
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: '3.14'
+      - run: uv sync --frozen --all-groups
+      - run: uv run mypy .
+      - run: uv run pytest tests/test_gateway.py
+      - name: Set lowercase image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "name=ghcr.io/${OWNER,,}/automated-registry-gateway" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - name: Build smoke-test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: automated-registry-gateway/Dockerfile
+          push: false
+          load: true
+          tags: automated-registry-gateway:candidate
+      - run: bash tests/actions/test-gateway-image.sh automated-registry-gateway:candidate
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: metadata
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            type=ref,event=tag
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: automated-registry-gateway/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}

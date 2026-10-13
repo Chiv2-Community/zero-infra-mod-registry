@@ -19,7 +19,8 @@ from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Re
 from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
-from zero_infra_mod_registry.utils.json_types import JsonObject, decode_json, json_array, json_object
+from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
+from mod_registry_core.registration import selected_dll_name, single_pak_name
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
@@ -61,15 +62,9 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         if release.draft:
             raise ValueError("Draft DLL releases cannot be registered")
         version = str(Version.parse(release.tag_name.removeprefix("v")))
-        assets = [asset for asset in release.get_assets() if asset.name.lower().endswith(".dll")]
-        if dll_file is not None:
-            assets = [asset for asset in assets if asset.name == dll_file]
-            if len(assets) != 1:
-                raise ValueError(f"Requested DLL asset must match exactly one DLL: {dll_file!r}")
-        if not assets:
-            raise ValueError("The release contains no DLL assets")
-        if len(assets) != 1:
-            raise ValueError("A DLL release must contain exactly one DLL asset unless --dll-file selects one")
+        release_assets = list(release.get_assets())
+        name = selected_dll_name((asset.name for asset in release_assets), dll_file)
+        assets = [asset for asset in release_assets if asset.name == name]
         url = assets[0].browser_download_url
         DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
         info = self.fetch_plugin_info(repo, release)
@@ -278,17 +273,12 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Returns:
             Asset object representing the .pak file, or an error string if not found or multiple found
         """
-        paks = [asset for asset in release.get_assets() if asset.name.endswith(".pak")]
-
-        if len(paks) == 0:
-            return f"No pak file found for release {release.tag_name}."
-
-        if len(paks) > 1:
-            return f"Multiple pak files found for release {release.tag_name}."
-
-        pak = paks[0]
-
-        return pak
+        assets = list(release.get_assets())
+        try:
+            name = single_pak_name((asset.name for asset in assets), release.tag_name)
+        except ValueError as error:
+            return str(error)
+        return next(asset for asset in assets if asset.name == name)
 
     def validate_version_tag_name(self, tag_name: str) -> Optional[str]:
         """

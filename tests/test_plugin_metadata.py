@@ -9,7 +9,7 @@ from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, Plug
 from zero_infra_mod_registry.models.mod_metadata import Dependency, Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json, json_object
+from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, json_object
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, response_fixture
 
 INFO = PluginInfo("Display name", "Description", ["Author"], [])

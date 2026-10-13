@@ -50,4 +50,4 @@ runs:
         elif [[ -f plugin.json ]]; then
           args+=(--plugin-file plugin.json)
         fi
-        uv run --project "$GITHUB_ACTION_PATH/../.." --frozen python -m zero_infra_mod_registry.metadata_validation "${args[@]}"
+        uv run --project "$GITHUB_ACTION_PATH/../.." --package zero-infra-mod-registry --no-dev --frozen python -m zero_infra_mod_registry.metadata_validation "${args[@]}"
