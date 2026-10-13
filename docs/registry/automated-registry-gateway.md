@@ -32,18 +32,9 @@ restrict access by immutable repository ID.
 
 ## Create the GitHub App
 
-1. Under your GitHub account or organization settings, create a GitHub App.
-2. Set its name and homepage URL. Disable **Active** under Webhook.
-3. Grant **Repository permissions → Issues: Read and write**. Metadata read access
-   is automatic.
-4. Install it on the registry owner, selecting **only the registry repository**.
-5. Record the App ID from the App settings and installation ID from the installed
-   App's URL (`.../installations/<id>`).
-6. Generate and download an RSA private key. Store it only on your server.
-7. Enable the registry's [issue workflow](README.md#process-issues) and Actions PR
-   creation setting.
-
-App-created issues trigger the issue workflow.
+Follow the complete [GitHub App setup checklist](../../README.md#github-app-setup-optional-gateway)
+in the README. It covers every setting, installation scope, permissions, IDs,
+private key and security implications. Publishers do not install the App.
 
 ## Server configuration
 
