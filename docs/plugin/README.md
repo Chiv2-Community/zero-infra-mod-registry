@@ -11,6 +11,22 @@
 
 ## Metadata workflow
 
+The action checks metadata schemas and dependency versions against the registry.
+Make your release build depend on this job to block publication when metadata is
+invalid. Use Linux runners and register dependencies first.
+
+The action installs Python through uv and reads dependency records from a
+checkout at `.metadata-validation-registry`. It fails if neither metadata file
+exists.
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `plugin_file` | `plugin.json` | Auto-detect root `plugin.json` | Plugin metadata path |
+| `mod_file` | `mod.json` | Auto-detect root `mod.json` | Pak metadata path; also validated when present |
+| `registry_repository` | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Dependency registry owner/repository |
+| `registry_ref` | `main` | `main` | Registry branch, tag or commit SHA |
+| `registry_token` | `${{ secrets.REGISTRY_READ_TOKEN }}` | `github.token` | Read access token; supply one for private registries |
+
 Save as `.github/workflows/metadata.yml`:
 
 ```yaml
@@ -27,19 +43,3 @@ jobs:
         with:
           plugin_file: plugin.json
 ```
-
-The action checks the schema and dependency versions against the registry. It
-does not download release assets. Make your release build depend on this job to
-block publication when metadata is invalid.
-
-| Input | Default | Usage |
-|---|---|---|
-| `plugin_file` | Auto-detect root `plugin.json` | Explicit plugin metadata path |
-| `mod_file` | Auto-detect root `mod.json` | Also validate pak metadata when present |
-| `registry_repository` | `Chiv2-Community/C2ModRegistry` | Dependency registry |
-| `registry_ref` | `main` | Registry branch, tag or SHA |
-| `registry_token` | `github.token` | Read access; provide a token for private registries |
-
-The action fails if neither metadata file exists. It installs Python through uv
-and reads dependency records from a checkout at `.metadata-validation-registry`.
-Use Linux runners. Register dependencies before publishing dependent plugins.

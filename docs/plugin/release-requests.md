@@ -1,10 +1,32 @@
 # Request release registration
 
-After publishing a GitHub release, call `actions/request-release`. Create a
-fine-grained token with **Issues: write** access to the destination registry and
+`actions/request-release` verifies a published release and an uploaded, nonempty
+asset, then creates a registration issue. For plugins, `asset_name` becomes
+`dll_file` in the request. For mods, registration scans the release's pak assets.
+Output: `issue_url`.
+
+Reruns reuse an existing open or closed issue identified by repository and tag.
+Serialize requests for the same repository/tag using concurrency. Correct failed
+requests or releases and reply `retry` on the issue. Registration opens an
+approval PR; maintainers merge it.
+
+Create a fine-grained token with **Issues: write** access to the destination registry and
 store it as `REGISTRY_ISSUE_TOKEN` in the publisher repository. The publisher's
 `GITHUB_TOKEN` is scoped to its own repository; use the separate token for the
 registry issue.
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `kind` | `plugin` | Required | `plugin` for DLLs or `mod` for pak assets |
+| `registry_token` | `${{ secrets.REGISTRY_ISSUE_TOKEN }}` | Required | Token with Issues write access to the registry |
+| `registry_repository` | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Destination owner/repository |
+| `source_token` | `${{ secrets.GITHUB_TOKEN }}` | `github.token` | Token with read access to the release repository |
+| `source_repository` | `Owner/Plugin` | `github.repository` | Release owner/repository |
+| `release_tag` | `v1.0.0` | `github.ref_name` | Exact published semantic version tag |
+| `asset_name` | `Plugin.dll` | Empty | Exact asset filename; required for multiple DLLs |
+
+Add this job after release publication. Use your publishing job name in `needs`.
+No checkout is required.
 
 ```yaml
 request-registration:
@@ -22,25 +44,3 @@ request-registration:
         asset_name: Plugin.dll
         registry_token: ${{ secrets.REGISTRY_ISSUE_TOKEN }}
 ```
-
-Use the actual publishing job name in `needs`. No checkout is required.
-
-| Input | Default | Usage |
-|---|---|---|
-| `kind` | Required | `plugin` for DLLs, `mod` for pak assets |
-| `registry_token` | Required | Issues write token for the registry |
-| `registry_repository` | `Chiv2-Community/C2ModRegistry` | Destination owner/repository |
-| `source_token` | `github.token` | Read access to the release repository |
-| `source_repository` | `github.repository` | Release owner/repository |
-| `release_tag` | `github.ref_name` | Exact published semantic version tag |
-| `asset_name` | Empty | Exact asset name; required if there are multiple DLLs |
-
-The action verifies the published release and an uploaded, nonempty asset before
-creating an issue. For plugins, `asset_name` is included as `dll_file` in the
-request. For mods, it checks asset presence; registration scans the release's pak
-assets. Output: `issue_url`.
-
-Reruns reuse an existing open or closed issue identified by repository and tag.
-Serialize requests for the same repository/tag using concurrency. Failed registry
-processing is retried by correcting the request or release and replying `retry`
-on that issue. Registration opens an approval PR; maintainers merge it.

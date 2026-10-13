@@ -1,6 +1,27 @@
 # Registry action
 
-The root Docker action runs on Linux. Checkout the registry before calling it:
+The root Docker action registers, removes, or validates entries in a checked-out
+registry. It runs on Linux and edits workspace files. Commit changes through a
+reviewed PR. Failures fail the step.
+
+Outputs: `result` (command log), `failed` (`true` or `false`). Read log outputs
+through environment variables, not inline shell interpolation.
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `command` | `add-dll-release` | Required | `add-package-release`, `add-dll-release`, `remove`, or `validate` |
+| `repo_url` | `https://github.com/Owner/Plugin` | Empty | Required for registration and removal |
+| `release_tag` | `v1.0.0` | Empty | Exact published tag; required for registration |
+| `dll_file` | `Plugin.dll` | Empty | Exact DLL asset name; required for ambiguous DLL releases |
+| `github_token` | `${{ secrets.GITHUB_TOKEN }}` | `github.token` | Token with read access to source repositories |
+| `dry_run` | `'true'` | `false` | Check an operation without writing files |
+| `verify_dll_downloads` | `'true'` | `false` | Download DLLs and check recorded hashes/sizes on `validate` |
+| `log_level` | `DEBUG` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, or `CRITICAL` |
+| `registry_path` | `./registry` | `./registry` | Repository records directory |
+| `package_db_path` | `./package_db` | `./package_db` | Pak database directory |
+| `dll_db_path` | `./dll_db` | `./dll_db` | Plugin database directory |
+
+Checkout the registry before calling the action:
 
 ```yaml
 steps:
@@ -13,25 +34,17 @@ steps:
       dll_file: Plugin.dll
 ```
 
-| Input | Default | Usage |
-|---|---|---|
-| `command` | Required | `add-package-release`, `add-dll-release`, `remove`, `validate` |
-| `repo_url` | Empty | Required for registration and removal |
-| `release_tag` | Empty | Required for registration; exact published tag |
-| `dll_file` | Empty | Exact DLL asset name; required for ambiguous DLL releases |
-| `github_token` | `github.token` | Read access to source repositories |
-| `dry_run` | `false` | Check an operation without writing files |
-| `verify_dll_downloads` | `false` | Download DLLs and check recorded hashes/sizes on `validate` |
-| `log_level` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-| `registry_path` | `./registry` | Repository records directory |
-| `package_db_path` | `./package_db` | Pak database directory |
-| `dll_db_path` | `./dll_db` | Plugin database directory |
-
-The action edits workspace files. Commit them through a reviewed PR. Outputs:
-`result` (command log), `failed` (`true` or `false`). Failures also fail the step.
-Read log outputs through environment variables, not inline shell interpolation.
-
 ## CLI
+
+The CLI runs the same registry operations locally. Set `GITHUB_TOKEN` for API
+access. Pass global options before the command; use `--help` for command details.
+
+| Option | Example | Default | Description |
+|---|---|---|---|
+| `--registry-path` | `./registry` | `./registry` | Repository records directory |
+| `--package-db-path` | `./package_db` | `./package_db` | Pak database directory |
+| `--dll-db-path` | `./dll_db` | `./dll_db` | Plugin database directory |
+| `--dry-run` | `--dry-run` | Disabled | Check an operation without writing files |
 
 ```sh
 export GITHUB_TOKEN=...
@@ -40,9 +53,6 @@ uv run zero-infra-mod-registry add-dll-release https://github.com/Owner/Plugin v
 uv run zero-infra-mod-registry validate --verify-dll-downloads
 uv run zero-infra-mod-registry remove https://github.com/Owner/Mod
 ```
-
-Global options: `--registry-path`, `--package-db-path`, `--dll-db-path`,
-`--dry-run`. Use `--help` for command details.
 
 For Docker, build `docker build -t registry-tool .`, then run:
 

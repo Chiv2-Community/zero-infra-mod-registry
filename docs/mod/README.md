@@ -10,6 +10,16 @@
 
 ## Metadata workflow
 
+The action validates metadata schemas and registered dependency versions. Make
+the publishing job depend on validation. For all options, see the
+[metadata action inputs](../plugin/README.md#metadata-workflow).
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `mod_file` | `mod.json` | Auto-detect root `mod.json` | Pak metadata path |
+| `registry_repository` | `Chiv2-Community/C2ModRegistry` | `Chiv2-Community/C2ModRegistry` | Dependency registry owner/repository |
+| `registry_ref` | `main` | `main` | Registry branch, tag or commit SHA |
+
 Save as `.github/workflows/metadata.yml`:
 
 ```yaml
@@ -27,13 +37,20 @@ jobs:
           mod_file: mod.json
 ```
 
-This validates the schema and registered dependency versions. Make the publishing
-job depend on validation. For alternate paths or registries, see the
-[metadata action inputs](../plugin/README.md#metadata-workflow).
-
 ## Release request
 
-Add this job to your release workflow:
+The action checks the published pak asset and opens or reuses a registry issue.
+Registry processing creates an approval PR. Configure `REGISTRY_ISSUE_TOKEN` with
+Issues write access to the registry. See [all release-request inputs and retry
+behavior](../plugin/release-requests.md).
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `kind` | `mod` | Required | Select pak registration |
+| `registry_token` | `${{ secrets.REGISTRY_ISSUE_TOKEN }}` | Required | Token with Issues write access to the registry |
+| `release_tag` | `v1.0.0` | `github.ref_name` | Exact published semantic version tag |
+
+Add this job to your release workflow. Use your publishing job name in `needs`:
 
 ```yaml
 request-registration:
@@ -51,7 +68,4 @@ request-registration:
         registry_token: ${{ secrets.REGISTRY_ISSUE_TOKEN }}
 ```
 
-Use your publishing job name in `needs`. Configure `REGISTRY_ISSUE_TOKEN` with
-Issues write access to the registry. See [release-request inputs and retry
-behavior](../plugin/release-requests.md). For manual requests, use the
-[registry issue payload](../registry/README.md#process-issues).
+For manual requests, use the [registry issue payload](../registry/README.md#issue-payload).

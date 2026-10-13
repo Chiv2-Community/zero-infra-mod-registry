@@ -11,6 +11,19 @@ reads legacy `dll_db/index.json` records.
 
 ## Process issues
 
+The workflow reads the current issue body, registers one release, validates both
+databases and DLL downloads, and opens a PR linked to the issue. Failures are
+reported with a workflow-log link. Correct the request or release, then reply
+`retry`. No registration commit is created on failure. Merging the PR closes the
+issue. PR comments are ignored.
+
+The workflow uses the caller's `GITHUB_TOKEN`; no additional secrets are required.
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `registry_branch` | `main` | `main` | Registry branch used as the registration PR base |
+| `tool_ref` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | `main` | Upstream implementation revision; pin to the same SHA as the workflow reference |
+
 Save as `.github/workflows/register.yml`:
 
 ```yaml
@@ -35,7 +48,16 @@ jobs:
       tool_ref: main
 ```
 
-Requests contain a fenced JSON block:
+### Issue payload
+
+Requests contain a fenced JSON block identifying one published release.
+
+| Field | Example | Requirement | Description |
+|---|---|---|---|
+| `action` | `add-package-release` | Required | `add-package-release` for pak mods or `add-dll-release` for plugins |
+| `repo_url` | `https://github.com/Owner/Mod` | Required | GitHub repository hosting the release |
+| `release_tag` | `v1.0.0` | Required | Exact published release tag |
+| `dll_file` | `Plugin.dll` | Required for multiple DLLs | Exact, case-sensitive DLL asset filename |
 
 ````text
 ```json
@@ -47,19 +69,16 @@ Requests contain a fenced JSON block:
 ```
 ````
 
-For plugins, use `add-dll-release`. If a release has multiple DLLs, include
-`"dll_file": "Plugin.dll"` with the exact, case-sensitive asset filename.
-
-The workflow reads the current issue body, registers one release, validates both
-databases and DLL downloads, and opens a PR linked to the issue. Failures are
-reported with a workflow-log link. Correct the request or release, then reply
-`retry`. No registration commit is created on failure. Merging the PR closes the
-issue. PR comments are ignored.
-
-Inputs: `registry_branch` (default `main`), `tool_ref` (default `main`). The workflow
-uses the caller's `GITHUB_TOKEN`; no additional secrets are required.
-
 ## Validate pull requests
+
+This checks the PR merge snapshot, dependencies, indexes and downloaded DLL
+hashes/sizes. Require this check for human-created PRs. PRs created using
+`GITHUB_TOKEN` do not trigger another workflow run; the issue workflow validates
+them before opening the PR.
+
+| Input | Example | Default | Description |
+|---|---|---|---|
+| `tool_ref` | `91583711a43d2ca53bf88e097d7a788165d9cf68` | `main` | Upstream implementation revision; pin to the same SHA as the workflow reference |
 
 Save as `.github/workflows/validate.yml`:
 
@@ -76,11 +95,6 @@ jobs:
     with:
       tool_ref: main
 ```
-
-This checks the PR merge snapshot, dependencies, indexes and downloaded DLL
-hashes/sizes. Only `tool_ref` is configurable. Require this check for human-created
-PRs. PRs created using `GITHUB_TOKEN` do not trigger another workflow run; the issue
-workflow validates them before opening the PR.
 
 ## Publish
 
