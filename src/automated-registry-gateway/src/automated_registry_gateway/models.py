@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import semver
 
-from zero_infra_mod_registry.utils.json_types import JsonObject, json_string
+from mod_registry_core.json_types import JsonObject, json_string
 
 
 class GatewayError(Exception):

@@ -24,13 +24,20 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
             else:
                 target.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(original, target / original.name)
-    result = subprocess.run(["uv", "build", "--wheel"], cwd=context, capture_output=True, text=True)
+    result = subprocess.run(["uv", "build", "--wheel", "--package", "zero-infra-mod-registry"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    wheel, = (context / "dist").glob("*.whl")
+    result = subprocess.run(["uv", "build", "--wheel", "--package", "mod-registry-core"], cwd=context, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    wheel, = (context / "dist").glob("zero_infra_mod_registry-*.whl")
+    core_wheel, = (context / "dist").glob("mod_registry_core-*.whl")
     installed = tmp_path / "installed"
     with ZipFile(wheel) as archive:
         for kind in ("common", "mod", "plugin"):
             assert f"zero_infra_mod_registry/schemas/{kind}.schema.json" in archive.namelist()
+        assert not any("gateway" in name for name in archive.namelist())
+        archive.extractall(installed)
+    with ZipFile(core_wheel) as archive:
+        assert "mod_registry_core/json_types.py" in archive.namelist()
         archive.extractall(installed)
     # -I prevents cwd/PYTHONPATH from providing source-tree schemas. Dependencies
     # come from the test environment, but production modules come only from the wheel.

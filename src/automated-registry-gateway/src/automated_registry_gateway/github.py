@@ -11,10 +11,10 @@ from urllib.parse import quote
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from zero_infra_mod_registry.gateway.models import Config, GatewayError, Identity, Issue, Registration
-from zero_infra_mod_registry.gateway.oidc import base64url
-from zero_infra_mod_registry.gateway.transport import Transport
-from zero_infra_mod_registry.utils.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
+from automated_registry_gateway.models import Config, GatewayError, Identity, Issue, Registration
+from automated_registry_gateway.oidc import base64url
+from automated_registry_gateway.transport import Transport
+from mod_registry_core.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
 
 API = "https://api.github.com"
 

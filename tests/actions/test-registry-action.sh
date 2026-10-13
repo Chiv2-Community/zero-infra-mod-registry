@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 image=${1:?Pass the built registry image}
+docker run --rm --entrypoint python "$image" -c '
+from importlib.metadata import version
+from importlib.util import find_spec
+assert version("zero-infra-mod-registry")
+assert version("mod-registry-core")
+assert find_spec("automated_registry_gateway") is None
+'
 temp=$(mktemp -d)
 trap 'rm -rf "$temp"' EXIT
 mkdir -p "$temp/registry" "$temp/package_db/packages" "$temp/dll_db"

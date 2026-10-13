@@ -69,8 +69,12 @@ For reusable workflows, pin `tool_ref` to the same SHA.
 
 ## Local development
 
+The uv workspace builds three packages: the registry, gateway, and shared core.
+See [package layout](docs/development.md).
+
 ```sh
 uv sync --all-groups
+uv build --all-packages
 uv run mypy .
 uv run pytest .
 node --test actions/automated-publish/*.test.cjs

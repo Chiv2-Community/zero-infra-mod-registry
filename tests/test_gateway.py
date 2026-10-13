@@ -14,12 +14,12 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 import pytest
 import requests
 
-from zero_infra_mod_registry.gateway.github import API, GithubApp
-from zero_infra_mod_registry.gateway.models import Config, GatewayError, Identity, Registration
-from zero_infra_mod_registry.gateway.oidc import ISSUER, JWKS_URL, Verifier, base64url, unbase64
-from zero_infra_mod_registry.gateway.server import GatewayServer
-from zero_infra_mod_registry.gateway.service import Service
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json, json_object
+from automated_registry_gateway.github import API, GithubApp
+from automated_registry_gateway.models import Config, GatewayError, Identity, Registration
+from automated_registry_gateway.oidc import ISSUER, JWKS_URL, Verifier, base64url, unbase64
+from automated_registry_gateway.server import GatewayServer
+from automated_registry_gateway.service import Service
+from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, json_object
 
 NOW = 1800000000
 REPO = "Publisher/Plugin"

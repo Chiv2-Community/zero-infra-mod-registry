@@ -1,4 +1,4 @@
-"""Typed JSON boundary: decoded values are narrowed before entering models."""
+"""Typed JSON boundary shared by the registry and gateway."""
 from __future__ import annotations
 
 import json

@@ -6,7 +6,7 @@ import pytest
 import requests
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
-from zero_infra_mod_registry.utils.json_types import JsonObject
+from mod_registry_core.json_types import JsonObject
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 

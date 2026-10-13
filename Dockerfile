@@ -18,7 +18,8 @@ COPY bin/ ./bin/
 COPY schemas/ ./schemas/
 
 # Build wheel package
-RUN uv build --wheel
+RUN uv build --wheel --package zero-infra-mod-registry
+RUN uv build --wheel --package mod-registry-core
 
 # Runtime stage
 FROM python:3.14-alpine

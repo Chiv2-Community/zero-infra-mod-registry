@@ -16,19 +16,26 @@ dependencies = [
     "urllib3>=2.0.5",
     "semver>=3.0.4",
     "jsonschema>=4.26.0",
-    "cryptography>=46.0.0",
+    "mod-registry-core==1.0.0",
 ]
 [project.scripts]
 zero-infra-mod-registry = "zero_infra_mod_registry.main:main"
-automated-registry-gateway = "zero_infra_mod_registry.gateway.server:main"
 
 [dependency-groups]
 dev = [
+    "automated-registry-gateway==1.0.0",
     "mypy>=1.19.1",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "types-jsonschema>=4.26.0.20261006",
 ]
+
+[tool.uv.workspace]
+members = ["src/core", "src/automated-registry-gateway"]
+
+[tool.uv.sources]
+mod-registry-core = { workspace = true }
+automated-registry-gateway = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -38,7 +45,7 @@ python_functions = "test_*"
 pythonpath = ["src"]
 
 [tool.coverage.run]
-source = ["zero_infra_mod_registry"]
+source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_core"]
 omit = ["tests/*"]
 
 [build-system]

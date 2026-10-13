@@ -4,8 +4,7 @@ COPY --from=uv /uv /bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
-COPY schemas/ ./schemas/
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev --no-editable --package automated-registry-gateway
 
 FROM python:3.14-slim
 RUN groupadd --gid 10001 gateway && useradd --uid 10001 --gid gateway --no-create-home gateway \

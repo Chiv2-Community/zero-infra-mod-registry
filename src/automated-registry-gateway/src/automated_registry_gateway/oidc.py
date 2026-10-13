@@ -12,9 +12,9 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-from zero_infra_mod_registry.gateway.models import Config, GatewayError, Identity, repository_name
-from zero_infra_mod_registry.gateway.transport import Transport
-from zero_infra_mod_registry.utils.json_types import JsonObject, decode_json, json_array, json_int, json_object, json_string
+from automated_registry_gateway.models import Config, GatewayError, Identity, repository_name
+from automated_registry_gateway.transport import Transport
+from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_int, json_object, json_string
 
 ISSUER = "https://token.actions.githubusercontent.com"
 JWKS_URL = f"{ISSUER}/.well-known/jwks"

@@ -5,7 +5,7 @@ import pytest
 from zero_infra_mod_registry.models.dll_metadata import PluginInfo, PluginTarget
 from zero_infra_mod_registry.models.mod_metadata import ModInfo
 from zero_infra_mod_registry.metadata_validation import metadata_validator as validator
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue
+from mod_registry_core.json_types import JsonObject, JsonValue
 
 
 @pytest.mark.parametrize("kind", ["mod", "plugin"])

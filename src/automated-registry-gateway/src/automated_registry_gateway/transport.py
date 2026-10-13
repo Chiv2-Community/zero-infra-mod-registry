@@ -5,8 +5,8 @@ from typing import Protocol
 
 import requests
 
-from zero_infra_mod_registry.gateway.models import GatewayError
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
+from automated_registry_gateway.models import GatewayError
+from mod_registry_core.json_types import JsonObject, JsonValue, decode_json
 
 
 class Transport(Protocol):

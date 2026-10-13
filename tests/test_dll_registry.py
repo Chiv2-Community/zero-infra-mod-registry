@@ -16,7 +16,7 @@ from zero_infra_mod_registry.models import DllRelease, Repo
 from zero_infra_mod_registry.models.dll_metadata import Plugin, PluginInfo, validate_dll_entries, validate_dll_releases
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
-from zero_infra_mod_registry.utils.json_types import JsonObject, JsonValue, decode_json
+from mod_registry_core.json_types import JsonObject, JsonValue, decode_json
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, response_fixture
 
 BINARY = b"registered DLL bytes"

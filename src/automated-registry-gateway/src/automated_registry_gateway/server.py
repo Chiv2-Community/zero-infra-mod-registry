@@ -8,12 +8,12 @@ import logging
 import socket
 from typing import override
 
-from zero_infra_mod_registry.gateway.github import GithubApp
-from zero_infra_mod_registry.gateway.models import Config, GatewayError
-from zero_infra_mod_registry.gateway.oidc import Verifier
-from zero_infra_mod_registry.gateway.service import Service
-from zero_infra_mod_registry.gateway.transport import GithubTransport
-from zero_infra_mod_registry.utils.json_types import JsonObject, decode_json, json_object
+from automated_registry_gateway.github import GithubApp
+from automated_registry_gateway.models import Config, GatewayError
+from automated_registry_gateway.oidc import Verifier
+from automated_registry_gateway.service import Service
+from automated_registry_gateway.transport import GithubTransport
+from mod_registry_core.json_types import JsonObject, decode_json, json_object
 
 
 class GatewayServer(ThreadingHTTPServer):

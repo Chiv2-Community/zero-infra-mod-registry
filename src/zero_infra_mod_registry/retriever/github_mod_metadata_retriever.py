@@ -19,7 +19,7 @@ from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Re
 from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
-from zero_infra_mod_registry.utils.json_types import JsonObject, decode_json, json_array, json_object
+from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
