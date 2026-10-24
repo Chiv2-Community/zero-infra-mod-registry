@@ -70,6 +70,12 @@ jobs:
       - name: Test action argument handling and failure outputs
         run: bash tests/actions/test-registry-action.sh zero-infra-mod-registry:${{ github.run_number }}
 
+      - uses: astral-sh/setup-uv@v7
+      - name: Test runner ownership and Git checkout
+        env:
+          REGISTRY_DOCKER_TEST_IMAGE: zero-infra-mod-registry:${{ github.run_number }}
+        run: uv run --no-project --with pytest pytest tests/test_action_entrypoint.py -q
+
       - name: Validate .net installation
         run: |
           docker run --rm --entrypoint=/usr/local/bin/UnchainedScanner zero-infra-mod-registry:${{ github.run_number }} --help

@@ -10,7 +10,20 @@ for ARG in "$@"; do
     ARGS+=("$ARG")
   fi
 done
-zero-infra-mod-registry "${ARGS[@]}" 2>&1 | tee /tmp/result.txt
+# Match the checkout owner so later host-side Git steps can remove new files
+# and directories. Standalone and already non-root containers keep their user.
+python -c '
+import os
+import sys
+
+workspace = os.environ.get("GITHUB_WORKSPACE")
+if os.geteuid() == 0 and workspace:
+    owner = os.stat(workspace)
+    os.setgroups([])
+    os.setgid(owner.st_gid)
+    os.setuid(owner.st_uid)
+os.execvp("zero-infra-mod-registry", ["zero-infra-mod-registry", *sys.argv[1:]])
+' "${ARGS[@]}" 2>&1 | tee /tmp/result.txt
 EXIT_CODE=${PIPESTATUS[0]}
 
 # Read the result
