@@ -46,7 +46,10 @@ def test_docker_generated_directories_allow_git_checkout(
         "commit", "--allow-empty", "-m", "Base")
     command = tmp_path / "zero-infra-mod-registry"
     command.write_text(
-        '#!/usr/bin/env python\nfrom pathlib import Path\nimport sys\n'
+        '#!/usr/bin/env python\nfrom pathlib import Path\nimport os, subprocess, sys\n'
+        'cache = Path(os.environ["DOTNET_BUNDLE_EXTRACT_BASE_DIR"])\n'
+        '(cache / "write-test").write_text("writable")\n'
+        'subprocess.run(["/usr/local/bin/UnchainedScanner", "--help"], check=True, capture_output=True)\n'
         'path = Path("package_db/packages/chivned/AldmereHardpoint.json")\n'
         'path.parent.mkdir(parents=True)\npath.write_text("{}")\n'
         f'sys.exit({exit_code})\n'

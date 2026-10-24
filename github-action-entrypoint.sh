@@ -15,6 +15,7 @@ done
 python -c '
 import os
 import sys
+import tempfile
 
 workspace = os.environ.get("GITHUB_WORKSPACE")
 if os.geteuid() == 0 and workspace:
@@ -22,6 +23,9 @@ if os.geteuid() == 0 and workspace:
     os.setgroups([])
     os.setgid(owner.st_gid)
     os.setuid(owner.st_uid)
+# Bundled .NET scanners cannot extract into the inherited root-owned HOME.
+if not os.environ.get("DOTNET_BUNDLE_EXTRACT_BASE_DIR"):
+    os.environ["DOTNET_BUNDLE_EXTRACT_BASE_DIR"] = tempfile.mkdtemp(prefix="registry-scanner-")
 os.execvp("zero-infra-mod-registry", ["zero-infra-mod-registry", *sys.argv[1:]])
 ' "${ARGS[@]}" 2>&1 | tee /tmp/result.txt
 EXIT_CODE=${PIPESTATUS[0]}
