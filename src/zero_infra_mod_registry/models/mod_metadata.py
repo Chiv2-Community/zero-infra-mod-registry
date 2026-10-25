@@ -63,7 +63,7 @@ class ModInfo:
 
     @property
     def dependencies(self) -> List[Dependency]:
-        """Legacy Python accessor; JSON output uses the explicit field names."""
+        """Deprecated alias of mod_dependencies, also emitted for legacy clients."""
         return self.mod_dependencies
 
     @staticmethod
@@ -81,6 +81,7 @@ class ModInfo:
         return {"repo_url": self.repo_url, "name": self.name, "description": self.description,
                 "icon_url": self.icon_url, "image_urls": [url for url in self.image_urls],
                 "authors": [author for author in self.authors], "mod_dependencies": [dep.asdict() for dep in self.mod_dependencies],
+                "dependencies": [dep.asdict() for dep in self.mod_dependencies],
                 "plugin_dependencies": [dep.asdict() for dep in self.plugin_dependencies]}
 
 

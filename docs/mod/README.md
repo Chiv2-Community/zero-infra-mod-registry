@@ -8,6 +8,18 @@
    assets to generate manifests.
 4. Request registration after publishing. Each release requires approval.
 
+## Dependencies and backward compatibility
+
+Use `mod_dependencies` for pak mods and `plugin_dependencies` for DLL plugins.
+`mod.json` also accepts `dependencies`, a deprecated alias of `mod_dependencies`.
+If both are present, their lists are combined, deduplicating repository/version
+pairs case-insensitively by repository URL.
+
+Serialized pak releases and `latest_release_info` include both `mod_dependencies`
+and an identical `dependencies` list for older clients, including when empty.
+`plugin_dependencies` remain separate; they are never copied to `dependencies`.
+Existing registry files receive the alias when rewritten, not by validation alone.
+
 ## Metadata workflow
 
 The action validates metadata schemas and registered dependency versions. Make

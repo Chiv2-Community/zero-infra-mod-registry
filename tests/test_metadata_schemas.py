@@ -62,6 +62,18 @@ def test_legacy_dependencies_are_only_documented_for_mods() -> None:
     assert not validator("plugin").is_valid(data)
 
 
+@pytest.mark.parametrize("fields", [("dependencies",), ("mod_dependencies",), ("dependencies", "mod_dependencies")])
+def test_mod_schema_accepts_both_dependency_spellings(fields: tuple[str, ...]) -> None:
+    data: JsonObject = {"name": "Example", "description": "Description", "authors": ["Author"]}
+    for field in fields:
+        data[field] = [{"repo_url": "https://github.com/Org/Mod", "version": "^1.0.0"}]
+    validator("mod").validate(data)
+    data["repo_url"] = "https://github.com/Org/Example"
+    info = ModInfo.from_dict(data)
+    assert len(info.mod_dependencies) == 1
+    assert ModInfo.from_dict(info.asdict()) == info
+
+
 @pytest.mark.parametrize("kind", ["mod", "plugin"])
 @pytest.mark.parametrize("field", ["name", "description", "authors"])
 def test_metadata_schemas_require_core_fields(kind: str, field: str) -> None:
