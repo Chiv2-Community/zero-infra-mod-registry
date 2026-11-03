@@ -3,6 +3,7 @@ from dataclasses import replace
 from datetime import datetime
 from github.GitRelease import GitRelease
 import json
+import logging
 import os
 from pathlib import Path
 import stat
@@ -51,6 +52,36 @@ def test_metadata_and_duplicate_validation() -> None:
     duplicate: JsonObject = {**ENTRY, "organization": "TEST", "name": "PLUGIN"}
     with pytest.raises(ValueError, match="Duplicate"):
         validate_dll_entries([ENTRY, duplicate])
+
+
+@pytest.mark.parametrize("registered", [True, False])
+@pytest.mark.parametrize("verify_downloads", [True, False])
+def test_dll_verification_messages(
+    registry: FilesystemPackageRegistry, caplog: pytest.LogCaptureFixture,
+    registered: bool, verify_downloads: bool,
+) -> None:
+    if registered:
+        assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    with caplog.at_level(logging.INFO):
+        assert registry.validate_dll_db(verify_downloads=verify_downloads)
+    if not verify_downloads:
+        assert "DLL download verification skipped: not requested." in caplog.text
+    elif not registered:
+        assert "DLL download verification skipped: no registered DLL releases." in caplog.text
+    else:
+        assert "DLL download verification passed for 1 registered release(s)." in caplog.text
+    assert ("DLL download verification passed" in caplog.text) == (registered and verify_downloads)
+
+
+def test_failed_dll_verification_does_not_report_success(
+    registry: FilesystemPackageRegistry, retriever: FakeRetriever, caplog: pytest.LogCaptureFixture,
+) -> None:
+    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    retriever.measurement = ("0" * 64, DLL.size)
+    with caplog.at_level(logging.INFO):
+        assert not registry.validate_dll_db(verify_downloads=True)
+    assert "DLL content mismatch" in caplog.text
+    assert "DLL download verification passed" not in caplog.text
 
 
 def test_typed_release_validation_does_not_reconstruct_models(monkeypatch: pytest.MonkeyPatch) -> None:

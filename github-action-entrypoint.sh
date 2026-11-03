@@ -57,7 +57,7 @@ if [ -n "$GITHUB_OUTPUT" ]; then
     echo "failed=false" >> "$GITHUB_OUTPUT"
     # Add to GitHub step summary if available
     if [ -n "$GITHUB_STEP_SUMMARY" ]; then
-      echo ":white_check_mark: All checks passed." >> "$GITHUB_STEP_SUMMARY"
+      echo ":white_check_mark: Command completed successfully." >> "$GITHUB_STEP_SUMMARY"
       echo "" >> "$GITHUB_STEP_SUMMARY"
       echo '```' >> "$GITHUB_STEP_SUMMARY"
       echo "$RESULT" >> "$GITHUB_STEP_SUMMARY"

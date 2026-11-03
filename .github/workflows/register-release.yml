@@ -48,6 +48,7 @@ jobs:
           release_tag: ${{ steps.request.outputs.release_tag }}
           release_asset_name: ${{ steps.request.outputs.dll_file }}
       - name: Validate updated registry
+        id: validate
         uses: ./.registry-tool
         with:
           command: validate
@@ -67,7 +68,11 @@ jobs:
           body: |
             Register `${{ steps.request.outputs.release_tag }}` from ${{ steps.request.outputs.repo_url }}.
 
-            Registry validation and DLL download verification passed. Review before merging.
+            Registry validation passed. Review before merging.
+
+            ```text
+            ${{ steps.validate.outputs.result }}
+            ```
 
             Resolves #${{ github.event.issue.number }}
       - name: Report result

@@ -118,6 +118,12 @@ class FilesystemPackageRegistry(PackageRegistry):
                     actual = self._require_retriever().measure_dll(entry.download_url)
                     if actual != (entry.sha256, entry.size):
                         raise ValueError(f"DLL content mismatch: {entry.organization}/{entry.name}:{entry.version}")
+                if entries:
+                    logging.info("DLL download verification passed for %d registered release(s).", len(entries))
+                else:
+                    logging.info("DLL download verification skipped: no registered DLL releases.")
+            else:
+                logging.info("DLL download verification skipped: not requested.")
             return True
         except Exception as error:
             logging.error(f"DLL registry validation failed: {error}")

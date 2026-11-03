@@ -18,17 +18,20 @@ def test_entrypoint_preserves_arguments_and_status(
     )
     command.chmod(0o755)
     output = tmp_path / "output"
+    summary = tmp_path / "summary"
     result = subprocess.run(
         ["bash", str(Path(__file__).resolve().parents[1] / "github-action-entrypoint.sh"),
          "add-package-release", "", "repo with spaces", "v1.0.0"],
         env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
              "GITHUB_WORKSPACE": str(tmp_path) if workspace else "", "GITHUB_OUTPUT": str(output),
-             "GITHUB_STEP_SUMMARY": ""},
+             "GITHUB_STEP_SUMMARY": str(summary)},
         capture_output=True, text=True,
     )
     assert result.returncode == exit_code, result.stderr
     assert result.stdout.strip() == '["add-package-release", "repo with spaces", "v1.0.0"]'
     assert f"failed={'true' if exit_code else 'false'}" in output.read_text()
+    assert ("Command completed successfully." in summary.read_text()) == (exit_code == 0)
+    assert "All checks passed" not in summary.read_text()
 
 
 @pytest.mark.skipif(not os.environ.get("REGISTRY_DOCKER_TEST_IMAGE"),
