@@ -138,6 +138,26 @@ def test_invalid_metadata(field: str, value: JsonValue) -> None:
         validate_dll_entries([invalid])
 
 
+@pytest.mark.parametrize("field,value", [
+    ("release_date", False), ("release_date", "not-a-date"),
+    ("release_notes_markdown", []), ("dll_file_name", 42),
+])
+@pytest.mark.parametrize("packaged", [False, True])
+def test_release_optional_field_errors_identify_field(field: str, value: JsonValue, packaged: bool) -> None:
+    data = DLL.package_dict() if packaged else DLL.asdict()
+    data[field] = value
+    with pytest.raises(ValueError, match=field):
+        if packaged:
+            DllRelease.from_package_dict("Test", "Plugin", data)
+        else:
+            DllRelease.from_dict(data)
+
+
+def test_stored_release_tag_type_error_identifies_field() -> None:
+    with pytest.raises(ValueError, match="tag"):
+        DllRelease.from_dict({**ENTRY, "tag": False})
+
+
 @pytest.mark.parametrize("entries", [None, {}, [None], [{}]])
 def test_invalid_index(entries: JsonValue) -> None:
     with pytest.raises(ValueError):

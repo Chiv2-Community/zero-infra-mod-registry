@@ -10,8 +10,9 @@ import pytest
 from zero_infra_mod_registry.metadata_validation import main, validate_metadata
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo, PluginTarget
+from zero_infra_mod_registry.models.mod_metadata import Release
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
-from mod_registry_core.json_types import JsonObject
+from mod_registry_core.json_types import JsonObject, JsonValue
 from tests.fakes import FakeRetriever, mod_fixture
 
 
@@ -56,8 +57,9 @@ def test_metadata_validation_rejects_missing_incompatible_and_wrong_type_depende
     data[field] = [{"repo_url": f"https://github.com/{repo}", "version": version}]
     path = tmp_path / f"{kind}.json"
     path.write_text(json.dumps(data))
-    with pytest.raises(ValueError, match="Unregistered"):
+    with pytest.raises(ValueError, match="Unregistered") as failure:
         validate_metadata(path, kind, registry)
+    assert str(path) in str(failure.value)
 
 
 def test_metadata_cli_validates_both_files(tmp_path: Path, registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -93,6 +95,29 @@ def test_metadata_cli_reports_all_schema_errors(
         assert detail in error
 
 
+@pytest.mark.parametrize("version,duplicate,field", [
+    ("01.0.0", False, "plugin_dependencies[0].version"),
+    ("1.0.0", True, "plugin_dependencies[1].repo_url"),
+])
+def test_metadata_cli_reports_source_for_semantic_errors(
+    tmp_path: Path, registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str], version: str, duplicate: bool, field: str,
+) -> None:
+    path = tmp_path / "local-plugin.json"
+    data = metadata()
+    dependency: JsonObject = {"repo_url": "https://github.com/Test/Native", "version": version}
+    data["plugin_dependencies"] = [dependency, {**dependency, "version": "^1.0.0"}] if duplicate else [dependency]
+    path.write_text(json.dumps(data))
+    monkeypatch.setattr(sys, "argv", ["validate-metadata", "--registry-directory", str(tmp_path), "--plugin-file", str(path)])
+    with pytest.raises(SystemExit) as failure:
+        main()
+    assert failure.value.code == 1
+    error = capsys.readouterr().err
+    assert str(path) in error
+    assert field in error
+    assert "Schema validation failed" not in error
+
+
 def test_mod_registry_error_identifies_package_tag_and_field(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     instance = FilesystemPackageRegistry(registry_path=str(tmp_path / "registry"),
         package_db_path=str(tmp_path / "package_db"), dll_db_path=str(tmp_path / "dll_db"))
@@ -109,6 +134,16 @@ def test_mod_registry_error_identifies_package_tag_and_field(tmp_path: Path, cap
     assert not instance.validate_package_db([])
     for detail in [str(path), "Test/Pak", "v1.0.0", "releases[0]", "authors[0]", "Expected a JSON string"]:
         assert detail in caplog.text
+
+
+@pytest.mark.parametrize("field,value", [
+    ("release_date", False), ("release_date", "not-a-date"), ("release_notes_markdown", []),
+])
+def test_mod_release_errors_identify_field(field: str, value: JsonValue) -> None:
+    data = mod_fixture("Pak").releases[0].asdict()
+    data[field] = value
+    with pytest.raises(ValueError, match=field):
+        Release.from_dict(data)
 
 
 def test_metadata_cli_rejects_no_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

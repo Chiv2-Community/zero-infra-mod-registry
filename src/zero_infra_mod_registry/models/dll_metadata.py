@@ -146,13 +146,16 @@ class DllRelease:
         fields = {"organization", "name", "version", "download_url", "sha256", "size"}
         optional = {"info", "tag", "release_date", "release_notes_markdown", "dll_file_name"}
         require_fields(data, fields, optional, "DLL metadata")
+        date = optional_string(data.get("release_date"), "release_date")
+        with validation_context("release_date"):
+            release_date = datetime.fromisoformat(date) if date is not None else None
         release = DllRelease(json_string(data["organization"], "organization"), json_string(data["name"], "name"),
                              json_string(data["version"], "version"), json_string(data["download_url"], "download_url"),
                               json_string(data["sha256"], "sha256"), json_int(data["size"], "size"),
                               PluginInfo.from_dict(data["info"]) if "info" in data else None,
-                              optional_string(data.get("tag")),
-                              datetime.fromisoformat(json_string(data["release_date"])) if data.get("release_date") is not None else None,
-                              optional_string(data.get("release_notes_markdown")), optional_string(data.get("dll_file_name")))
+                              optional_string(data.get("tag"), "tag"), release_date,
+                              optional_string(data.get("release_notes_markdown"), "release_notes_markdown"),
+                              optional_string(data.get("dll_file_name"), "dll_file_name"))
         release.validate()
         return release
 
@@ -183,11 +186,15 @@ class DllRelease:
         data = json_object(value)
         require_fields(data, {"tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"}, set(), "plugin release")
         tag = json_string(data["tag"], "tag")
+        date = optional_string(data["release_date"], "release_date")
+        with validation_context("release_date"):
+            release_date = datetime.fromisoformat(date) if date is not None else None
         release = DllRelease(org, name, str(Version.parse(tag.removeprefix("v"))), json_string(data["download_url"], "download_url"),
                              json_string(data["hash"], "hash"), json_int(data["size"], "size"),
                              PluginInfo.from_dict(data["info"]) if data["info"] is not None else None,
-                             tag, datetime.fromisoformat(json_string(data["release_date"])) if data["release_date"] is not None else None,
-                             optional_string(data["release_notes_markdown"]), optional_string(data["dll_file_name"]))
+                             tag, release_date,
+                             optional_string(data["release_notes_markdown"], "release_notes_markdown"),
+                             optional_string(data["dll_file_name"], "dll_file_name"))
         release.validate()
         return release
 

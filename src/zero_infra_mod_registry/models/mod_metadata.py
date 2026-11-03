@@ -106,12 +106,15 @@ class Release:
     def from_dict(value: JsonValue) -> Release:
         data = json_object(value)
         require_fields(data, {"tag", "hash", "pak_file_name", "release_date", "info", "release_notes_markdown", "manifest"}, set(data), "mod release")
+        date = json_string(data["release_date"], "release_date")
+        with validation_context("release_date"):
+            release_date = datetime.fromisoformat(date)
         return Release(
             tag=json_string(data["tag"], "tag"), hash=json_string(data["hash"], "hash"),
             pak_file_name=json_string(data["pak_file_name"], "pak_file_name"),
-            release_date=datetime.fromisoformat(json_string(data["release_date"], "release_date")),
+            release_date=release_date,
             info=ModInfo.from_dict(data["info"]),
-            release_notes_markdown=optional_string(data["release_notes_markdown"]),
+            release_notes_markdown=optional_string(data["release_notes_markdown"], "release_notes_markdown"),
             manifest=Manifest.from_dict(data["manifest"]),
         )
 

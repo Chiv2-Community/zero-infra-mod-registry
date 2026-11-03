@@ -39,17 +39,17 @@ def validate_metadata(path: Path, kind: str, registry: FilesystemPackageRegistry
         errors = sorted(f"{error.json_path}: {error.message}" for error in validator.iter_errors(data))
         if errors:
             raise ValueError("Schema validation failed:\n" + "\n".join(f"- {error}" for error in errors))
-    mod_dependencies: list[Dependency]
-    plugin_dependencies: list[Dependency]
-    if kind == "plugin":
-        plugin = PluginInfo.from_dict(data)
-        mod_dependencies, plugin_dependencies = plugin.mod_dependencies, plugin.plugin_dependencies
-    else:
-        mod_dependencies = mod_dependencies_from_dict(data)
-        plugin_dependencies = dependencies_from_dict(data, "plugin_dependencies")
-    for dependency in mod_dependencies + plugin_dependencies:
-        parse_version_requirement(dependency.version)
-    registry.validate_metadata_dependencies(mod_dependencies, plugin_dependencies)
+        mod_dependencies: list[Dependency]
+        plugin_dependencies: list[Dependency]
+        if kind == "plugin":
+            plugin = PluginInfo.from_dict(data)
+            mod_dependencies, plugin_dependencies = plugin.mod_dependencies, plugin.plugin_dependencies
+        else:
+            mod_dependencies = mod_dependencies_from_dict(data)
+            plugin_dependencies = dependencies_from_dict(data, "plugin_dependencies")
+        for dependency in mod_dependencies + plugin_dependencies:
+            parse_version_requirement(dependency.version)
+        registry.validate_metadata_dependencies(mod_dependencies, plugin_dependencies)
 
 
 def main() -> None:
