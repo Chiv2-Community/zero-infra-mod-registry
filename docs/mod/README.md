@@ -12,6 +12,8 @@
 
 Use `mod_dependencies` for pak mods and `plugin_dependencies` for DLL plugins.
 `mod.json` also accepts `dependencies`, a deprecated alias of `mod_dependencies`.
+`mod_dependencies` is required when `dependencies` is absent. Use
+`"mod_dependencies": []` for mods with no pak dependencies.
 If both are present, their lists are combined, deduplicating repository/version
 pairs case-insensitively by repository URL.
 

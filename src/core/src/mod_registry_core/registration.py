@@ -1,8 +1,27 @@
 """Pure release-selection and registration wire-contract helpers."""
 from collections.abc import Iterable
+from pathlib import Path
 import re
 
+from cattrs import Converter
+from jsonschema import Draft202012Validator
+from jsonschema.protocols import Validator
+from mod_registry_core.generated_requests import RegistrationRequest
+
 from mod_registry_core.json_types import JsonObject, decode_json, json_object, json_string
+
+
+def request_validator() -> Validator:
+    schemas = Path(__file__).resolve().parent / "schemas"
+    schema = json_object(decode_json((schemas / "request.schema.json").read_text()))
+    return Draft202012Validator(schema)
+
+
+def load_registration_request(value: JsonObject) -> RegistrationRequest:
+    errors = sorted(f"{error.json_path}: {error.message}" for error in request_validator().iter_errors(value))
+    if errors:
+        raise ValueError("Invalid registration request:\n" + "\n".join(errors))
+    return Converter().structure(value, RegistrationRequest)
 
 
 def selected_dll_name(names: Iterable[str], dll_file: str | None = None) -> str:
@@ -48,15 +67,8 @@ def parse_registration_payload(body: str) -> JsonObject:
     if block is None:
         raise ValueError("Include a fenced JSON registration request")
     value = json_object(decode_json(block[1]))
-    action = json_string(value.get("action"))
-    if action not in {"add-package-release", "add-dll-release"}:
-        raise ValueError("Invalid registration action")
-    payload: JsonObject = {"action": action}
-    for field in ("repo_url", "release_tag", "dll_file"):
-        if field == "dll_file" and field not in value:
-            continue
-        text = json_string(value.get(field))
-        if not text.strip():
-            raise ValueError(f"{field} must be a nonempty string")
-        payload[field] = text
+    request = load_registration_request(value)
+    payload: JsonObject = {"action": request.action.value, "repo_url": request.repo_url, "release_tag": request.release_tag}
+    if request.dll_file is not None:
+        payload["dll_file"] = request.dll_file
     return payload

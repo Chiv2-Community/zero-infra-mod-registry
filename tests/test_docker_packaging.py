@@ -57,7 +57,7 @@ for target in ('server', 'client', 'shared'):
     validate_metadata(path, 'plugin', registry)
     assert PluginInfo.from_dict(data).target is PluginTarget(target)
 path = Path('mod.json')
-path.write_text(json.dumps({'name': 'Pak', 'description': 'Description', 'authors': ['Author']}))
+path.write_text(json.dumps({'name': 'Pak', 'description': 'Description', 'authors': ['Author'], 'mod_dependencies': []}))
 validate_metadata(path, 'mod', registry)
 from zero_infra_mod_registry.metadata_validation import metadata_validator
 for kind in ('mod', 'plugin'):

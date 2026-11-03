@@ -21,7 +21,7 @@ T = TypeVar("T")
 
 
 def mod_fixture(name: str = "Plugin", tag: str = "v1.0.0", date: datetime = datetime(2023, 1, 1)) -> Mod:
-    info = ModInfo(f"https://github.com/Test/{name}", name, "Fixture", None, [], ["Author"], [])
+    info = ModInfo(repo_url=f"https://github.com/Test/{name}", name=name, description="Fixture", authors=["Author"])
     release = Release(tag, "a" * 128, f"{name}.pak", date, info, "Notes", Manifest([], [], [], [], []))
     return Mod(info, [release])
 

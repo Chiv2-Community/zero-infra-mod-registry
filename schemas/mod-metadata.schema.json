@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/mod-metadata.schema.json",
+  "$ref": "#/$defs/modInfo",
+  "$defs": {
+    "dependency": {
+      "title": "Dependency", "type": "object", "required": ["repo_url", "version"],
+      "properties": {"repo_url": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "modInfo": {
+      "title": "ModInfo", "type": "object", "required": ["repo_url", "name", "description", "authors"],
+      "if": {"not": {"required": ["dependencies"]}},
+      "then": {"required": ["mod_dependencies"]},
+      "properties": {
+        "repo_url": {"type": "string"}, "name": {"type": "string"}, "description": {"type": "string"},
+        "icon_url": {"type": ["string", "null"], "default": null},
+        "image_urls": {"type": "array", "items": {"type": "string"}, "default": []},
+        "authors": {"type": "array", "items": {"type": "string"}},
+        "mod_dependencies": {"$ref": "#/$defs/dependencies", "default": []},
+        "plugin_dependencies": {"$ref": "#/$defs/dependencies", "default": []},
+        "dependencies": {"$ref": "#/$defs/dependencies", "default": [], "deprecated": true}
+      }
+    },
+    "modRelease": {
+      "title": "Release", "type": "object", "required": ["tag", "hash", "pak_file_name", "release_date", "info", "release_notes_markdown", "manifest"],
+      "properties": {
+        "tag": {"type": "string"}, "hash": {"type": "string"}, "pak_file_name": {"type": "string"},
+        "release_date": {"type": "string", "x-python-datetime": true},
+        "info": {"$ref": "#/$defs/modInfo"},
+        "release_notes_markdown": {"type": ["string", "null"]},
+        "manifest": {"$ref": "pak-manifest.schema.json#/$defs/manifest"}
+      }
+    },
+    "mod": {
+      "title": "Mod", "type": "object", "required": ["latest_release_info", "releases"],
+      "properties": {
+        "latest_release_info": {"$ref": "#/$defs/modInfo"},
+        "releases": {"type": "array", "items": {"$ref": "#/$defs/modRelease"}}
+      }
+    }
+  }
+}

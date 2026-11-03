@@ -44,6 +44,8 @@ assert find_spec(sys.argv[1]) is not None
 assert find_spec(sys.argv[2]) is None
 from mod_registry_core.json_types import decode_json, json_object
 assert json_object(decode_json('{"name":"example"}')) == {'name': 'example'}
+from mod_registry_core.registration import load_registration_request
+assert load_registration_request({'action': 'add-package-release', 'repo_url': 'https://github.com/Test/Pak', 'release_tag': 'v1.0.0'}).release_tag == 'v1.0.0'
 if sys.argv[1] == 'automated_registry_gateway':
     from automated_registry_gateway.server import main
 else:

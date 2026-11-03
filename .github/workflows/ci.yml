@@ -41,6 +41,9 @@ jobs:
       - name: Build workspace packages
         run: uv build --all-packages
 
+      - name: Check generated models
+        run: uv run python scripts/generate_models.py --check
+
       - name: Run mypy
         run: uv run mypy .
 

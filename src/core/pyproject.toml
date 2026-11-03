@@ -3,7 +3,7 @@ name = "mod-registry-core"
 version = "1.0.0"
 description = "Shared typed JSON utilities"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["cattrs>=26.2.1", "jsonschema>=4.26.0"]
 
 [build-system]
 requires = ["hatchling"]

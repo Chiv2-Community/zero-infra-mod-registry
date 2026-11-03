@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/dll-metadata.schema.json",
+  "$ref": "#/$defs/pluginInfo",
+  "$defs": {
+    "target": {"title": "PluginTarget", "type": "string", "enum": ["server", "client", "shared"]},
+    "pluginInfo": {
+      "title": "PluginInfo", "type": "object", "required": ["name", "description", "authors"], "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"}, "description": {"type": "string"},
+        "authors": {"type": "array", "items": {"type": "string"}},
+        "plugin_dependencies": {"$ref": "mod-metadata.schema.json#/$defs/dependencies", "default": []},
+        "icon_url": {"type": ["string", "null"], "default": null},
+        "image_urls": {"type": "array", "items": {"type": "string"}, "default": []},
+        "mod_dependencies": {"$ref": "mod-metadata.schema.json#/$defs/dependencies", "default": []},
+        "repo_url": {"type": ["string", "null"], "default": null},
+        "target": {"$ref": "#/$defs/target", "default": "shared"},
+        "$schema": {"type": "string"}
+      }
+    },
+    "pluginRelease": {
+      "title": "PluginRelease", "type": "object", "required": ["tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"], "additionalProperties": false,
+      "properties": {
+        "tag": {"type": "string"}, "hash": {"type": "string"}, "download_url": {"type": "string"}, "size": {"type": "integer"},
+        "dll_file_name": {"type": ["string", "null"]}, "release_date": {"type": ["string", "null"], "x-python-datetime": true},
+        "info": {"$ref": "#/$defs/pluginInfo"}, "release_notes_markdown": {"type": ["string", "null"]}
+      }
+    },
+    "pluginPackage": {
+      "title": "PluginPackage", "type": "object", "required": ["latest_release_info", "releases"], "additionalProperties": false,
+      "properties": {
+        "latest_release_info": {"$ref": "#/$defs/pluginInfo"},
+        "releases": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pluginRelease"}}
+      }
+    },
+    "dllRelease": {
+      "title": "DllRelease", "description": "Resolved DLL release after adding source repository identity.",
+      "type": "object", "required": ["organization", "name", "version", "download_url", "sha256", "size"],
+      "properties": {
+        "organization": {"type": "string"}, "name": {"type": "string"}, "version": {"type": "string"},
+        "download_url": {"type": "string"}, "sha256": {"type": "string"}, "size": {"type": "integer"},
+        "info": {"anyOf": [{"$ref": "#/$defs/pluginInfo"}, {"type": "null"}], "default": null},
+        "tag": {"type": ["string", "null"], "default": null},
+        "release_date": {"type": ["string", "null"], "default": null, "x-python-datetime": true},
+        "release_notes_markdown": {"type": ["string", "null"], "default": null},
+        "dll_file_name": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "plugin": {
+      "title": "Plugin", "description": "Resolved plugin releases; latest metadata is computed at serialization.",
+      "type": "object", "required": ["releases"],
+      "properties": {"releases": {"type": "array", "items": {"$ref": "#/$defs/dllRelease"}}}
+    }
+  }
+}

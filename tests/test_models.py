@@ -51,6 +51,7 @@ def test_manifest_parser_rejects_incorrect_container_types(value: JsonValue) -> 
 def test_marker_defaults_are_independent_and_null_compatible() -> None:
     first = ModMarkerInfo("first", "hash")
     second = ModMarkerInfo("second", "hash")
+    assert first.associated_blueprints is not None
     first.associated_blueprints.append("/Game/Blueprint")
     assert second.associated_blueprints == []
     value: JsonObject = {"path": "marker", "hash": "hash", "associated_blueprints": None}

@@ -1,0 +1,71 @@
+{% for decorator in decorators -%}
+{{ decorator }}
+{% endfor -%}
+@dataclass(frozen=True)
+{% if base_class -%}
+class {{ class_name }}({{ base_class }}):
+{% else -%}
+class {{ class_name }}:
+{% endif -%}
+{%- for field in fields -%}
+    {%- if field.field %}
+    {{ field.name }}: {{ field.type_hint }} = {{ field.field }}
+    {%- else %}
+    {{ field.name }}: {{ field.type_hint }}{% if not (field.required and not field.use_default_with_required) %} = {{ field.represented_default }}{% endif %}
+    {%- endif %}
+{%- endfor %}
+{% if class_name not in ['Model', 'Plugin', 'DllRelease', 'PluginPackage', 'PluginRelease', 'RegistrationRequest'] %}
+    @staticmethod
+{% if base_class %}    @override
+{% endif %}
+    def from_dict(value: JsonValue) -> {{ class_name }}:
+        from zero_infra_mod_registry.models.loading import load
+        return load(value, {{ class_name }})
+
+{% if base_class %}    @override
+{% endif %}
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.loading import serialize
+        return serialize(self)
+{% endif %}
+{% if class_name in ['PluginInfo', 'DllRelease'] %}
+    def validate(self) -> None:
+        from zero_infra_mod_registry.models.dll_metadata import {% if class_name == 'PluginInfo' %}validate_plugin_info{% else %}validate_dll_release{% endif %}
+        {% if class_name == 'PluginInfo' %}validate_plugin_info{% else %}validate_dll_release{% endif %}(self)
+{% endif %}
+{% if class_name == 'DllRelease' %}
+    @property
+    def key(self) -> tuple[str, str, str]:
+        from zero_infra_mod_registry.models.dll_metadata import dll_release_key
+        return dll_release_key(self)
+
+    def package_dict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.dll_metadata import dll_package_dict
+        return dll_package_dict(self)
+
+    @staticmethod
+    def from_package_dict(org: str, name: str, value: JsonValue) -> DllRelease:
+        from zero_infra_mod_registry.models.dll_metadata import dll_from_package_dict
+        return dll_from_package_dict(org, name, value)
+{% endif %}
+{% if class_name == 'Plugin' %}
+    def sorted_releases(self) -> list[DllRelease]:
+        from zero_infra_mod_registry.models.dll_metadata import sorted_plugin_releases
+        return sorted_plugin_releases(self)
+
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.dll_metadata import plugin_dict
+        return plugin_dict(self)
+
+    def latest_info(self) -> PluginInfo:
+        from zero_infra_mod_registry.models.dll_metadata import latest_plugin_info
+        return latest_plugin_info(self)
+
+    @staticmethod
+    def from_dict(org: str, name: str, value: JsonValue) -> Plugin:
+        from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict
+        return plugin_from_dict(org, name, value)
+{% endif %}
+{% if not fields and class_name == 'Model' %}
+    pass
+{% endif %}

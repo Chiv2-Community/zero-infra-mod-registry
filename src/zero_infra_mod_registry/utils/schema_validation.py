@@ -13,7 +13,7 @@ _VALIDATORS: dict[tuple[str, str | None], Validator] = {}
 
 
 def schema_validator(kind: str, definition: str | None = None) -> Validator:
-    if kind not in {"mod", "plugin", "registry"}:
+    if kind not in {"mod", "plugin", "registry", "mod-metadata", "dll-metadata", "pak-manifest", "request"}:
         raise ValueError("Unknown metadata schema")
     key = kind, definition
     if key in _VALIDATORS:
@@ -22,7 +22,7 @@ def schema_validator(kind: str, definition: str | None = None) -> Validator:
     if not schemas.exists():
         schemas = Path(__file__).resolve().parents[3] / "schemas"
     documents: JsonObject = {}
-    for name in ("common", "mod", "plugin", "registry"):
+    for name in ("common", "mod", "plugin", "registry", "mod-metadata", "dll-metadata", "pak-manifest", "request"):
         document = json_object(decode_json((schemas / f"{name}.schema.json").read_text()))
         documents[name] = document
     reference = json_string(json_object(documents[kind])["$id"])

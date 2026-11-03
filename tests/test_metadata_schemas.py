@@ -28,6 +28,8 @@ def test_metadata_schemas_accept_dependency_fields(kind: str) -> None:
 @pytest.mark.parametrize("kind", ["mod", "plugin"])
 def test_metadata_schemas_accept_minimal_metadata(kind: str) -> None:
     data: JsonObject = {"name": "Example", "description": "Description", "authors": ["Author"]}
+    if kind == "mod":
+        data["mod_dependencies"] = []
     validator(kind).validate(data)
 
 
