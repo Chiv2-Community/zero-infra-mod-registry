@@ -8,7 +8,7 @@ import sys
 import pytest
 
 from mod_registry_core.generated_requests import Action, RegistrationRequest
-from mod_registry_core.json_types import JsonObject
+from mod_registry_core.json_types import JsonObject, JsonValue
 from mod_registry_core.registration import load_registration_request
 from zero_infra_mod_registry.models import Dependency, Mod, ModInfo
 from zero_infra_mod_registry.models.dll_metadata import PluginInfo
@@ -91,3 +91,49 @@ def test_issue_request_uses_generated_model_and_schema() -> None:
     assert request.dll_file is None
     with pytest.raises(ValueError, match="dll_file"):
         load_registration_request({"action": "add-dll-release", "repo_url": "https://github.com/Test/Plugin", "release_tag": "v1.0.0", "dll_file": None})
+
+
+@pytest.mark.parametrize("kind", ["plugin", "dll-metadata"])
+@pytest.mark.parametrize("field,value", [
+    ("target", "both"), ("name", " \t"), ("description", "\n"),
+    ("authors", []), ("authors", ["Author", " "]),
+    ("icon_url", "http://example.com/icon.png"),
+    ("icon_url", "https://user:password@example.com/icon.png"),
+    ("icon_url", "https://:443/icon.png"),
+    ("icon_url", "https://[::::]/icon.png"),
+    ("icon_url", "https://example.com/icon.png\n"),
+    ("image_urls", ["https://example.com/a.png", "http://example.com/b.png"]),
+    ("mod_dependencies", [{"repo_url": "https://evil.com/Test/Pak", "version": "1.0.0"}]),
+    ("mod_dependencies", [{"repo_url": "https://github.com/Test/Pak\n", "version": "1.0.0"}]),
+    ("plugin_dependencies", [{"repo_url": "https://github.com/Test/Plugin.Core", "version": "1.0.0"}]),
+])
+def test_plugin_structure_is_rejected_by_schema_alone(kind: str, field: str, value: JsonValue) -> None:
+    data: JsonObject = {"name": "Plugin", "description": "Description", "authors": ["Author"], field: value}
+    with pytest.raises(ValueError, match=field):
+        validate_schema(data, kind)
+
+
+@pytest.mark.parametrize("url", ["https://example.com/icon.png", "https://example.com:8443/icon.png", "https://[::1]/icon.png"])
+def test_plugin_schema_accepts_https_hosts_and_ports(url: str) -> None:
+    data: JsonObject = {"name": "Plugin", "description": "Description", "authors": ["Author"], "icon_url": url}
+    validate_schema(data, "plugin")
+    validate_schema(data, "dll-metadata")
+
+
+def test_direct_plugin_validation_uses_the_schema() -> None:
+    info = PluginInfo(" ", "Description", ["Author"], [])
+    with pytest.raises(ValueError, match=r"Schema validation failed:[\s\S]*\$\.name"):
+        info.validate()
+
+
+def test_semantic_dependency_checks_remain_in_python() -> None:
+    data: JsonObject = {"name": "Plugin", "description": "Description", "authors": ["Author"],
+                        "plugin_dependencies": [{"repo_url": "https://github.com/Test/Other", "version": "1.0.0"},
+                                                {"repo_url": "https://github.com/test/other", "version": "2.0.0"}]}
+    validate_schema(data, "dll-metadata")
+    with pytest.raises(ValueError, match="Duplicate plugin dependency"):
+        PluginInfo.from_dict(data)
+    data["plugin_dependencies"] = [{"repo_url": "https://github.com/Test/Other", "version": "1.0.0-01"}]
+    validate_schema(data, "dll-metadata")
+    with pytest.raises(ValueError, match=r"plugin_dependencies\[0\]\.version"):
+        PluginInfo.from_dict(data)

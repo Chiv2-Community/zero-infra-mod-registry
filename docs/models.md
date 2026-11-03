@@ -1,7 +1,7 @@
 # Metadata models
 
 Schemas are the source of truth. Dataclasses are generated at development time
-and checked in. Do not edit generated Python or the bundled request-schema copy.
+and checked in. Do not edit generated Python.
 
 | Schema | Contract |
 |---|---|
@@ -9,7 +9,8 @@ and checked in. Do not edit generated Python or the bundled request-schema copy.
 | `schemas/dll-metadata.schema.json` | Stored DLL metadata, packages, and resolved releases |
 | `schemas/pak-manifest.schema.json` | Scanner inventories and pak assets |
 | `schemas/request.schema.json` | Fenced registration requests in registry issues |
-| `schemas/mod.schema.json`, `schemas/plugin.schema.json` | Submission validation |
+| `schemas/mod.schema.json` | Mod submission validation |
+| `schemas/plugin.schema.json` | Plugin submission validation |
 | `schemas/registry.schema.json` | References to stored-record contracts |
 
 Regenerate after changing schemas or generation templates:
@@ -23,15 +24,23 @@ uv run python scripts/generate_models.py --check
 CI checks regeneration, strict typing, and tests. The pinned generator and locked
 formatters make generation reproducible. Runtime installs do not need the generator.
 
-`models/generated.py` contains metadata dataclasses. Shared issue-request types
+`models/generated.py` contains metadata dataclasses. Dependency contracts share
+the generated `models/generated_dependencies.py` value type; their URL and version
+constraints are still checked against the applicable schema. Shared issue-request types
 live in `mod_registry_core/generated_requests.py` so the gateway does not depend
-on the registry application. The request schema is copied into that package by
-the same generation command; the check also detects a stale copy.
+on the registry application. Both applications use `schemas/request.schema.json`.
+Package builds bundle that source automatically; no duplicate schema is checked in.
+Both image builds include the root schemas directory in their build inputs.
 
 Loading validates raw JSON with `jsonschema`, then structures it with `cattrs`.
 Generated convenience methods delegate to handwritten loading, serialization,
 and semantic-check functions; templates never duplicate field declarations.
 Repository identity (`Repo`) is an internal helper, not a metadata document.
+
+Plugin schemas enforce enums, nonblank text, authors, HTTPS media URLs, and
+dependency URL patterns. Python checks case-insensitive repository uniqueness,
+parses version requirements, and checks repository/tag consistency and registered
+dependencies.
 
 ## Compatibility
 

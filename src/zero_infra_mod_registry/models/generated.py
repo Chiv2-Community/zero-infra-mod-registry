@@ -8,30 +8,13 @@ from enum import StrEnum
 from typing import override
 
 from mod_registry_core.json_types import JsonObject, JsonValue
+from zero_infra_mod_registry.models.generated_dependencies import Dependency
 
 
 @dataclass(frozen=True)
 class Model:
 
     pass
-
-
-@dataclass(frozen=True)
-class Dependency:
-
-    repo_url: str
-    version: str
-
-    @staticmethod
-    def from_dict(value: JsonValue) -> Dependency:
-        from zero_infra_mod_registry.models.loading import load
-
-        return load(value, Dependency)
-
-    def asdict(self) -> JsonObject:
-        from zero_infra_mod_registry.models.loading import serialize
-
-        return serialize(self)
 
 
 type ModMetadataDependencies = list[Dependency]
@@ -46,9 +29,9 @@ class ModInfo:
     authors: list[str]
     icon_url: str | None = None
     image_urls: list[str] = field(default_factory=list)
-    mod_dependencies: ModMetadataDependencies = field(default_factory=list)
-    plugin_dependencies: ModMetadataDependencies = field(default_factory=list)
-    dependencies: ModMetadataDependencies = field(default_factory=list)
+    mod_dependencies: list[Dependency] = field(default_factory=list)
+    plugin_dependencies: list[Dependency] = field(default_factory=list)
+    dependencies: list[Dependency] = field(default_factory=list)
 
     @staticmethod
     def from_dict(value: JsonValue) -> ModInfo:
@@ -178,16 +161,138 @@ class PluginTarget(StrEnum):
     SHARED = 'shared'
 
 
+type CommonText = str
+
+
+type CommonPakRepository = str
+
+
+type CommonVersionRequirement = str
+
+
+type CommonPluginRepository = str
+
+
+type CommonMediaUrl = str
+
+
+@dataclass(frozen=True)
+class ModMarkerInfo(BaseAsset):
+
+    associated_blueprints: list[str] | None = field(default_factory=list)
+
+    @staticmethod
+    @override
+    def from_dict(value: JsonValue) -> ModMarkerInfo:
+        from zero_infra_mod_registry.models.loading import load
+
+        return load(value, ModMarkerInfo)
+
+    @override
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.loading import serialize
+
+        return serialize(self)
+
+
+type CommonDependencies = list[Dependency]
+
+
+@dataclass(frozen=True)
+class Manifest:
+
+    markers: list[ModMarkerInfo] = field(default_factory=list)
+    blueprints: list[BlueprintModInfo] = field(default_factory=list)
+    maps: list[GameMapInfo] = field(default_factory=list)
+    replacements: list[AssetReplacementInfo] = field(default_factory=list)
+    arbitrary: list[ArbitraryAssetInfo] = field(default_factory=list)
+
+    @staticmethod
+    def from_dict(value: JsonValue) -> Manifest:
+        from zero_infra_mod_registry.models.loading import load
+
+        return load(value, Manifest)
+
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.loading import serialize
+
+        return serialize(self)
+
+
+@dataclass(frozen=True)
+class Release:
+
+    tag: str
+    hash: str
+    pak_file_name: str
+    release_date: datetime
+    info: ModInfo
+    release_notes_markdown: str | None
+    manifest: Manifest
+
+    @staticmethod
+    def from_dict(value: JsonValue) -> Release:
+        from zero_infra_mod_registry.models.loading import load
+
+        return load(value, Release)
+
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.loading import serialize
+
+        return serialize(self)
+
+
+@dataclass(frozen=True)
+class Mod:
+
+    latest_release_info: ModInfo
+    releases: list[Release]
+
+    @staticmethod
+    def from_dict(value: JsonValue) -> Mod:
+        from zero_infra_mod_registry.models.loading import load
+
+        return load(value, Mod)
+
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.loading import serialize
+
+        return serialize(self)
+
+
+@dataclass(frozen=True)
+class PakInventory:
+
+    pak_name: str
+    pak_path: str
+    pak_hash: str | None = None
+    inventory: Manifest = field(default_factory=lambda: Manifest())
+
+    @staticmethod
+    def from_dict(value: JsonValue) -> PakInventory:
+        from zero_infra_mod_registry.models.loading import load
+
+        return load(value, PakInventory)
+
+    def asdict(self) -> JsonObject:
+        from zero_infra_mod_registry.models.loading import serialize
+
+        return serialize(self)
+
+
+type CommonPluginDependencies = list[Dependency]
+
+
 @dataclass(frozen=True)
 class PluginInfo:
 
     name: str
     description: str
     authors: list[str]
-    plugin_dependencies: ModMetadataDependencies = field(default_factory=list)
+    plugin_dependencies: list[Dependency] = field(default_factory=list)
     icon_url: str | None = None
     image_urls: list[str] = field(default_factory=list)
-    mod_dependencies: ModMetadataDependencies = field(default_factory=list)
+    mod_dependencies: list[Dependency] = field(default_factory=list)
     repo_url: str | None = None
     target: PluginTarget = PluginTarget.SHARED
     field_schema: str | None = None
@@ -292,104 +397,3 @@ class Plugin:
         from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict
 
         return plugin_from_dict(org, name, value)
-
-
-@dataclass(frozen=True)
-class ModMarkerInfo(BaseAsset):
-
-    associated_blueprints: list[str] | None = field(default_factory=list)
-
-    @staticmethod
-    @override
-    def from_dict(value: JsonValue) -> ModMarkerInfo:
-        from zero_infra_mod_registry.models.loading import load
-
-        return load(value, ModMarkerInfo)
-
-    @override
-    def asdict(self) -> JsonObject:
-        from zero_infra_mod_registry.models.loading import serialize
-
-        return serialize(self)
-
-
-@dataclass(frozen=True)
-class Manifest:
-
-    markers: list[ModMarkerInfo] = field(default_factory=list)
-    blueprints: list[BlueprintModInfo] = field(default_factory=list)
-    maps: list[GameMapInfo] = field(default_factory=list)
-    replacements: list[AssetReplacementInfo] = field(default_factory=list)
-    arbitrary: list[ArbitraryAssetInfo] = field(default_factory=list)
-
-    @staticmethod
-    def from_dict(value: JsonValue) -> Manifest:
-        from zero_infra_mod_registry.models.loading import load
-
-        return load(value, Manifest)
-
-    def asdict(self) -> JsonObject:
-        from zero_infra_mod_registry.models.loading import serialize
-
-        return serialize(self)
-
-
-@dataclass(frozen=True)
-class Release:
-
-    tag: str
-    hash: str
-    pak_file_name: str
-    release_date: datetime
-    info: ModInfo
-    release_notes_markdown: str | None
-    manifest: Manifest
-
-    @staticmethod
-    def from_dict(value: JsonValue) -> Release:
-        from zero_infra_mod_registry.models.loading import load
-
-        return load(value, Release)
-
-    def asdict(self) -> JsonObject:
-        from zero_infra_mod_registry.models.loading import serialize
-
-        return serialize(self)
-
-
-@dataclass(frozen=True)
-class Mod:
-
-    latest_release_info: ModInfo
-    releases: list[Release]
-
-    @staticmethod
-    def from_dict(value: JsonValue) -> Mod:
-        from zero_infra_mod_registry.models.loading import load
-
-        return load(value, Mod)
-
-    def asdict(self) -> JsonObject:
-        from zero_infra_mod_registry.models.loading import serialize
-
-        return serialize(self)
-
-
-@dataclass(frozen=True)
-class PakInventory:
-
-    pak_name: str
-    pak_path: str
-    pak_hash: str | None = None
-    inventory: Manifest = field(default_factory=lambda: Manifest())
-
-    @staticmethod
-    def from_dict(value: JsonValue) -> PakInventory:
-        from zero_infra_mod_registry.models.loading import load
-
-        return load(value, PakInventory)
-
-    def asdict(self) -> JsonObject:
-        from zero_infra_mod_registry.models.loading import serialize
-
-        return serialize(self)

@@ -13,6 +13,8 @@ from mod_registry_core.json_types import JsonObject, decode_json, json_object, j
 
 def request_validator() -> Validator:
     schemas = Path(__file__).resolve().parent / "schemas"
+    if not (schemas / "request.schema.json").is_file():
+        schemas = Path(__file__).resolve().parents[4] / "schemas"
     schema = json_object(decode_json((schemas / "request.schema.json").read_text()))
     return Draft202012Validator(schema)
 

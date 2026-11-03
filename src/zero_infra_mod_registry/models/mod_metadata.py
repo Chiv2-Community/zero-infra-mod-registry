@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from typing import override
 
 from mod_registry_core.json_types import JsonObject, json_array
+from zero_infra_mod_registry.models.generated_dependencies import Dependency as Dependency
 from zero_infra_mod_registry.models.generated import (
-    Dependency as Dependency, Mod as Mod, ModInfo as ModInfo, Release as Release,
+    Mod as Mod, ModInfo as ModInfo, Release as Release,
 )
 
 

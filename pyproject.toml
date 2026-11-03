@@ -15,7 +15,7 @@ dependencies = [
     "types-urllib3>=1.26.25.14",
     "urllib3>=2.0.5",
     "semver>=3.0.4",
-    "jsonschema>=4.26.0",
+    "jsonschema[format-nongpl]>=4.26.0",
     "mod-registry-core==1.0.0",
     "cattrs>=26.2.1",
 ]
@@ -26,6 +26,7 @@ zero-infra-mod-registry = "zero_infra_mod_registry.main:main"
 dev = [
     "automated-registry-gateway==1.0.0",
     "datamodel-code-generator[black,isort]==0.88.0",
+    "hatchling>=1.33.0",
     "mypy>=1.19.1",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",

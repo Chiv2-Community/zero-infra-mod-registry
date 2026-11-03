@@ -57,10 +57,10 @@ def _mod_info(value: JsonValue, _: type[ModInfo]) -> ModInfo:
 
 
 def _plugin_info(value: JsonValue, _: type[PluginInfo]) -> PluginInfo:
-    from zero_infra_mod_registry.models.dll_metadata import validate_plugin_info
+    from zero_infra_mod_registry.models.dll_metadata import validate_plugin_dependencies
 
     info = _structure_plugin_info(value, PluginInfo)
-    validate_plugin_info(info)
+    validate_plugin_dependencies(info)
     return info
 
 

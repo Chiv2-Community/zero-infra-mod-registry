@@ -177,13 +177,13 @@ def test_retrieval_and_registration_preserve_target(
 
 @pytest.mark.parametrize("repo", [".", "..", "../Pak", "Pak/Core", "Pak%2eCore", "Pak.Core?x=1", "Pak.Core#fragment"])
 def test_pak_dependency_paths_remain_strict(repo: str) -> None:
-    with pytest.raises(ValueError, match="GitHub repository"):
+    with pytest.raises(ValueError, match=r"mod_dependencies\[0\]\.repo_url"):
         PluginInfo.from_dict({**INFO.asdict(), "mod_dependencies": [
             {"repo_url": f"https://github.com/Test/{repo}", "version": "1.0.0"}]})
 
 
 def test_dotted_plugin_dependency_remains_rejected() -> None:
-    with pytest.raises(ValueError, match="GitHub repository"):
+    with pytest.raises(ValueError, match=r"plugin_dependencies\[0\]\.repo_url"):
         PluginInfo.from_dict({**INFO.asdict(), "plugin_dependencies": [
             {"repo_url": "https://github.com/Test/Plugin.Core", "version": "1.0.0"}]})
 

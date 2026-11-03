@@ -13,10 +13,10 @@ from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, jso
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "src/zero_infra_mod_registry/models/generated.py"
 REQUEST_OUTPUT = ROOT / "src/core/src/mod_registry_core/generated_requests.py"
-REQUEST_SCHEMA = REQUEST_OUTPUT.parent / "schemas/request.schema.json"
+DEPENDENCY_OUTPUT = OUTPUT.with_name("generated_dependencies.py")
 
 
-def generate(request: bool = False) -> str:
+def generate(request: bool = False, dependency: bool = False) -> str:
     # Inline local references so generation never fetches a schema over the network.
     definitions: JsonObject = {}
     documents = {path.name: json_object(decode_json(path.read_text())) for path in (ROOT / "schemas").glob("*.schema.json")}
@@ -49,9 +49,17 @@ def generate(request: bool = False) -> str:
                 definitions[key] = inline(document, target)
         return result
 
-    filenames = ("request.schema.json",) if request else ("mod-metadata.schema.json", "dll-metadata.schema.json", "pak-manifest.schema.json")
+    filenames: tuple[str, ...]
+    if request:
+        filenames = ("request.schema.json",)
+    elif dependency:
+        filenames = ("mod-metadata.schema.json",)
+    else:
+        filenames = ("mod-metadata.schema.json", "dll-metadata.schema.json", "pak-manifest.schema.json")
     for filename in filenames:
         for name, definition in json_object(documents[filename]["$defs"]).items():
+            if dependency and name != "dependency":
+                continue
             key = filename.removesuffix(".schema.json").replace("-", "_") + "_" + name
             definitions[key] = inline(definition, filename)
     with tempfile.TemporaryDirectory() as directory:
@@ -59,11 +67,17 @@ def generate(request: bool = False) -> str:
         output = Path(directory) / "generated.py"
         bundle: JsonObject = {"type": "object", "$defs": definitions}
         schema.write_text(json.dumps(bundle))
+        # URL/version constraints differ, but dependency value fields do not.
+        overrides = {} if request or dependency else {
+            name: "zero_infra_mod_registry.models.generated_dependencies.Dependency"
+            for name in ("Dependency", "CommonDependency", "CommonPluginDependency")
+        }
         subprocess.run([
             sys.executable, "-m", "datamodel_code_generator", "--input", str(schema),
             "--input-file-type", "jsonschema", "--output", str(output),
             "--output-model-type", "dataclasses.dataclass", "--target-python-version", "3.12",
             "--frozen-dataclasses", "--use-standard-collections", "--use-union-operator",
+            "--collapse-root-models", "--type-overrides", json.dumps(overrides),
             "--use-title-as-name", "--disable-timestamp", "--use-default", "--strict-nullable",
             "--output-datetime-class", "datetime", "--use-subclass-enum", "--capitalise-enum-members",
             "--deserialize-default-values", "enum",
@@ -80,8 +94,7 @@ def main() -> None:
     parser.add_argument("--check", action="store_true")
     parser.parse_args()
     outputs = {
-        OUTPUT: generate(), REQUEST_OUTPUT: generate(True),
-        REQUEST_SCHEMA: (ROOT / "schemas/request.schema.json").read_text(),
+        OUTPUT: generate(), REQUEST_OUTPUT: generate(True), DEPENDENCY_OUTPUT: generate(dependency=True),
     }
     for path, generated in outputs.items():
         if "--check" in sys.argv[1:]:

@@ -3,8 +3,10 @@
   "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/common.schema.json",
   "title": "Shared metadata definitions",
   "$defs": {
-    "pakRepository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/(?!\\.{1,2}$)[A-Za-z0-9_.-]+$"},
-    "pluginRepository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+$"},
+    "text": {"type": "string", "pattern": "\\S"},
+    "mediaUrl": {"type": "string", "format": "uri", "pattern": "^https://(?:\\[[0-9A-Fa-f:.]+\\]|[^:/@?#\\s\\[\\]]+)(?::[0-9]+)?(?:[/?#][^\\s]*)?(?![\\s\\S])", "description": "HTTPS URL with a hostname and no embedded credentials."},
+    "pakRepository": {"type": "string", "format": "uri", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/(?!\\.{1,2}$)[A-Za-z0-9_.-]+(?![\\s\\S])"},
+    "pluginRepository": {"type": "string", "format": "uri", "pattern": "^https://github\\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+(?![\\s\\S])"},
     "versionRequirement": {
       "type": "string",
       "not": {"pattern": "^v?\\^.*,"},

@@ -13,32 +13,16 @@ from zero_infra_mod_registry.utils.schema_validation import validate_schema
 
 
 def validate_plugin_info(info: PluginInfo) -> None:
-    if not isinstance(info.target, PluginTarget):
-        raise ValueError("Plugin target must be server, client or shared")
-    for field_name, text in [("name", info.name), ("description", info.description)]:
-        if not text.strip():
-            raise ValueError(f"{field_name}: must not be blank")
-    if not info.authors:
-        raise ValueError("authors: must contain at least one author")
-    for index, author in enumerate(info.authors):
-        if not author.strip():
-            raise ValueError(f"authors[{index}]: must not be blank")
-    urls = [(f"image_urls[{index}]", url) for index, url in enumerate(info.image_urls)]
-    if info.icon_url is not None:
-        urls.append(("icon_url", info.icon_url))
-    for field_name, image_url in urls:
-        image = urlparse(image_url)
-        if image.scheme != "https" or not image.hostname or image.username or image.password:
-            raise ValueError(f"{field_name}: Plugin image/icon URLs must use HTTPS without credentials")
+    validate_schema(info.asdict(), "dll-metadata", "pluginInfo")
+    validate_plugin_dependencies(info)
+
+
+def validate_plugin_dependencies(info: PluginInfo) -> None:
     repos: set[tuple[str, str]] = set()
     dependencies = [("mod", index, dependency) for index, dependency in enumerate(info.mod_dependencies)]
     dependencies += [("plugin", index, dependency) for index, dependency in enumerate(info.plugin_dependencies)]
     for kind, index, dependency in dependencies:
         path = f"{kind}_dependencies[{index}]"
-        url = urlparse(dependency.repo_url)
-        repository = r"(?!\.{1,2}$)[A-Za-z0-9_.-]+" if kind == "mod" else r"[A-Za-z0-9_-]+"
-        if url.scheme != "https" or url.netloc != "github.com" or not re.fullmatch(r"/[A-Za-z0-9_-]+/" + repository, url.path) or url.query or url.fragment:
-            raise ValueError(f"{path}.repo_url: Plugin dependencies must reference a GitHub repository")
         key = kind, dependency.repo_url.lower()
         if key in repos:
             raise ValueError(f"{path}.repo_url: Duplicate plugin dependency")
