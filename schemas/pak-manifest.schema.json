@@ -46,7 +46,7 @@
     },
     "marker": {
       "title": "ModMarkerInfo", "allOf": [{"$ref": "#/$defs/asset"}],
-      "properties": {"associated_blueprints": {"type": ["array", "null"], "items": {"type": "string"}, "default": []}}
+      "properties": {"associated_blueprints": {"type": ["array", "null"], "items": {"type": "string"}, "default": [], "x-python-null-as-default": true}}
     },
     "manifest": {
       "title": "Manifest", "type": "object",

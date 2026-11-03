@@ -1,7 +1,7 @@
 # Metadata models
 
-Schemas are the source of truth. Dataclasses are generated at development time
-and checked in. Do not edit generated Python.
+Schemas are the source of truth. Dataclasses, schema bindings, and loading hooks
+are generated at development time and checked in. Do not edit generated Python.
 
 | Schema | Contract |
 |---|---|
@@ -25,16 +25,20 @@ CI checks regeneration, strict typing, and tests. The pinned generator and locke
 formatters make generation reproducible. Runtime installs do not need the generator.
 
 The independent `generated-models` workspace package contains `generated_models.metadata`,
-`generated_models.dependencies`, and `generated_models.requests`. It has no runtime
-dependencies. Consumers import its dataclasses and enums directly. Dependency contracts
+`generated_models.dependencies`, `generated_models.requests`, and `generated_models.loading`.
+Runtime dependencies are `jsonschema` and `cattrs`. Consumers import its dataclasses and enums directly. Dependency contracts
 share one value type; URL and version constraints remain in the applicable schemas.
-Both applications use `schemas/request.schema.json`.
-Package builds bundle that source automatically; no duplicate schema is checked in.
+Both applications use the generated loader for issue requests.
+The generated-models build bundles root schemas automatically; consumers do not
+carry separate schema copies. No duplicate schema is checked in.
 Both image builds include the root schemas directory in their build inputs.
 
 Loading validates raw JSON with `jsonschema`, then structures it with `cattrs`.
-Loading, serialization, and semantic checks are handwritten consumer functions;
-generated definitions contain only value types. The development-only `code-gen` package calls
+`generated_models.loading.load` validates before structuring; `serialize` applies
+the generated wire transformations, including inside nested models.
+The registry wrapper adds semantic checks and diagnostic context, not structural
+validation rules. Package adapters retain runtime repository identity and release selection.
+The development-only `code-gen` package calls
 the generator's Python API in-process and bundles local references for offline generation.
 Repository identity (`Repo`) is an internal helper, not a metadata document.
 
@@ -49,10 +53,25 @@ Both `dependencies` and `mod_dependencies` are modeled. `dependencies` is
 deprecated; `mod_dependencies` is required when `dependencies` is absent.
 Declare an empty list when there are no pak dependencies.
 
-`models/loading.py` normalizes both input lists into `mod_dependencies`,
+Generated loading normalizes both input lists into `mod_dependencies`,
 deduplicating case-insensitive repository/version pairs. It clears the consumed
 deprecated field. Serialization emits the merged list under both names, including
-in historical releases. This behavior is not implemented in generated definitions.
+in historical releases. These hooks are derived from schema annotations.
+
+| Annotation | Generated behavior |
+|---|---|
+| `x-python-name` | Map a wire field to its Python name in both directions |
+| `x-python-null-as-default` | Replace an accepted null with the declared default |
+| `x-python-merge-into` | Merge a deprecated list into its canonical field; clear the deprecated field on load |
+| `x-python-unique-key` / `x-python-case-insensitive` | Select merge identity fields and case-insensitive comparisons |
+| `x-python-serialize-alias` | Emit the merged list under the deprecated spelling too |
+| `x-python-omit-none` | Omit null fields when serializing this model |
+| `x-python-omit-empty` | Omit an empty field when serializing |
+
+Annotations describe transformations, not additional validation constraints.
+Raw input is always validated before normalization. SemVer interpretation,
+dependency uniqueness and resolution, repository/tag consistency, release selection,
+and downloaded-file integrity remain runtime checks.
 
 Stored release timestamps accept timezone-naive ISO values as well as aware
 values. The generation-only `x-python-datetime` annotation selects Python's

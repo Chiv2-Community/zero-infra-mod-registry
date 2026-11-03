@@ -1,5 +1,4 @@
 """DLL semantic checks and package adapters; fields are schema-generated."""
-import re
 from urllib.parse import urlparse
 
 from semver import Version
@@ -11,6 +10,7 @@ from zero_infra_mod_registry.utils.version_requirements import dependency_matche
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.schema_validation import validate_schema
 from zero_infra_mod_registry.models.loading import load, serialize
+from generated_models.loading import serialize as serialize_model
 
 
 def validate_plugin_info(info: PluginInfo) -> None:
@@ -37,25 +37,14 @@ def dll_release_key(release: DllRelease) -> tuple[str, str, str]:
 
 
 def validate_dll_release(release: DllRelease) -> None:
+    validate_schema(serialize_model(release), "dll-metadata", "dllRelease")
     if release.info is not None:
-        validate_plugin_info(release.info)
-    for value in (release.organization, release.name):
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
-            raise ValueError("Invalid DLL organization/name")
+        validate_plugin_dependencies(release.info)
     Version.parse(release.version)
     if release.tag is not None and str(Version.parse(release.tag.removeprefix("v"))) != release.version:
         raise ValueError("DLL tag/version mismatch")
     if release.info is not None and release.info.repo_url is not None and release.info.repo_url.lower() != f"https://github.com/{release.organization}/{release.name}".lower():
         raise ValueError("DLL metadata repository mismatch")
-    url = urlparse(release.download_url)
-    if url.scheme != "https" or not url.hostname or url.username or url.password or not url.path.lower().endswith(".dll") or url.fragment:
-        raise ValueError("DLL source must be an HTTPS DLL URL")
-    if not re.fullmatch(r"[a-f0-9]{64}", release.sha256):
-        raise ValueError("Invalid DLL SHA-256")
-    if isinstance(release.size, bool) or release.size <= 0:
-        raise ValueError("Invalid DLL size")
-    if release.dll_file_name is not None and (not release.dll_file_name.lower().endswith(".dll") or "/" in release.dll_file_name or "\\" in release.dll_file_name):
-        raise ValueError("Invalid DLL asset filename")
 
 
 def dll_package_dict(release: DllRelease) -> JsonObject:

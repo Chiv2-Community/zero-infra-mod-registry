@@ -3,7 +3,7 @@ name = "generated-models"
 version = "1.0.0"
 description = "Schema-generated registry metadata and request types"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["cattrs>=26.2.1", "jsonschema[format-nongpl]>=4.26.0"]
 
 [build-system]
 requires = ["hatchling"]
@@ -11,3 +11,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/generated_models"]
+
+[tool.hatch.build.hooks.custom]
+path = "build_schemas.py"

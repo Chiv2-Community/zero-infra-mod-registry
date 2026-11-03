@@ -459,6 +459,16 @@ wheels = [
 name = "generated-models"
 version = "1.0.0"
 source = { editable = "packages/generated-models" }
+dependencies = [
+    { name = "cattrs" },
+    { name = "jsonschema", extra = ["format-nongpl"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cattrs", specifier = ">=26.2.1" },
+    { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26.0" },
+]
 
 [[package]]
 name = "genson"
@@ -790,14 +800,12 @@ name = "mod-registry-core"
 version = "1.0.0"
 source = { editable = "packages/mod-registry-core" }
 dependencies = [
-    { name = "cattrs" },
     { name = "generated-models" },
     { name = "jsonschema" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "cattrs", specifier = ">=26.2.1" },
     { name = "generated-models", editable = "packages/generated-models" },
     { name = "jsonschema", specifier = ">=4.26.0" },
 ]

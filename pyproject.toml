@@ -61,9 +61,6 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/zero_infra_mod_registry"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"schemas" = "zero_infra_mod_registry/schemas"
-
 [tool.mypy]
 python_version = "3.12"
 strict = true

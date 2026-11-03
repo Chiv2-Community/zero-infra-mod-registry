@@ -10,7 +10,7 @@ on the independent generated-models package.
 | `zero-infra-mod-registry` | `src/zero_infra_mod_registry/` | Registry CLI and metadata validation |
 | `automated-registry-gateway` | `packages/automated-registry-gateway/src/automated_registry_gateway/` | Optional OIDC HTTP service |
 | `mod-registry-core` | `packages/mod-registry-core/src/mod_registry_core/` | Shared typed JSON utilities |
-| `generated-models` | `packages/generated-models/src/generated_models/` | Schema-generated dataclasses and enums |
+| `generated-models` | `packages/generated-models/src/generated_models/` | Generated types, validation, loading, and serialization |
 | `code-gen` | `packages/code-gen/src/code_gen/` | Development-only model generator (`python -m code_gen`) |
 
 The root `pyproject.toml` defines the workspace and dev tools. Each member has its

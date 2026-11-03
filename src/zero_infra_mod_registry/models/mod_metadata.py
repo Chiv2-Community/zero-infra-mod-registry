@@ -4,6 +4,7 @@ from typing import override
 
 from mod_registry_core.json_types import JsonObject, json_array
 from generated_models.dependencies import Dependency
+from generated_models.loading import merge_modinfo_dependencies
 
 
 @dataclass(frozen=True)
@@ -28,9 +29,6 @@ def dependencies_from_dict(data: JsonObject, field_name: str) -> list[Dependency
 
 
 def mod_dependencies_from_dict(data: JsonObject) -> list[Dependency]:
-    """Merge both schema-declared spellings outside the generated model."""
-    dependencies = dependencies_from_dict(data, "mod_dependencies") + dependencies_from_dict(data, "dependencies")
-    unique: dict[tuple[str, str], Dependency] = {}
-    for dependency in dependencies:
-        unique[(dependency.repo_url.lower(), dependency.version)] = dependency
-    return list(unique.values())
+    """Load dependency values and apply the generated compatibility transform."""
+    return merge_modinfo_dependencies(dependencies_from_dict(data, "mod_dependencies"),
+                                     dependencies_from_dict(data, "dependencies"))

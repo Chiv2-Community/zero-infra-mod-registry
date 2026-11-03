@@ -22,10 +22,30 @@ def workspace_wheels(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_request_schema_is_bundled_from_the_root_source(workspace_wheels: Path) -> None:
     root = Path(__file__).resolve().parents[1]
-    assert not (root / "packages/mod-registry-core/src/mod_registry_core/schemas/request.schema.json").exists()
-    wheel, = workspace_wheels.glob("mod_registry_core-*.whl")
+    assert not (root / "packages/generated-models/src/generated_models/schemas").exists()
+    wheel, = workspace_wheels.glob("generated_models-*.whl")
     with ZipFile(wheel) as archive:
-        assert archive.read("mod_registry_core/schemas/request.schema.json") == (root / "schemas/request.schema.json").read_bytes()
+        for schema in (root / "schemas").glob("*.schema.json"):
+            assert archive.read(f"generated_models/schemas/{schema.name}") == schema.read_bytes()
+
+
+def test_generated_models_sdist_builds_with_its_own_schemas(workspace_wheels: Path, tmp_path: Path) -> None:
+    source, = workspace_wheels.glob("generated_models-*.tar.gz")
+    result = subprocess.run(["uv", "build", "--wheel", str(source), "--out-dir", str(tmp_path)],
+                            cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    original, = workspace_wheels.glob("generated_models-*.whl")
+    rebuilt, = tmp_path.glob("generated_models-*.whl")
+    with ZipFile(original) as before, ZipFile(rebuilt) as after:
+        for name in before.namelist():
+            if name.startswith("generated_models/"):
+                assert after.read(name) == before.read(name)
+
+
+def test_codegen_wheel_includes_loading_template(workspace_wheels: Path) -> None:
+    wheel, = workspace_wheels.glob("code_gen-*.whl")
+    with ZipFile(wheel) as archive:
+        assert b"__SCHEMA_BINDINGS__" in archive.read("code_gen/loading.py.tmpl")
 
 
 def test_gateway_image_inputs_bundle_the_request_schema(tmp_path: Path) -> None:
@@ -103,7 +123,7 @@ def test_generated_models_install_without_consumers(workspace_wheels: Path, tmp_
     result = subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     python = environment / "bin/python"
-    result = subprocess.run(["uv", "pip", "install", "--no-deps", "--python", str(python), str(wheel)], capture_output=True, text=True)
+    result = subprocess.run(["uv", "pip", "install", "--python", str(python), str(wheel)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     script = """
 from importlib.util import find_spec
@@ -111,11 +131,21 @@ from dataclasses import is_dataclass
 from generated_models.dependencies import Dependency
 from generated_models.metadata import ModInfo
 from generated_models.requests import Action, RegistrationRequest
+from generated_models.loading import load, serialize
 assert is_dataclass(ModInfo) and is_dataclass(RegistrationRequest)
 assert ModInfo('https://github.com/Test/Pak', 'Pak', 'Description', ['Author']).mod_dependencies == []
 assert RegistrationRequest(Action.ADD_DLL_RELEASE, 'https://github.com/Test/Plugin', 'v1.0.0').dll_file is None
 assert Dependency('https://github.com/Test/Pak', '^1.0.0').version == '^1.0.0'
-for module in ('zero_infra_mod_registry', 'mod_registry_core', 'automated_registry_gateway', 'cattrs', 'datamodel_code_generator'):
+request = load({'action':'add-dll-release', 'repo_url':'https://github.com/Test/Plugin', 'release_tag':'v1.0.0'}, RegistrationRequest)
+assert request.action is Action.ADD_DLL_RELEASE
+assert serialize(request)['release_tag'] == 'v1.0.0'
+try:
+    load({'action':'bogus'}, RegistrationRequest)
+except ValueError as error:
+    assert '$.action' in str(error)
+else:
+    raise AssertionError('Structural validation was skipped')
+for module in ('zero_infra_mod_registry', 'mod_registry_core', 'automated_registry_gateway', 'datamodel_code_generator'):
     assert find_spec(module) is None
 """
     result = subprocess.run([str(python), "-I", "-c", script], cwd=tmp_path, capture_output=True, text=True)

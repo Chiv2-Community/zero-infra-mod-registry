@@ -35,11 +35,11 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
     core_wheel, = (context / "dist").glob("mod_registry_core-*.whl")
     installed = tmp_path / "installed"
     with ZipFile(wheel) as archive:
-        for kind in ("common", "mod", "plugin"):
-            assert f"zero_infra_mod_registry/schemas/{kind}.schema.json" in archive.namelist()
         assert not any("gateway" in name for name in archive.namelist())
         archive.extractall(installed)
     with ZipFile(models_wheel) as archive:
+        for kind in ("common", "mod", "plugin", "request"):
+            assert f"generated_models/schemas/{kind}.schema.json" in archive.namelist()
         archive.extractall(installed)
     with ZipFile(core_wheel) as archive:
         assert "mod_registry_core/json_types.py" in archive.namelist()

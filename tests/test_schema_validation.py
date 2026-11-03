@@ -5,7 +5,7 @@ import pytest
 
 from generated_models.metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.models.loading import serialize
-from zero_infra_mod_registry.utils.schema_validation import _VALIDATORS, validate_schema
+from generated_models.loading import _VALIDATORS, validate_schema
 from tests.fakes import mod_fixture
 
 
