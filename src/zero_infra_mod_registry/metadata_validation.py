@@ -6,15 +6,17 @@ from pathlib import Path
 import sys
 
 from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.protocols import Validator
 
 from zero_infra_mod_registry.models.dll_metadata import PluginInfo
 from zero_infra_mod_registry.models.mod_metadata import Dependency, dependencies_from_dict, mod_dependencies_from_dict
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from mod_registry_core.json_types import decode_json, json_object
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
+from zero_infra_mod_registry.utils.validation_errors import validation_context
 
 
-def metadata_validator(kind: str) -> Draft202012Validator:
+def metadata_validator(kind: str) -> Validator:
     if kind not in {"mod", "plugin"}:
         raise ValueError("Metadata kind must be mod or plugin")
     schemas = Path(__file__).resolve().parent / "schemas"
@@ -32,8 +34,11 @@ def metadata_validator(kind: str) -> Draft202012Validator:
 
 def validate_metadata(path: Path, kind: str, registry: FilesystemPackageRegistry) -> None:
     validator = metadata_validator(kind)
-    data = json_object(decode_json(path.read_text()))
-    validator.validate(data)
+    with validation_context(str(path)):
+        data = json_object(decode_json(path.read_text()))
+        errors = sorted(f"{error.json_path}: {error.message}" for error in validator.iter_errors(data))
+        if errors:
+            raise ValueError("Schema validation failed:\n" + "\n".join(f"- {error}" for error in errors))
     mod_dependencies: list[Dependency]
     plugin_dependencies: list[Dependency]
     if kind == "plugin":

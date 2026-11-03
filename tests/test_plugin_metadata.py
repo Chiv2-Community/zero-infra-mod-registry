@@ -39,6 +39,55 @@ def test_missing_or_invalid_plugin_json_is_rejected(monkeypatch: pytest.MonkeyPa
         GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), FakeRelease().as_release())
 
 
+INVALID_METADATA_CASES: list[tuple[JsonObject, list[str]]] = [
+    ({"name": "Plugin", "typo": True}, ["missing required fields: authors, description", "unexpected fields: typo"]),
+    ({**INFO.asdict(), "authors": [True]}, ["authors[0]", "Expected a JSON string"]),
+    ({**INFO.asdict(), "plugin_dependencies": [{"repo_url": True, "version": "1.0.0"}]},
+     ["plugin_dependencies[0]", "repo_url", "Expected a JSON string"]),
+]
+
+
+@pytest.mark.parametrize("data,details", INVALID_METADATA_CASES)
+def test_registration_summary_identifies_metadata_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+    data: JsonObject, details: list[str],
+) -> None:
+    def get(url: str, *, timeout: int) -> requests.Response:
+        return response_fixture(json.dumps(data).encode(), url)
+
+    monkeypatch.setattr(requests, "get", get)
+    retriever = GithubModMetadataRetriever(FakeGithub([FakeRelease(assets=[FakeAsset()])]).as_github())
+    registry = FilesystemPackageRegistry(retriever, str(tmp_path / "registry"), str(tmp_path / "packages"), str(tmp_path / "dlls"))
+    assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    for detail in ["Test/Plugin", "v1.0.0", "plugin.json", *details]:
+        assert detail in caplog.text
+
+
+def test_registry_summary_identifies_invalid_stored_release(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    registry = FilesystemPackageRegistry(registry_path=str(tmp_path / "registry"),
+        package_db_path=str(tmp_path / "packages"), dll_db_path=str(tmp_path / "dlls"))
+    path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"
+    path.parent.mkdir(parents=True)
+    release = ENTRY.package_dict()
+    del release["hash"]
+    release["unexpected"] = True
+    package: JsonObject = {"latest_release_info": INFO.asdict(), "releases": [release]}
+    path.write_text(json.dumps(package))
+    Path(registry.plugin_list_index_path).write_text("Test/Plugin\n")
+    assert not registry.validate_dll_db()
+    for detail in [str(path), "Test/Plugin", "1.0.0", "releases[0]", "missing required fields: hash", "unexpected fields: unexpected"]:
+        assert detail in caplog.text
+
+
+def test_latest_metadata_mismatch_names_package_release_and_fields() -> None:
+    data = Plugin([ENTRY]).asdict()
+    data["latest_release_info"] = replace(INFO, name="Wrong name", description="Wrong description").asdict()
+    with pytest.raises(ValueError) as failure:
+        Plugin.from_dict("Test", "Plugin", data)
+    for detail in ["Test/Plugin", "1.0.0", "latest_release_info.name", "latest_release_info.description"]:
+        assert detail in str(failure.value)
+
+
 @pytest.mark.parametrize("field,value", [("name", ""), ("description", None), ("authors", "Author"),
                                          ("authors", []), ("authors", [False]), ("plugin_dependencies", {}),
                                          ("plugin_dependencies", [{"repo_url": "https://evil.com/a/b", "version": "1.0.0"}]),

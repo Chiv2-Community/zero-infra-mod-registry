@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from semver import Version
 from zero_infra_mod_registry.models.mod_metadata import Dependency, dependencies_from_dict
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches as dependency_matches, parse_version_requirement
+from zero_infra_mod_registry.utils.validation_errors import require_fields, validation_context
 
 from mod_registry_core.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, optional_string, string_array
 
@@ -37,39 +38,51 @@ class PluginInfo:
     def validate(self) -> None:
         if not isinstance(self.target, PluginTarget):
             raise ValueError("Plugin target must be server, client or shared")
-        if not self.name.strip() or not self.description.strip() or not self.authors or any(not author.strip() for author in self.authors):
-            raise ValueError("plugin.json requires a name, description and authors")
-        urls = self.image_urls + ([self.icon_url] if self.icon_url is not None else [])
-        for image_url in urls:
+        for field_name, text in [("name", self.name), ("description", self.description)]:
+            if not text.strip():
+                raise ValueError(f"{field_name}: must not be blank")
+        if not self.authors:
+            raise ValueError("authors: must contain at least one author")
+        for index, author in enumerate(self.authors):
+            if not author.strip():
+                raise ValueError(f"authors[{index}]: must not be blank")
+        urls = [(f"image_urls[{index}]", url) for index, url in enumerate(self.image_urls)]
+        if self.icon_url is not None:
+            urls.append(("icon_url", self.icon_url))
+        for field_name, image_url in urls:
             image = urlparse(image_url)
             if image.scheme != "https" or not image.hostname or image.username or image.password:
-                raise ValueError("Plugin image/icon URLs must use HTTPS without credentials")
+                raise ValueError(f"{field_name}: Plugin image/icon URLs must use HTTPS without credentials")
         repos: set[Tuple[str, str]] = set()
-        for kind, dependency in [("mod", dependency) for dependency in self.mod_dependencies] + [("plugin", dependency) for dependency in self.plugin_dependencies]:
+        dependencies = [("mod", index, dependency) for index, dependency in enumerate(self.mod_dependencies)]
+        dependencies += [("plugin", index, dependency) for index, dependency in enumerate(self.plugin_dependencies)]
+        for kind, index, dependency in dependencies:
+            path = f"{kind}_dependencies[{index}]"
             url = urlparse(dependency.repo_url)
             repository = r"(?!\.{1,2}$)[A-Za-z0-9_.-]+" if kind == "mod" else r"[A-Za-z0-9_-]+"
             if url.scheme != "https" or url.netloc != "github.com" or not re.fullmatch(r"/[A-Za-z0-9_-]+/" + repository, url.path) or url.query or url.fragment:
-                raise ValueError("Plugin dependencies must reference a GitHub repository")
+                raise ValueError(f"{path}.repo_url: Plugin dependencies must reference a GitHub repository")
             key = kind, dependency.repo_url.lower()
             if key in repos:
-                raise ValueError("Duplicate plugin dependency")
+                raise ValueError(f"{path}.repo_url: Duplicate plugin dependency")
             repos.add(key)
-            parse_version_requirement(dependency.version)
+            with validation_context(f"{path}.version"):
+                parse_version_requirement(dependency.version)
 
     @staticmethod
     def from_dict(value: JsonValue) -> PluginInfo:
         data = json_object(value)
         required = {"name", "description", "authors"}
-        if not required <= set(data) or not set(data) <= required | {"$schema", "mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url", "target"}:
-            raise ValueError("Invalid plugin.json fields")
+        require_fields(data, required, {"$schema", "mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url", "target"}, "plugin.json")
         if "$schema" in data:
-            json_string(data["$schema"])
-        info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
+            json_string(data["$schema"], "$schema")
+        with validation_context("target"):
+            target = PluginTarget(json_string(data.get("target", "shared"), "target"))
+        info = PluginInfo(json_string(data["name"], "name"), json_string(data["description"], "description"), string_array(data["authors"], "authors"),
                           dependencies_from_dict(data, "plugin_dependencies"),
-                          optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
+                          optional_string(data.get("icon_url"), "icon_url"), string_array(data.get("image_urls", []), "image_urls"),
                           dependencies_from_dict(data, "mod_dependencies"),
-                          optional_string(data.get("repo_url")),
-                          PluginTarget(json_string(data.get("target", "shared"))))
+                          optional_string(data.get("repo_url"), "repo_url"), target)
         info.validate()
         return info
 
@@ -132,11 +145,10 @@ class DllRelease:
         data = json_object(value)
         fields = {"organization", "name", "version", "download_url", "sha256", "size"}
         optional = {"info", "tag", "release_date", "release_notes_markdown", "dll_file_name"}
-        if not fields <= set(data) or not set(data) <= fields | optional:
-            raise ValueError("Invalid DLL metadata fields")
-        release = DllRelease(json_string(data["organization"]), json_string(data["name"]),
-                             json_string(data["version"]), json_string(data["download_url"]),
-                              json_string(data["sha256"]), json_int(data["size"]),
+        require_fields(data, fields, optional, "DLL metadata")
+        release = DllRelease(json_string(data["organization"], "organization"), json_string(data["name"], "name"),
+                             json_string(data["version"], "version"), json_string(data["download_url"], "download_url"),
+                              json_string(data["sha256"], "sha256"), json_int(data["size"], "size"),
                               PluginInfo.from_dict(data["info"]) if "info" in data else None,
                               optional_string(data.get("tag")),
                               datetime.fromisoformat(json_string(data["release_date"])) if data.get("release_date") is not None else None,
@@ -169,11 +181,10 @@ class DllRelease:
     @staticmethod
     def from_package_dict(org: str, name: str, value: JsonValue) -> DllRelease:
         data = json_object(value)
-        if set(data) != {"tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"}:
-            raise ValueError("Invalid plugin release fields")
-        tag = json_string(data["tag"])
-        release = DllRelease(org, name, str(Version.parse(tag.removeprefix("v"))), json_string(data["download_url"]),
-                             json_string(data["hash"]), json_int(data["size"]),
+        require_fields(data, {"tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"}, set(), "plugin release")
+        tag = json_string(data["tag"], "tag")
+        release = DllRelease(org, name, str(Version.parse(tag.removeprefix("v"))), json_string(data["download_url"], "download_url"),
+                             json_string(data["hash"], "hash"), json_int(data["size"], "size"),
                              PluginInfo.from_dict(data["info"]) if data["info"] is not None else None,
                              tag, datetime.fromisoformat(json_string(data["release_date"])) if data["release_date"] is not None else None,
                              optional_string(data["release_notes_markdown"]), optional_string(data["dll_file_name"]))
@@ -208,18 +219,36 @@ class Plugin:
     @staticmethod
     def from_dict(org: str, name: str, value: JsonValue) -> Plugin:
         data = json_object(value)
-        if set(data) != {"latest_release_info", "releases"}:
-            raise ValueError("Invalid plugin package fields")
-        latest = PluginInfo.from_dict(data["latest_release_info"])
-        releases = [DllRelease.from_package_dict(org, name, item) for item in json_array(data["releases"])]
+        require_fields(data, {"latest_release_info", "releases"}, set(), f"{org}/{name}")
+        with validation_context(f"{org}/{name} latest_release_info"):
+            latest = PluginInfo.from_dict(data["latest_release_info"])
+        releases: List[DllRelease] = []
+        for index, item in enumerate(json_array(data["releases"], "releases")):
+            tag = item.get("tag", "unknown tag") if isinstance(item, dict) else "unknown tag"
+            with validation_context(f"{org}/{name} {tag} releases[{index}]"):
+                releases.append(DllRelease.from_package_dict(org, name, item))
         plugin = Plugin(releases)
-        if not releases or latest != plugin.latest_info():
-            raise ValueError("Plugin latest-release metadata mismatch")
+        if not releases:
+            raise ValueError(f"{org}/{name} releases: must contain at least one release")
+        expected = plugin.latest_info()
+        if latest != expected:
+            actual_fields, expected_fields = latest.asdict(), expected.asdict()
+            differences = sorted(key for key in actual_fields.keys() | expected_fields.keys()
+                                 if actual_fields.get(key) != expected_fields.get(key))
+            tag = next(release.tag or release.version for release in plugin.sorted_releases() if release.info is not None)
+            raise ValueError(f"{org}/{name} {tag}: Plugin latest-release metadata mismatch in "
+                             + ", ".join(f"latest_release_info.{key}" for key in differences))
         return plugin
 
 
 def validate_dll_entries(value: JsonValue) -> List[DllRelease]:
-    releases = [DllRelease.from_dict(entry) for entry in json_array(value)]
+    releases: List[DllRelease] = []
+    for index, entry in enumerate(json_array(value)):
+        identity = "unknown package/version"
+        if isinstance(entry, dict):
+            identity = f"{entry.get('organization', '?')}/{entry.get('name', '?')} {entry.get('version', '?')}"
+        with validation_context(f"{identity} entries[{index}]"):
+            releases.append(DllRelease.from_dict(entry))
     validate_dll_releases(releases)
     return releases
 

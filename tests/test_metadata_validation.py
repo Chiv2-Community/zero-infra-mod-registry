@@ -73,6 +73,44 @@ def test_metadata_cli_validates_both_files(tmp_path: Path, registry: FilesystemP
     assert failure.value.code == 1
 
 
+@pytest.mark.parametrize("kind", ["mod", "plugin"])
+def test_metadata_cli_reports_all_schema_errors(
+    tmp_path: Path, registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str], kind: str,
+) -> None:
+    path = tmp_path / f"{kind}.json"
+    data = metadata()
+    del data["description"]
+    data["authors"] = [False]
+    data["plugin_dependencies"] = [{"repo_url": True, "version": "1.0.0"}]
+    path.write_text(json.dumps(data))
+    monkeypatch.setattr(sys, "argv", ["validate-metadata", "--registry-directory", str(tmp_path), f"--{kind}-file", str(path)])
+    with pytest.raises(SystemExit) as failure:
+        main()
+    assert failure.value.code == 1
+    error = capsys.readouterr().err
+    for detail in [str(path), "description", "$.authors[0]", "$.plugin_dependencies[0].repo_url", "not of type 'string'"]:
+        assert detail in error
+
+
+def test_mod_registry_error_identifies_package_tag_and_field(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    instance = FilesystemPackageRegistry(registry_path=str(tmp_path / "registry"),
+        package_db_path=str(tmp_path / "package_db"), dll_db_path=str(tmp_path / "dll_db"))
+    path = Path(instance.packages_dir) / "Test/Pak.json"
+    path.parent.mkdir(parents=True)
+    data = mod_fixture("Pak").asdict()
+    releases = data["releases"]
+    assert isinstance(releases, list) and isinstance(releases[0], dict)
+    info = releases[0]["info"]
+    assert isinstance(info, dict)
+    info["authors"] = [False]
+    path.write_text(json.dumps(data))
+    Path(instance.mod_list_index_path).write_text("Test/Pak\n")
+    assert not instance.validate_package_db([])
+    for detail in [str(path), "Test/Pak", "v1.0.0", "releases[0]", "authors[0]", "Expected a JSON string"]:
+        assert detail in caplog.text
+
+
 def test_metadata_cli_rejects_no_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(sys, "argv", ["validate-metadata", "--registry-directory", str(tmp_path)])
     with pytest.raises(SystemExit) as failure:

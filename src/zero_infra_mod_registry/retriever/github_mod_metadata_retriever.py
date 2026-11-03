@@ -19,6 +19,7 @@ from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Re
 from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
+from zero_infra_mod_registry.utils.validation_errors import validation_context
 from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
 from mod_registry_core.registration import selected_dll_name, single_pak_name
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
@@ -98,7 +99,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             return json_object(decode_json(response.text))
 
     def fetch_plugin_info(self, repo: Repo, release: GitRelease) -> PluginInfo:
-        info = PluginInfo.from_dict(self._fetch_release_json(repo, release, "plugin.json"))
+        with validation_context(f"{repo} {release.tag_name} plugin.json"):
+            info = PluginInfo.from_dict(self._fetch_release_json(repo, release, "plugin.json"))
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return replace(info, repo_url=repo.github_url())
@@ -167,9 +169,10 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         """
         if release.draft:
             raise ValueError("Draft pak releases cannot be registered")
-        response_json = self._fetch_release_json(repo, release, "mod.json")
-        response_json["repo_url"] = repo.github_url()
-        mod_info = ModInfo.from_dict(response_json)
+        with validation_context(f"{repo} {release.tag_name} mod.json"):
+            response_json = self._fetch_release_json(repo, release, "mod.json")
+            response_json["repo_url"] = repo.github_url()
+            mod_info = ModInfo.from_dict(response_json)
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None

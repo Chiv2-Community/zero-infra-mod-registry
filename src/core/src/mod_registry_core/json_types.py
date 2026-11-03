@@ -18,26 +18,26 @@ def decode_json(text: str) -> JsonValue:
     return cast(JsonValue, json.loads(text, parse_constant=_reject_constant))
 
 
-def json_object(value: JsonValue) -> JsonObject:
+def json_object(value: JsonValue, path: str = "$") -> JsonObject:
     if not isinstance(value, dict):
-        raise ValueError("Expected a JSON object")
+        raise ValueError(f"{path}: Expected a JSON object")
     return value
 
 
-def json_array(value: JsonValue) -> List[JsonValue]:
+def json_array(value: JsonValue, path: str = "$") -> List[JsonValue]:
     if not isinstance(value, list):
-        raise ValueError("Expected a JSON array")
+        raise ValueError(f"{path}: Expected a JSON array")
     return value
 
 
-def json_string(value: JsonValue) -> str:
+def json_string(value: JsonValue, path: str = "$") -> str:
     if not isinstance(value, str):
-        raise ValueError("Expected a JSON string")
+        raise ValueError(f"{path}: Expected a JSON string")
     return value
 
 
-def optional_string(value: JsonValue) -> str | None:
-    return None if value is None else json_string(value)
+def optional_string(value: JsonValue, path: str = "$") -> str | None:
+    return None if value is None else json_string(value, path)
 
 
 def json_bool(value: JsonValue) -> bool:
@@ -46,11 +46,11 @@ def json_bool(value: JsonValue) -> bool:
     return value
 
 
-def json_int(value: JsonValue) -> int:
+def json_int(value: JsonValue, path: str = "$") -> int:
     if not isinstance(value, int) or isinstance(value, bool):
-        raise ValueError("Expected a JSON integer")
+        raise ValueError(f"{path}: Expected a JSON integer")
     return value
 
 
-def string_array(value: JsonValue) -> List[str]:
-    return [json_string(item) for item in json_array(value)]
+def string_array(value: JsonValue, path: str = "$") -> List[str]:
+    return [json_string(item, f"{path}[{index}]") for index, item in enumerate(json_array(value, path))]

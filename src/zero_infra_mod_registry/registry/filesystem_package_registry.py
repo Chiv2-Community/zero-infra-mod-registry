@@ -11,6 +11,7 @@ from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_entries, validate_dll_releases
+from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
 from mod_registry_core.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
@@ -82,7 +83,7 @@ class FilesystemPackageRegistry(PackageRegistry):
     def _load_dll_index(self) -> List[DllRelease]:
         entries: List[DllRelease] = []
         if os.path.exists(self.dll_index_path):
-            with open(self.dll_index_path) as file:
+            with validation_context(self.dll_index_path), open(self.dll_index_path) as file:
                 entries = validate_dll_entries(decode_json(file.read()))
         legacy = {entry.key: entry for entry in entries}
         merged = legacy.copy()
@@ -92,7 +93,8 @@ class FilesystemPackageRegistry(PackageRegistry):
                 raise ValueError("Invalid or duplicate plugin index entry")
             seen.add(package.lower())
             org, name = package.split("/")
-            with open(os.path.join(self.plugin_packages_dir, org, name + ".json")) as file:
+            path = os.path.join(self.plugin_packages_dir, org, name + ".json")
+            with validation_context(path), open(path) as file:
                 plugin = Plugin.from_dict(org, name, decode_json(file.read()))
             package_keys: set[Tuple[str, str, str]] = set()
             for entry in plugin.releases:
@@ -151,7 +153,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             self._write_registry_files(paths)
             return True
         except Exception as error:
-            logging.error(f"Failed to register DLL release: {error}")
+            logging.error(f"Failed to register DLL release {repo} {release_tag}: {error}")
             return False
 
     @staticmethod
@@ -279,7 +281,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.info(f"Successfully added release {release_tag} to repo {repo}.")
             return True
         except Exception as error:
-            logging.error(f"Failed to register pak release: {error}")
+            logging.error(f"Failed to register pak release {repo} {release_tag}: {error}")
             return False
 
     @override
@@ -348,7 +350,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         try:
             org_dir = os.path.join(self.packages_dir, repo.org)
             mod_file_path = os.path.join(org_dir, f"{repo.name}.json")
-            with open(mod_file_path, "r") as file:
+            with validation_context(f"{repo} ({mod_file_path})"), open(mod_file_path, "r") as file:
                 mod_dict = decode_json(file.read())
                 return Mod.from_dict(mod_dict)
         except FileNotFoundError:
@@ -383,7 +385,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             package_path = os.path.join(self.packages_dir, org, f"{name}.json")
             if mod_path_filter(package_path):
                 try:
-                    with open(package_path, "r") as file:
+                    with validation_context(f"{package} ({package_path})"), open(package_path, "r") as file:
                         mod_dict = decode_json(file.read())
                         mod = Mod.from_dict(mod_dict)
 
@@ -391,6 +393,9 @@ class FilesystemPackageRegistry(PackageRegistry):
 
                 except FileNotFoundError:
                     logging.error(f"Package {package} not found during validation.")
+                    return False
+                except ValueError as error:
+                    logging.error("Package validation failed: %s", error)
                     return False
 
         # Check for missing dependencies
