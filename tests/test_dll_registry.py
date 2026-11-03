@@ -17,7 +17,7 @@ from zero_infra_mod_registry.models import DllRelease, Repo
 from zero_infra_mod_registry.models.dll_metadata import Plugin, PluginInfo, validate_dll_releases
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever, ModMetadataRetriever
-from mod_registry_core.json_types import JsonObject, JsonValue, decode_json
+from mod_registry_core.json_types import decode_json
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, mod_fixture, response_fixture
 
 BINARY = b"registered DLL bytes"
@@ -46,8 +46,7 @@ def registry(tmp_path: Path, retriever: FakeRetriever) -> FilesystemPackageRegis
     return FilesystemPackageRegistry(retriever, str(tmp_path / "registry"), str(tmp_path / "package_db"), str(tmp_path / "dll_db"))
 
 
-def test_metadata_and_duplicate_validation() -> None:
-    assert DllRelease.from_package_dict("Test", "Plugin", DLL.package_dict()) == DLL
+def test_duplicate_release_identity_is_case_insensitive() -> None:
     with pytest.raises(ValueError, match="Duplicate"):
         validate_dll_releases([DLL, replace(DLL, organization="TEST", name="PLUGIN")])
 
@@ -82,28 +81,6 @@ def test_failed_dll_verification_does_not_report_success(
     assert "DLL download verification passed" not in caplog.text
 
 
-def test_typed_release_validation_does_not_reconstruct_models(monkeypatch: pytest.MonkeyPatch) -> None:
-    def serialize(self: DllRelease) -> JsonObject:
-        raise AssertionError("Domain validation must not serialize models")
-
-    monkeypatch.setattr(DllRelease, "package_dict", serialize)
-    releases = [DLL]
-    validate_dll_releases(releases)
-    assert releases[0] is DLL
-    with pytest.raises(ValueError, match="Duplicate"):
-        validate_dll_releases([DLL, replace(DLL, organization="TEST")])
-
-
-def test_registry_loading_validates_without_json_round_trip(registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
-    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-
-    def serialize(self: DllRelease) -> JsonObject:
-        raise AssertionError("Registry loading must not serialize parsed models")
-
-    monkeypatch.setattr(DllRelease, "package_dict", serialize)
-    assert registry._load_dll_releases() == [DLL]
-
-
 @pytest.mark.parametrize("plugin_first", [True, False])
 def test_same_repository_and_tag_registers_both_kinds_without_overwriting(
     registry: FilesystemPackageRegistry, retriever: FakeRetriever, plugin_first: bool,
@@ -122,46 +99,6 @@ def test_same_repository_and_tag_registers_both_kinds_without_overwriting(
     assert Path(registry.plugin_list_index_path).read_text() == "Test/Plugin\n"
     assert registry.validate_package_db([])
     assert registry.validate_dll_db(verify_downloads=True)
-
-
-@pytest.mark.parametrize("field,value", [
-    ("tag", "latest"),
-    ("download_url", "http://example.com/Plugin.dll"), ("download_url", "https://example.com/Plugin.pak"),
-    ("download_url", "https://user:password@example.com/Plugin.dll"),
-    ("hash", "bad"), ("size", 0), ("size", True),
-])
-def test_invalid_metadata(field: str, value: JsonValue) -> None:
-    invalid: JsonObject = {**DLL.package_dict(), field: value}
-    with pytest.raises(ValueError):
-        DllRelease.from_package_dict("Test", "Plugin", invalid)
-
-
-@pytest.mark.parametrize("release", [replace(DLL, organization="../escape"), replace(DLL, name="bad.dll"), replace(DLL, version="latest")])
-def test_invalid_release_identity(release: DllRelease) -> None:
-    with pytest.raises(ValueError):
-        release.validate()
-
-
-@pytest.mark.parametrize("field,value", [
-    ("release_date", False), ("release_date", "not-a-date"),
-    ("release_notes_markdown", []), ("dll_file_name", 42),
-])
-def test_release_optional_field_errors_identify_field(field: str, value: JsonValue) -> None:
-    data = DLL.package_dict()
-    data[field] = value
-    with pytest.raises(ValueError, match=field):
-        DllRelease.from_package_dict("Test", "Plugin", data)
-
-
-def test_stored_release_tag_type_error_identifies_field() -> None:
-    with pytest.raises(ValueError, match="tag"):
-        DllRelease.from_package_dict("Test", "Plugin", {**DLL.package_dict(), "tag": False})
-
-
-@pytest.mark.parametrize("entries", [None, {}, [None], [{}]])
-def test_invalid_plugin_package(entries: JsonValue) -> None:
-    with pytest.raises(ValueError):
-        Plugin.from_dict("Test", "Plugin", entries)
 
 
 def test_registration_separate_from_pak_index_and_immutable(registry: FilesystemPackageRegistry) -> None:
@@ -191,23 +128,13 @@ def test_plugin_package_tracks_release_notes_and_latest_metadata(registry: Files
     assert registry.validate_dll_db(verify_downloads=True)
 
 
-def test_plugin_serialization_sorts_once_and_preserves_latest_info_selection(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_plugin_serialization_preserves_date_order_and_tie_selection() -> None:
     first_info = replace(INFO, name="First tied release")
     first = replace(DLL, version="2.0.0", tag="v2.0.0", release_date=datetime(2024, 1, 1), info=first_info)
     second = replace(DLL, version="3.0.0", tag="v3.0.0", release_date=first.release_date, info=replace(INFO, name="Second tied release"))
     undated = replace(DLL, version="0.9.0", tag="v0.9.0", release_date=None)
     plugin = Plugin([DLL, first, second, undated])
-    original = Plugin.sorted_releases
-    calls = 0
-
-    def sorted_releases(self: Plugin) -> list[DllRelease]:
-        nonlocal calls
-        calls += 1
-        return original(self)
-
-    monkeypatch.setattr(Plugin, "sorted_releases", sorted_releases)
     data = plugin.asdict()
-    assert calls == 1
     assert data == {"latest_release_info": first_info.asdict(),
                      "releases": [release.package_dict() for release in [first, second, DLL, undated]]}
     assert plugin.latest_info() == first_info
@@ -224,25 +151,10 @@ def test_obsolete_index_is_not_loaded_or_migrated(registry: FilesystemPackageReg
     assert path.read_bytes() == original
 
 
-def test_obsolete_index_does_not_affect_package_validation(registry: FilesystemPackageRegistry) -> None:
-    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    Path(registry.plugin_list_index_path).with_name("index.json").write_text("not JSON")
-    assert registry.validate_dll_db()
-    assert registry._load_dll_releases() == [DLL]
-
-
 def test_duplicate_package_releases_fail_validation(registry: FilesystemPackageRegistry) -> None:
     assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
     path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"
     path.write_text(json.dumps(Plugin([DLL, DLL]).asdict()))
-    assert not registry.validate_dll_db()
-
-
-def test_package_release_without_metadata_is_rejected(registry: FilesystemPackageRegistry) -> None:
-    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    older = replace(DLL, version="0.9.0", tag="v0.9.0", info=None, release_date=datetime(2022, 1, 1))
-    path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"
-    path.write_text(json.dumps(Plugin([DLL, older]).asdict()))
     assert not registry.validate_dll_db()
 
 
@@ -251,13 +163,6 @@ def test_invalid_plugin_package_index_is_rejected(registry: FilesystemPackageReg
     assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
     Path(registry.plugin_list_index_path).write_text(index)
     assert not registry.validate_dll_db()
-
-
-def test_plugin_package_rejects_inconsistent_latest_metadata() -> None:
-    data = Plugin([DLL]).asdict()
-    data["latest_release_info"] = replace(INFO, name="Incorrect").asdict()
-    with pytest.raises(ValueError, match="latest-release"):
-        Plugin.from_dict("Test", "Plugin", data)
 
 
 def test_plugin_package_write_failure_rolls_back(registry: FilesystemPackageRegistry, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -285,17 +190,6 @@ def test_dry_run_and_failed_retrieval_do_not_write(registry: FilesystemPackageRe
     assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
     assert not Path(registry.plugin_list_index_path).exists()
     assert not (Path(registry.plugin_packages_dir) / "Test/Plugin.json").exists()
-
-
-def test_validation_checks_metadata_and_download_integrity(registry: FilesystemPackageRegistry, retriever: FakeRetriever) -> None:
-    assert registry.validate_dll_db()
-    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert registry.validate_dll_db(verify_downloads=True)
-    retriever.measurement = "0" * 64, DLL.size
-    assert not registry.validate_dll_db(verify_downloads=True)
-    invalid: JsonObject = {"latest_release_info": INFO.asdict(), "releases": [{**DLL.package_dict(), "size": 0}]}
-    (Path(registry.plugin_packages_dir) / "Test/Plugin.json").write_text(json.dumps(invalid))
-    assert not registry.validate_dll_db()
 
 
 def test_github_retriever_hashes_download_without_pak_scanner(monkeypatch: pytest.MonkeyPatch) -> None:

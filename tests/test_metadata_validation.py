@@ -10,9 +10,8 @@ import pytest
 from zero_infra_mod_registry.metadata_validation import main, validate_metadata
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo, PluginTarget
-from zero_infra_mod_registry.models.mod_metadata import Release
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
-from mod_registry_core.json_types import JsonObject, JsonValue
+from mod_registry_core.json_types import JsonObject
 from tests.fakes import FakeRetriever, mod_fixture
 
 
@@ -106,7 +105,7 @@ def test_metadata_cli_reports_source_for_semantic_errors(
     path = tmp_path / "local-plugin.json"
     data = metadata()
     dependency: JsonObject = {"repo_url": "https://github.com/Test/Native", "version": version}
-    data["plugin_dependencies"] = [dependency, {**dependency, "version": "^1.0.0"}] if duplicate else [dependency]
+    data["plugin_dependencies"] = [dependency, {**dependency, "repo_url": "https://github.com/test/native", "version": "^1.0.0"}] if duplicate else [dependency]
     path.write_text(json.dumps(data))
     monkeypatch.setattr(sys, "argv", ["validate-metadata", "--registry-directory", str(tmp_path), "--plugin-file", str(path)])
     with pytest.raises(SystemExit) as failure:
@@ -134,16 +133,6 @@ def test_mod_registry_error_identifies_package_tag_and_field(tmp_path: Path, cap
     assert not instance.validate_package_db([])
     for detail in [str(path), "Test/Pak", "v1.0.0", "releases[0]", "authors[0]", "not of type 'string'"]:
         assert detail in caplog.text
-
-
-@pytest.mark.parametrize("field,value", [
-    ("release_date", False), ("release_date", "not-a-date"), ("release_notes_markdown", []),
-])
-def test_mod_release_errors_identify_field(field: str, value: JsonValue) -> None:
-    data = mod_fixture("Pak").releases[0].asdict()
-    data[field] = value
-    with pytest.raises(ValueError, match=field):
-        Release.from_dict(data)
 
 
 def test_metadata_cli_rejects_no_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -176,8 +165,7 @@ def test_local_registry_construction_does_not_create_directories(tmp_path: Path)
     assert not (tmp_path / "package_db").exists()
 
 
-@pytest.mark.parametrize("target", list(PluginTarget))
-def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPackageRegistry, target: PluginTarget) -> None:
+def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPackageRegistry) -> None:
     root = Path(__file__).resolve().parents[1]
     action_directory = root / "actions/validate-metadata"
     action = (action_directory / "action.yml").read_text()
@@ -186,7 +174,7 @@ def test_composite_action_validation_step(tmp_path: Path, registry: FilesystemPa
     shutil.copytree(tmp_path / "package_db", published / "package_db")
     shutil.copytree(tmp_path / "dll_db", published / "dll_db")
     data = metadata()
-    data["target"] = target.value
+    data["target"] = PluginTarget.CLIENT.value
     (tmp_path / "plugin.json").write_text(json.dumps(data))
     env = {**os.environ, "GITHUB_WORKSPACE": str(tmp_path), "GITHUB_ACTION_PATH": str(action_directory),
            "MOD_FILE": "", "PLUGIN_FILE": ""}

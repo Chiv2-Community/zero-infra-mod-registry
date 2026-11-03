@@ -15,10 +15,13 @@ from tests.fakes import FakeRetriever, mod_fixture
 def test_old_mod_dependencies_are_normalized_and_both_fields_are_preserved() -> None:
     data: JsonObject = {"repo_url": "https://github.com/Test/Pak", "name": "Pak", "description": "Description", "authors": ["Author"],
                         "dependencies": [{"repo_url": "https://github.com/Test/OldPak", "version": "1.0.0"}],
-                        "mod_dependencies": [{"repo_url": "https://github.com/Test/NewPak", "version": ">=1.0.0"}],
+                        "mod_dependencies": [{"repo_url": "https://github.com/Test/NewPak", "version": ">=1.0.0"},
+                                             {"repo_url": "https://github.com/test/oldpak", "version": "1.0.0"}],
                         "plugin_dependencies": [{"repo_url": "https://github.com/Test/Native", "version": "^1.0.0"}]}
     info = ModInfo.from_dict(data)
     assert {dependency.repo_url for dependency in info.mod_dependencies} == {"https://github.com/Test/OldPak", "https://github.com/Test/NewPak"}
+    assert len(info.mod_dependencies) == 2
+    assert info.dependencies == []
     assert info.plugin_dependencies == [Dependency("https://github.com/Test/Native", "^1.0.0")]
     assert info.asdict()["dependencies"] == info.asdict()["mod_dependencies"]
     assert ModInfo.from_dict(info.asdict()) == info
