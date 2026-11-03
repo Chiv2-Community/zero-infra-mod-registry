@@ -1,5 +1,4 @@
 """Schema diagnostics and stored-record compatibility."""
-from dataclasses import replace
 import socket
 
 import pytest
@@ -23,7 +22,7 @@ def test_schema_reports_all_fields_in_one_registration_error() -> None:
         assert detail in message
 
 
-def test_nullable_plugin_info_reports_nested_fields_not_only_union_failure() -> None:
+def test_plugin_info_reports_nested_fields() -> None:
     data = DLL.package_dict()
     data["info"] = {**INFO.asdict(), "authors": [False], "description": 42}
     with pytest.raises(ValueError) as failure:
@@ -32,20 +31,18 @@ def test_nullable_plugin_info_reports_nested_fields_not_only_union_failure() -> 
         assert field in str(failure.value)
 
 
-def test_legacy_index_diagnostics_include_package_and_version() -> None:
-    data = DLL.asdict()
+def test_package_diagnostics_include_release_tag() -> None:
+    data = DLL.package_dict()
     data["size"] = False
     with pytest.raises(ValueError) as failure:
-        validate_schema([data], "registry", "dllIndex")
-    assert "$[0].size (Test/Plugin 1.0.0)" in str(failure.value)
+        validate_schema(data, "registry", "pluginRelease")
+    assert "$.size (1.0.0)" in str(failure.value)
 
 
-def test_legacy_dll_without_info_and_nullable_stored_metadata_remain_readable() -> None:
-    legacy = replace(DLL, info=None)
-    assert DllRelease.from_dict(legacy.asdict()) == legacy
-    data = DLL.asdict()
+def test_nullable_stored_metadata_remains_readable() -> None:
+    data = DLL.package_dict()
     data["info"] = {**INFO.asdict(), "repo_url": None, "$schema": "legacy-schema-name"}
-    assert DllRelease.from_dict(data).info == INFO
+    assert DllRelease.from_package_dict("Test", "Plugin", data).info == INFO
 
 
 def test_stored_mod_keeps_legacy_dependencies_extra_fields_and_naive_dates() -> None:
@@ -71,6 +68,6 @@ def test_bundled_schema_references_need_no_network(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(socket, "create_connection", blocked)
     _VALIDATORS.clear()
-    validate_schema(DLL.asdict(), "registry", "dllRelease")
+    validate_schema(DLL.package_dict(), "registry", "pluginRelease")
     validate_schema(INFO.asdict(), "plugin")
     validate_schema(mod_fixture().asdict(), "registry", "mod")

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import requests
 
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, PluginInfo, PluginTarget, dependency_matches, validate_dll_entries
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, PluginInfo, PluginTarget, dependency_matches, validate_dll_releases
 from zero_infra_mod_registry.models.mod_metadata import Dependency, Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
@@ -98,11 +98,9 @@ def test_plugin_info_rejects_invalid_fields(field: str, value: JsonValue) -> Non
         PluginInfo.from_dict(data)
 
 
-def test_metadata_round_trip_and_legacy_compatibility() -> None:
-    assert DllRelease.from_dict(ENTRY.asdict()) == ENTRY
-    legacy = replace(ENTRY, info=None)
-    assert DllRelease.from_dict(legacy.asdict()) == legacy
-    assert "info" not in legacy.asdict()
+def test_metadata_package_round_trip() -> None:
+    release = replace(ENTRY, tag="1.0.0")
+    assert DllRelease.from_package_dict("Test", "Plugin", release.package_dict()) == release
 
 
 @pytest.mark.parametrize("target", list(PluginTarget))
@@ -111,7 +109,6 @@ def test_plugin_target_round_trips(target: PluginTarget) -> None:
     assert info.target is target
     assert info.asdict()["target"] == target.value
     release = replace(ENTRY, info=info, tag="v1.0.0")
-    assert DllRelease.from_dict(release.asdict()) == release
     assert DllRelease.from_package_dict("Test", "Plugin", release.package_dict()) == release
     assert Plugin.from_dict("Test", "Plugin", Plugin([release]).asdict()).releases == [release]
 
@@ -214,8 +211,8 @@ def test_invalid_target_aborts_retrieval_and_registration_before_download(
 def test_optional_icon_and_images_round_trip() -> None:
     info = replace(INFO, icon_url="https://example.com/icon.png", image_urls=["https://example.com/screenshot.png"])
     assert PluginInfo.from_dict(info.asdict()) == info
-    release = replace(ENTRY, info=info)
-    assert DllRelease.from_dict(release.asdict()) == release
+    release = replace(ENTRY, info=info, tag="1.0.0")
+    assert DllRelease.from_package_dict("Test", "Plugin", release.package_dict()) == release
     assert PluginInfo.from_dict(INFO.asdict()).icon_url is None
     assert PluginInfo.from_dict(INFO.asdict()).image_urls == []
 
@@ -233,12 +230,12 @@ def test_invalid_icon_and_images_are_rejected(field: str, value: JsonValue) -> N
 def test_registry_requires_registered_dependency_versions() -> None:
     info = replace(INFO, plugin_dependencies=[Dependency("https://github.com/Test/Other", ">=1.0.0,<2.0.0")])
     plugin = replace(ENTRY, info=info)
-    dependency = replace(ENTRY, name="Other", info=None)
-    assert validate_dll_entries([plugin.asdict(), dependency.asdict()]) == [plugin, dependency]
+    dependency = replace(ENTRY, name="Other")
+    validate_dll_releases([plugin, dependency])
     with pytest.raises(ValueError, match="Unregistered plugin dependency"):
-        validate_dll_entries([plugin.asdict()])
+        validate_dll_releases([plugin])
     with pytest.raises(ValueError, match="Unregistered plugin dependency"):
-        validate_dll_entries([plugin.asdict(), replace(dependency, version="2.0.0").asdict()])
+        validate_dll_releases([plugin, replace(dependency, version="2.0.0")])
 
 
 @pytest.mark.parametrize("version,requirement,expected", [("1.2.0", "^1.0.0", True), ("2.0.0", "^1.0.0", False),
@@ -253,7 +250,9 @@ def test_new_registration_requires_info_and_does_not_write_on_failure(tmp_path: 
     retriever.dll = replace(ENTRY, info=None)
     registry = FilesystemPackageRegistry(retriever, str(tmp_path / "registry"), str(tmp_path / "packages"), str(tmp_path / "dlls"))
     assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert not Path(registry.dll_index_path).exists()
+    assert not Path(registry.plugin_list_index_path).exists()
+    assert not (Path(registry.plugin_packages_dir) / "Test/Plugin.json").exists()
     retriever.dll = replace(ENTRY, info=replace(INFO, plugin_dependencies=[Dependency("https://github.com/Test/Missing", "1.0.0")]))
     assert not registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0", dry_run=True)
-    assert not Path(registry.dll_index_path).exists()
+    assert not Path(registry.plugin_list_index_path).exists()
+    assert not (Path(registry.plugin_packages_dir) / "Test/Plugin.json").exists()

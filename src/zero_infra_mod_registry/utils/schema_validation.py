@@ -38,8 +38,6 @@ def schema_validator(kind: str, definition: str | None = None) -> Validator:
 
 def _release_label(value: JsonValue) -> str:
     if isinstance(value, dict):
-        if "organization" in value:
-            return f" ({value.get('organization', '?')}/{value.get('name', '?')} {value.get('version', '?')})"
         if isinstance(value.get("tag"), str):
             return f" ({value['tag']})"
     return ""

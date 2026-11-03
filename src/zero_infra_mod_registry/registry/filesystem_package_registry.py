@@ -10,9 +10,8 @@ from typing import Callable, List, Optional, Tuple, override
 from semver import Version
 
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_entries, validate_dll_releases
+from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_releases
 from zero_infra_mod_registry.utils.validation_errors import validation_context
-from zero_infra_mod_registry.utils.schema_validation import validate_schema
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
 from mod_registry_core.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
@@ -53,7 +52,6 @@ class FilesystemPackageRegistry(PackageRegistry):
         """
         self.registry_path = registry_path
         self.package_db_path = package_db_path
-        self.dll_index_path = os.path.join(dll_db_path, "index.json")
         self.plugin_list_index_path = os.path.join(dll_db_path, "plugin_list_index.txt")
         self.plugin_packages_dir = os.path.join(dll_db_path, "packages")
         self.packages_dir = os.path.join(package_db_path, "packages")
@@ -81,15 +79,8 @@ class FilesystemPackageRegistry(PackageRegistry):
             raise ValueError("This registry has no release retriever; only local validation is available")
         return self.mod_retriever
 
-    def _load_dll_index(self) -> List[DllRelease]:
-        entries: List[DllRelease] = []
-        if os.path.exists(self.dll_index_path):
-            with validation_context(self.dll_index_path), open(self.dll_index_path) as file:
-                data = decode_json(file.read())
-                validate_schema(data, "registry", "dllIndex")
-                entries = validate_dll_entries(data)
-        legacy = {entry.key: entry for entry in entries}
-        merged = legacy.copy()
+    def _load_dll_releases(self) -> List[DllRelease]:
+        releases: List[DllRelease] = []
         seen: set[str] = set()
         for package in self._load_package_list(self.plugin_list_index_path):
             if not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", package) or package.lower() in seen:
@@ -100,24 +91,13 @@ class FilesystemPackageRegistry(PackageRegistry):
             with validation_context(path), open(path) as file:
                 data = decode_json(file.read())
                 plugin = Plugin.from_dict(org, name, data)
-            package_keys: set[Tuple[str, str, str]] = set()
-            for entry in plugin.releases:
-                if entry.key in package_keys:
-                    raise ValueError("Duplicate DLL release")
-                package_keys.add(entry.key)
-                old = legacy.get(entry.key)
-                if old is not None and old.package_dict() != entry.package_dict():
-                    raise ValueError("Plugin package conflicts with legacy DLL entry")
-                if entry.info is None and old is None:
-                    raise ValueError("Plugin package release is missing metadata")
-                merged[entry.key] = entry
-        releases = list(merged.values())
+            releases.extend(plugin.releases)
         validate_dll_releases(releases)
         return releases
 
     def validate_dll_db(self, verify_downloads: bool = False) -> bool:
         try:
-            entries = self._load_dll_index()
+            entries = self._load_dll_releases()
             self._validate_plugin_mod_dependencies(entries)
             if verify_downloads:
                 for entry in entries:
@@ -137,7 +117,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def add_dll_release(self, repo: Repo, release_tag: str, dry_run: bool = False, dll_file: str | None = None) -> bool:
         try:
-            entries = self._load_dll_index()
+            entries = self._load_dll_releases()
             entry = self._require_retriever().fetch_dll_release(repo, release_tag, dll_file)
             entry.validate()
             if entry.info is None:
@@ -199,7 +179,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def validate_metadata_dependencies(self, mod_dependencies: List[Dependency], plugin_dependencies: List[Dependency]) -> None:
         """Validate release metadata dependencies against this published database."""
-        plugins = self._load_dll_index() if plugin_dependencies else []
+        plugins = self._load_dll_releases() if plugin_dependencies else []
         for dependency in plugin_dependencies:
             if not self._has_plugin_dependency(plugins, dependency):
                 raise ValueError(f"Unregistered plugin dependency: {dependency.repo_url} {dependency.version}")
@@ -405,7 +385,7 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Check for missing dependencies
         missing_deps: List[Tuple[Release, Dependency]] = []
         try:
-            plugins = self._load_dll_index()
+            plugins = self._load_dll_releases()
         except ValueError as error:
             logging.error("DLL registry is invalid: %s", error)
             return False

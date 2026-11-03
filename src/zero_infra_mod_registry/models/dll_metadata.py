@@ -136,37 +136,6 @@ class DllRelease:
     def key(self) -> Tuple[str, str, str]:
         return self.organization.lower(), self.name.lower(), self.version.lower()
 
-    @staticmethod
-    def from_dict(value: JsonValue) -> DllRelease:
-        validate_schema(value, "registry", "dllRelease")
-        data = json_object(value)
-        with validation_context("release_date"):
-            date = datetime.fromisoformat(json_string(data["release_date"])) if data.get("release_date") is not None else None
-        release = DllRelease(json_string(data["organization"]), json_string(data["name"]),
-                             json_string(data["version"]), json_string(data["download_url"]),
-                              json_string(data["sha256"]), json_int(data["size"]),
-                              PluginInfo.from_dict(data["info"]) if "info" in data else None,
-                              optional_string(data.get("tag")),
-                              date,
-                              optional_string(data.get("release_notes_markdown")), optional_string(data.get("dll_file_name")))
-        release.validate()
-        return release
-
-    def asdict(self) -> JsonObject:
-        data: JsonObject = {"organization": self.organization, "name": self.name, "version": self.version,
-                            "download_url": self.download_url, "sha256": self.sha256, "size": self.size}
-        if self.info is not None:
-            data["info"] = self.info.asdict()
-        if self.tag is not None:
-            data["tag"] = self.tag
-        if self.release_date is not None:
-            data["release_date"] = self.release_date.isoformat()
-        if self.release_notes_markdown is not None:
-            data["release_notes_markdown"] = self.release_notes_markdown
-        if self.dll_file_name is not None:
-            data["dll_file_name"] = self.dll_file_name
-        return data
-
     def package_dict(self) -> JsonObject:
         return {"tag": self.tag or self.version, "hash": self.sha256, "dll_file_name": self.dll_file_name,
                 "download_url": self.download_url, "size": self.size,
@@ -209,10 +178,9 @@ class Plugin:
 
     @staticmethod
     def _latest_info(releases: List[DllRelease]) -> PluginInfo:
-        info = next((release.info for release in releases if release.info is not None), None)
-        if info is None:
+        if not releases or releases[0].info is None:
             raise ValueError("Plugin package has no metadata")
-        return info
+        return releases[0].info
 
     @staticmethod
     def from_dict(org: str, name: str, value: JsonValue) -> Plugin:
@@ -227,29 +195,16 @@ class Plugin:
             with validation_context(f"{org}/{name} {tag} releases[{index}]"):
                 releases.append(DllRelease.from_package_dict(org, name, item))
         plugin = Plugin(releases)
-        if not releases:
-            raise ValueError(f"{org}/{name} releases: must contain at least one release")
         expected = plugin.latest_info()
         if latest != expected:
             actual_fields, expected_fields = latest.asdict(), expected.asdict()
             differences = sorted(key for key in actual_fields.keys() | expected_fields.keys()
                                  if actual_fields.get(key) != expected_fields.get(key))
-            tag = next(release.tag or release.version for release in plugin.sorted_releases() if release.info is not None)
+            latest_release = plugin.sorted_releases()[0]
+            tag = latest_release.tag or latest_release.version
             raise ValueError(f"{org}/{name} {tag}: Plugin latest-release metadata mismatch in "
                              + ", ".join(f"latest_release_info.{key}" for key in differences))
         return plugin
-
-
-def validate_dll_entries(value: JsonValue) -> List[DllRelease]:
-    releases: List[DllRelease] = []
-    for index, entry in enumerate(json_array(value)):
-        identity = "unknown package/version"
-        if isinstance(entry, dict):
-            identity = f"{entry.get('organization', '?')}/{entry.get('name', '?')} {entry.get('version', '?')}"
-        with validation_context(f"{identity} entries[{index}]"):
-            releases.append(DllRelease.from_dict(entry))
-    validate_dll_releases(releases)
-    return releases
 
 
 def validate_dll_releases(releases: List[DllRelease]) -> None:
@@ -260,7 +215,7 @@ def validate_dll_releases(releases: List[DllRelease]) -> None:
         raise ValueError("Duplicate DLL release")
     for release in releases:
         if release.info is None:
-            continue  # Previously approved entries predate plugin.json.
+            raise ValueError("DLL releases require plugin.json metadata")
         for dependency in release.info.plugin_dependencies:
             org, name = urlparse(dependency.repo_url).path.strip("/").split("/")
             if org.lower() == release.key[0] and name.lower() == release.key[1]:

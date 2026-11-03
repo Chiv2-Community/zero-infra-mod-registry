@@ -78,25 +78,13 @@
         "mod_dependencies": {"$ref": "#/$defs/dependencies"}, "plugin_dependencies": {"$ref": "#/$defs/dependencies"}
       }
     },
-    "dllRelease": {
-      "type": "object", "required": ["organization", "name", "version", "download_url", "sha256", "size"],
-      "additionalProperties": false,
-      "properties": {
-        "organization": {"type": "string"}, "name": {"type": "string"}, "version": {"type": "string"},
-        "download_url": {"type": "string"}, "sha256": {"type": "string"}, "size": {"type": "integer"},
-        "info": {"$ref": "#/$defs/pluginInfo"}, "tag": {"$ref": "#/$defs/nullableString"},
-        "release_date": {"$ref": "#/$defs/timestamp"},
-        "release_notes_markdown": {"$ref": "#/$defs/nullableString"}, "dll_file_name": {"$ref": "#/$defs/nullableString"}
-      }
-    },
-    "dllIndex": {"type": "array", "items": {"$ref": "#/$defs/dllRelease"}},
     "pluginRelease": {
       "type": "object", "required": ["tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"],
       "additionalProperties": false,
       "properties": {
         "tag": {"type": "string"}, "hash": {"type": "string"}, "download_url": {"type": "string"}, "size": {"type": "integer"},
         "dll_file_name": {"$ref": "#/$defs/nullableString"}, "release_date": {"$ref": "#/$defs/timestamp"},
-        "info": {"anyOf": [{"$ref": "#/$defs/pluginInfo"}, {"type": "null"}]},
+        "info": {"$ref": "#/$defs/pluginInfo"},
         "release_notes_markdown": {"$ref": "#/$defs/nullableString"}
       }
     },

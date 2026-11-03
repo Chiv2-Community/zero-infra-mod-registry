@@ -6,8 +6,8 @@ pull requests**. Maintainers still review and merge registration PRs. Register
 dependencies before dependent releases.
 
 The root action creates `registry/`, `package_db/`, and `dll_db/` on first
-registration. Existing registries use the same directories. The validator also
-reads legacy `dll_db/index.json` records.
+registration. Existing registries use the same directories. DLL releases use
+`dll_db/plugin_list_index.txt` and `dll_db/packages/<owner>/<repository>.json`.
 
 ## Process issues
 
