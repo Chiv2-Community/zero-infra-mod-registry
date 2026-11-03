@@ -16,7 +16,7 @@ def workspace_wheels(tmp_path_factory: pytest.TempPathFactory) -> Path:
     result = subprocess.run(["uv", "build", "--all-packages", "--out-dir", str(output)],
                             cwd=root, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert len(list(output.glob("*.whl"))) == 3
+    assert len(list(output.glob("*.whl"))) == 5
     return output
 
 
@@ -63,6 +63,7 @@ def test_component_installs_without_other_component(
 ) -> None:
     wheel, = workspace_wheels.glob(f"{package}-*.whl")
     core_wheel, = workspace_wheels.glob("mod_registry_core-*.whl")
+    models_wheel, = workspace_wheels.glob("generated_models-*.whl")
     with ZipFile(wheel) as archive:
         assert any(name.startswith(f"{module}/") for name in archive.namelist())
         assert not any(name.startswith(f"{other}/") for name in archive.namelist())
@@ -70,7 +71,7 @@ def test_component_installs_without_other_component(
     result = subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     python = environment / "bin/python"
-    result = subprocess.run(["uv", "pip", "install", "--python", str(python), str(core_wheel), str(wheel)],
+    result = subprocess.run(["uv", "pip", "install", "--python", str(python), str(models_wheel), str(core_wheel), str(wheel)],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     script = """
@@ -94,3 +95,28 @@ assert callable(main)
     command = environment / "bin" / package.replace("_", "-")
     help_result = subprocess.run([str(command), "--help"], cwd=tmp_path, capture_output=True, text=True)
     assert help_result.returncode == 0, help_result.stderr
+
+
+def test_generated_models_install_without_consumers(workspace_wheels: Path, tmp_path: Path) -> None:
+    wheel, = workspace_wheels.glob("generated_models-*.whl")
+    environment = tmp_path / "venv"
+    result = subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    python = environment / "bin/python"
+    result = subprocess.run(["uv", "pip", "install", "--no-deps", "--python", str(python), str(wheel)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    script = """
+from importlib.util import find_spec
+from dataclasses import is_dataclass
+from generated_models.dependencies import Dependency
+from generated_models.metadata import ModInfo
+from generated_models.requests import Action, RegistrationRequest
+assert is_dataclass(ModInfo) and is_dataclass(RegistrationRequest)
+assert ModInfo('https://github.com/Test/Pak', 'Pak', 'Description', ['Author']).mod_dependencies == []
+assert RegistrationRequest(Action.ADD_DLL_RELEASE, 'https://github.com/Test/Plugin', 'v1.0.0').dll_file is None
+assert Dependency('https://github.com/Test/Pak', '^1.0.0').version == '^1.0.0'
+for module in ('zero_infra_mod_registry', 'mod_registry_core', 'automated_registry_gateway', 'cattrs', 'datamodel_code_generator'):
+    assert find_spec(module) is None
+"""
+    result = subprocess.run([str(python), "-I", "-c", script], cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr

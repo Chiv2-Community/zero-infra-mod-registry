@@ -9,8 +9,9 @@ import pytest
 
 from mod_registry_core.json_types import decode_json
 from zero_infra_mod_registry.main import main
-from zero_infra_mod_registry.models import Mod
-from zero_infra_mod_registry.models.dll_metadata import Plugin
+from generated_models.metadata import Mod, Plugin
+from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict
+from zero_infra_mod_registry.models.loading import load, serialize
 
 # Downloaded unchanged from this URL; tests never fetch a moving branch.
 COMMIT = "1d3c56e3cbc85e7406b5a361831e1da3ad8f2da0"
@@ -36,14 +37,14 @@ def test_pinned_c2modregistry_validates_and_round_trips(tmp_path: Path, monkeypa
         "--package-db-path", str(root / "package_db"), "--dll-db-path", str(root / "dll_db"), "validate"])
     main()
 
-    mods = [Mod.from_dict(decode_json(path.read_text())) for path in sorted((root / "package_db/packages").rglob("*.json"))]
+    mods = [load(decode_json(path.read_text()), Mod) for path in sorted((root / "package_db/packages").rglob("*.json"))]
     plugins: list[Plugin] = []
     for path in sorted((root / "dll_db/packages").rglob("*.json")):
-        plugin = Plugin.from_dict(path.parent.name, path.stem, decode_json(path.read_text()))
-        assert Plugin.from_dict(path.parent.name, path.stem, plugin.asdict()) == plugin
+        plugin = plugin_from_dict(path.parent.name, path.stem, decode_json(path.read_text()))
+        assert plugin_from_dict(path.parent.name, path.stem, serialize(plugin)) == plugin
         plugins.append(plugin)
     assert (len(mods), sum(len(mod.releases) for mod in mods)) == (19, 41)
     assert (len(plugins), sum(len(plugin.releases) for plugin in plugins)) == (1, 4)
     for mod in mods:
-        assert Mod.from_dict(mod.asdict()) == mod
+        assert load(serialize(mod), Mod) == mod
     assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before

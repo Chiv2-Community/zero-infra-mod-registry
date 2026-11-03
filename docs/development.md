@@ -1,14 +1,17 @@
 # Python workspace
 
-The root project is the registry. Gateway and core are separate uv workspace
+The root project is the registry. Gateway, core, generated models, and code generation are uv workspace
 members under `src/`. Each builds its own wheel and source distribution. Both
-applications depend on core; neither imports the other.
+applications depend on core; neither imports the other. Registry and core depend
+on the independent generated-models package.
 
 | Package | Sources | Purpose |
 |---|---|---|
 | `zero-infra-mod-registry` | `src/zero_infra_mod_registry/` | Registry CLI and metadata validation |
 | `automated-registry-gateway` | `src/automated-registry-gateway/src/automated_registry_gateway/` | Optional OIDC HTTP service |
 | `mod-registry-core` | `src/core/src/mod_registry_core/` | Shared typed JSON utilities |
+| `generated-models` | `src/generated_models/src/generated_models/` | Schema-generated dataclasses and enums |
+| `code-gen` | `src/code_gen/src/code_gen/` | Development-only model generator (`python -m code_gen`) |
 
 The root `pyproject.toml` defines the workspace and dev tools. Each member has its
 own `pyproject.toml`. `uv.lock` covers all packages. Gateway is a dev dependency

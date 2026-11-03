@@ -13,28 +13,29 @@ and checked in. Do not edit generated Python.
 | `schemas/plugin.schema.json` | Plugin submission validation |
 | `schemas/registry.schema.json` | References to stored-record contracts |
 
-Regenerate after changing schemas or generation templates:
+Run from the repository root after changing schemas or generator options:
 
 ```sh
 uv sync --all-groups
-uv run python scripts/generate_models.py
-uv run python scripts/generate_models.py --check
+uv run python -m code_gen
+uv run python -m code_gen --check
 ```
 
 CI checks regeneration, strict typing, and tests. The pinned generator and locked
 formatters make generation reproducible. Runtime installs do not need the generator.
 
-`models/generated.py` contains metadata dataclasses. Dependency contracts share
-the generated `models/generated_dependencies.py` value type; their URL and version
-constraints are still checked against the applicable schema. Shared issue-request types
-live in `mod_registry_core/generated_requests.py` so the gateway does not depend
-on the registry application. Both applications use `schemas/request.schema.json`.
+The independent `generated-models` workspace package contains `generated_models.metadata`,
+`generated_models.dependencies`, and `generated_models.requests`. It has no runtime
+dependencies. Consumers import its dataclasses and enums directly. Dependency contracts
+share one value type; URL and version constraints remain in the applicable schemas.
+Both applications use `schemas/request.schema.json`.
 Package builds bundle that source automatically; no duplicate schema is checked in.
 Both image builds include the root schemas directory in their build inputs.
 
 Loading validates raw JSON with `jsonschema`, then structures it with `cattrs`.
-Generated convenience methods delegate to handwritten loading, serialization,
-and semantic-check functions; templates never duplicate field declarations.
+Loading, serialization, and semantic checks are handwritten consumer functions;
+generated definitions contain only value types. The development-only `code-gen` package calls
+the generator's Python API in-process and bundles local references for offline generation.
 Repository identity (`Repo`) is an internal helper, not a metadata document.
 
 Plugin schemas enforce enums, nonblank text, authors, HTTPS media URLs, and

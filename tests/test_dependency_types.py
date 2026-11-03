@@ -5,8 +5,10 @@ import json
 import pytest
 
 from zero_infra_mod_registry.metadata_validation import validate_metadata
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
-from zero_infra_mod_registry.models.mod_metadata import Dependency, Mod, ModInfo, Repo
+from generated_models.dependencies import Dependency
+from generated_models.metadata import DllRelease, Mod, ModInfo, PluginInfo
+from zero_infra_mod_registry.models import Repo
+from zero_infra_mod_registry.models.loading import load, serialize
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
 from tests.fakes import FakeRetriever, mod_fixture
@@ -18,13 +20,13 @@ def test_old_mod_dependencies_are_normalized_and_both_fields_are_preserved() -> 
                         "mod_dependencies": [{"repo_url": "https://github.com/Test/NewPak", "version": ">=1.0.0"},
                                              {"repo_url": "https://github.com/test/oldpak", "version": "1.0.0"}],
                         "plugin_dependencies": [{"repo_url": "https://github.com/Test/Native", "version": "^1.0.0"}]}
-    info = ModInfo.from_dict(data)
+    info = load(data, ModInfo)
     assert {dependency.repo_url for dependency in info.mod_dependencies} == {"https://github.com/Test/OldPak", "https://github.com/Test/NewPak"}
     assert len(info.mod_dependencies) == 2
     assert info.dependencies == []
     assert info.plugin_dependencies == [Dependency("https://github.com/Test/Native", "^1.0.0")]
-    assert info.asdict()["dependencies"] == info.asdict()["mod_dependencies"]
-    assert ModInfo.from_dict(info.asdict()) == info
+    assert serialize(info)["dependencies"] == serialize(info)["mod_dependencies"]
+    assert load(serialize(info), ModInfo) == info
 
 
 @pytest.mark.parametrize("with_dependencies", [False, True])
@@ -36,12 +38,12 @@ def test_every_serialized_release_mirrors_pak_dependencies(with_dependencies: bo
                           plugin_dependencies=[Dependency("https://github.com/Test/Native", "^2.0.0")])
     mod = Mod(latest_info, [replace(original.releases[0], info=old_info),
                            replace(original.releases[0], tag="v2.0.0", info=latest_info)])
-    data = mod.asdict()
+    data = serialize(mod)
     infos = [json_object(data["latest_release_info"])]
     infos.extend(json_object(json_object(release)["info"]) for release in json_array(data["releases"]))
     for info in infos:
-        assert info["dependencies"] == info["mod_dependencies"] == [dep.asdict() for dep in dependencies]
-    assert Mod.from_dict(data) == mod
+        assert info["dependencies"] == info["mod_dependencies"] == [serialize(dep) for dep in dependencies]
+    assert load(data, Mod) == mod
 
 
 def test_registration_writes_alias_for_existing_and_new_releases(tmp_path: Path) -> None:
@@ -112,13 +114,13 @@ def test_dotted_pak_dependencies_validate_and_register(tmp_path: Path, kind: str
     validate_metadata(path, kind, registry)
     if kind == "plugin":
         fake.dll = DllRelease("Test", "Consumer", "1.0.0", "https://example.com/Consumer.dll", "a" * 64, 1,
-                              PluginInfo.from_dict(data))
+                              load(data, PluginInfo))
         assert registry.add_dll_release(Repo("Test", "Consumer"), "v1.0.0")
         assert registry.validate_dll_db()
     else:
         pak = mod_fixture("Consumer")
         data["repo_url"] = "https://github.com/Test/Consumer"
-        info = ModInfo.from_dict(data)
+        info = load(data, ModInfo)
         fake.releases[("Test/Consumer", "v1.0.0")] = replace(pak.releases[0], info=info)
         assert registry.add_package_release(Repo("Test", "Consumer"), "v1.0.0")
     assert registry.validate_package_db([])

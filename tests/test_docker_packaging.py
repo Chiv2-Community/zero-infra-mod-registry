@@ -29,12 +29,17 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
     result = subprocess.run(["uv", "build", "--wheel", "--package", "mod-registry-core"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     wheel, = (context / "dist").glob("zero_infra_mod_registry-*.whl")
+    result = subprocess.run(["uv", "build", "--wheel", "--package", "generated-models"], cwd=context, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    models_wheel, = (context / "dist").glob("generated_models-*.whl")
     core_wheel, = (context / "dist").glob("mod_registry_core-*.whl")
     installed = tmp_path / "installed"
     with ZipFile(wheel) as archive:
         for kind in ("common", "mod", "plugin"):
             assert f"zero_infra_mod_registry/schemas/{kind}.schema.json" in archive.namelist()
         assert not any("gateway" in name for name in archive.namelist())
+        archive.extractall(installed)
+    with ZipFile(models_wheel) as archive:
         archive.extractall(installed)
     with ZipFile(core_wheel) as archive:
         assert "mod_registry_core/json_types.py" in archive.namelist()
@@ -47,7 +52,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, sys.argv[1])
 from zero_infra_mod_registry.metadata_validation import validate_metadata
-from zero_infra_mod_registry.models.dll_metadata import PluginInfo, PluginTarget
+from generated_models.metadata import PluginInfo, PluginTarget
+from zero_infra_mod_registry.models.loading import load
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 registry = FilesystemPackageRegistry(registry_path='registry', package_db_path='package_db', dll_db_path='dll_db')
 for target in ('server', 'client', 'shared'):
@@ -55,7 +61,7 @@ for target in ('server', 'client', 'shared'):
     path = Path('plugin.json')
     path.write_text(json.dumps(data))
     validate_metadata(path, 'plugin', registry)
-    assert PluginInfo.from_dict(data).target is PluginTarget(target)
+    assert load(data, PluginInfo).target is PluginTarget(target)
 path = Path('mod.json')
 path.write_text(json.dumps({'name': 'Pak', 'description': 'Description', 'authors': ['Author'], 'mod_dependencies': []}))
 validate_metadata(path, 'mod', registry)

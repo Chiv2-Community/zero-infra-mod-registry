@@ -5,8 +5,11 @@ from pathlib import Path
 import pytest
 import requests
 
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, PluginInfo, PluginTarget, validate_dll_releases
-from zero_infra_mod_registry.models.mod_metadata import Dependency, Repo
+from generated_models.dependencies import Dependency
+from generated_models.metadata import DllRelease, Plugin, PluginInfo, PluginTarget
+from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict, validate_dll_releases
+from zero_infra_mod_registry.models.loading import load, serialize
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
 from mod_registry_core.json_types import JsonObject, decode_json, json_object
@@ -22,7 +25,7 @@ def test_plugin_json_is_fetched_from_exact_release_tag(monkeypatch: pytest.Monke
     def get(url: str, *, timeout: int) -> requests.Response:
         calls.append(url)
         assert timeout == 60
-        return response_fixture(json.dumps(INFO.asdict()).encode(), url)
+        return response_fixture(json.dumps(serialize(INFO)).encode(), url)
 
     monkeypatch.setattr(requests, "get", get)
     result = GithubModMetadataRetriever(FakeGithub([]).as_github()).fetch_plugin_info(Repo("Test", "Plugin"), FakeRelease(tag_name="v1.0.0-RC2").as_release())
@@ -60,10 +63,10 @@ def test_registry_summary_identifies_invalid_stored_release(tmp_path: Path, capl
         package_db_path=str(tmp_path / "packages"), dll_db_path=str(tmp_path / "dlls"))
     path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"
     path.parent.mkdir(parents=True)
-    release = ENTRY.package_dict()
+    release = serialize(ENTRY)
     del release["hash"]
     release["unexpected"] = True
-    package: JsonObject = {"latest_release_info": INFO.asdict(), "releases": [release]}
+    package: JsonObject = {"latest_release_info": serialize(INFO), "releases": [release]}
     path.write_text(json.dumps(package))
     Path(registry.plugin_list_index_path).write_text("Test/Plugin\n")
     assert not registry.validate_dll_db()
@@ -72,26 +75,26 @@ def test_registry_summary_identifies_invalid_stored_release(tmp_path: Path, capl
 
 
 def test_latest_metadata_mismatch_names_package_release_and_fields() -> None:
-    data = Plugin([ENTRY]).asdict()
-    data["latest_release_info"] = replace(INFO, name="Wrong name", description="Wrong description").asdict()
+    data = serialize(Plugin([ENTRY]))
+    data["latest_release_info"] = serialize(replace(INFO, name="Wrong name", description="Wrong description"))
     with pytest.raises(ValueError) as failure:
-        Plugin.from_dict("Test", "Plugin", data)
+        plugin_from_dict("Test", "Plugin", data)
     for detail in ["Test/Plugin", "1.0.0", "latest_release_info.name", "latest_release_info.description"]:
         assert detail in str(failure.value)
 
 
 def test_legacy_plugin_metadata_without_target_defaults_to_shared() -> None:
-    data = INFO.asdict()
+    data = serialize(INFO)
     del data["target"]
-    assert PluginInfo.from_dict(data).target is PluginTarget.SHARED
-    package = Plugin([ENTRY]).asdict()
+    assert load(data, PluginInfo).target is PluginTarget.SHARED
+    package = serialize(Plugin([ENTRY]))
     latest = json_object(package["latest_release_info"])
     del latest["target"]
     package["latest_release_info"] = latest
-    release = ENTRY.package_dict()
+    release = serialize(ENTRY)
     release["info"] = data
     package["releases"] = [release]
-    assert Plugin.from_dict("Test", "Plugin", package).releases == [replace(ENTRY, tag="1.0.0")]
+    assert plugin_from_dict("Test", "Plugin", package).releases == [replace(ENTRY, tag="1.0.0")]
 
 
 @pytest.mark.parametrize("uploaded", [False, True])
@@ -99,7 +102,7 @@ def test_retrieval_and_registration_preserve_target(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool,
 ) -> None:
     binary = b"DLL bytes"
-    data = INFO.asdict()
+    data = serialize(INFO)
     data["target"] = PluginTarget.CLIENT.value
     metadata_url = "https://example.com/plugin.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/plugin.json"
     calls: list[str] = []
@@ -124,10 +127,10 @@ def test_retrieval_and_registration_preserve_target(
     package = json_object(decode_json((Path(registry.plugin_packages_dir) / "Test/Plugin.json").read_text()))
     expected = PluginTarget.CLIENT
     assert json_object(package["latest_release_info"])["target"] == expected.value
-    restored = Plugin.from_dict("Test", "Plugin", package)
+    restored = plugin_from_dict("Test", "Plugin", package)
     assert restored.releases[0].info is not None
     assert restored.releases[0].info.target is expected
-    assert "manifest" not in restored.releases[0].package_dict()
+    assert "manifest" not in serialize(restored.releases[0])
     assert registry.validate_dll_db(verify_downloads=True)
     assert calls == [metadata_url, ENTRY.download_url, ENTRY.download_url]
 
@@ -140,7 +143,7 @@ def test_invalid_target_aborts_retrieval_and_registration_before_download(
     def get(url: str, *, timeout: int) -> requests.Response:
         calls.append(url)
         assert url.endswith("/v1.0.0/plugin.json")
-        invalid: JsonObject = {**INFO.asdict(), "target": "both"}
+        invalid: JsonObject = {**serialize(INFO), "target": "both"}
         return response_fixture(json.dumps(invalid).encode(), url)
 
     monkeypatch.setattr(requests, "get", get)

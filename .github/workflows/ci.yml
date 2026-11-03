@@ -42,7 +42,7 @@ jobs:
         run: uv build --all-packages
 
       - name: Check generated models
-        run: uv run python scripts/generate_models.py --check
+        run: uv run python -m code_gen --check
 
       - name: Run mypy
         run: uv run mypy .

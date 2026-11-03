@@ -3,7 +3,8 @@ import socket
 
 import pytest
 
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
+from generated_models.metadata import DllRelease, PluginInfo
+from zero_infra_mod_registry.models.loading import serialize
 from zero_infra_mod_registry.utils.schema_validation import _VALIDATORS, validate_schema
 from tests.fakes import mod_fixture
 
@@ -13,8 +14,8 @@ DLL = DllRelease("Test", "Plugin", "1.0.0", "https://example.com/Plugin.dll", "a
 
 
 def test_schema_aggregates_nested_leaf_errors_with_release_identity() -> None:
-    data = DLL.package_dict()
-    data["info"] = {**INFO.asdict(), "authors": [False], "description": 42, "icon_url": 8}
+    data = serialize(DLL)
+    data["info"] = {**serialize(INFO), "authors": [False], "description": 42, "icon_url": 8}
     with pytest.raises(ValueError) as failure:
         validate_schema(data, "registry", "pluginRelease")
     for field in ["$.info.authors[0] (1.0.0)", "$.info.description (1.0.0)", "$.info.icon_url (1.0.0)"]:
@@ -28,6 +29,6 @@ def test_bundled_schema_references_need_no_network(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(socket, "create_connection", blocked)
     _VALIDATORS.clear()
-    validate_schema(DLL.package_dict(), "registry", "pluginRelease")
-    validate_schema(INFO.asdict(), "plugin")
-    validate_schema(mod_fixture().asdict(), "registry", "mod")
+    validate_schema(serialize(DLL), "registry", "pluginRelease")
+    validate_schema(serialize(INFO), "plugin")
+    validate_schema(serialize(mod_fixture()), "registry", "mod")

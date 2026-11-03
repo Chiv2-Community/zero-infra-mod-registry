@@ -4,7 +4,8 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from zero_infra_mod_registry.models import Dependency, Repo
+from generated_models.dependencies import Dependency
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
 from tests.fakes import FakeRetriever, mod_fixture

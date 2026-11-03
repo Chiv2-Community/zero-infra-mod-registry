@@ -2,7 +2,9 @@ from datetime import datetime
 
 import pytest
 from github.GitRelease import GitRelease
-from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
+from generated_models.dependencies import Dependency
+from generated_models.metadata import Mod, Release
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, mod_fixture
 

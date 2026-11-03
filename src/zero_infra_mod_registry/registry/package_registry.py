@@ -3,7 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Callable, List, Optional
 
-from zero_infra_mod_registry.models import Mod, Repo
+from generated_models.metadata import Mod
+from zero_infra_mod_registry.models import Repo
 
 
 class PackageRegistry(ABC):

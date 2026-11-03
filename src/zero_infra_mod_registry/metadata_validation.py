@@ -7,8 +7,10 @@ import sys
 
 from jsonschema.protocols import Validator
 
-from zero_infra_mod_registry.models.dll_metadata import PluginInfo
-from zero_infra_mod_registry.models.mod_metadata import Dependency, dependencies_from_dict, mod_dependencies_from_dict
+from generated_models.dependencies import Dependency
+from generated_models.metadata import PluginInfo
+from zero_infra_mod_registry.models.loading import load
+from zero_infra_mod_registry.models.mod_metadata import dependencies_from_dict, mod_dependencies_from_dict
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from mod_registry_core.json_types import decode_json, json_object
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
@@ -29,7 +31,7 @@ def validate_metadata(path: Path, kind: str, registry: FilesystemPackageRegistry
         mod_dependencies: list[Dependency]
         plugin_dependencies: list[Dependency]
         if kind == "plugin":
-            plugin = PluginInfo.from_dict(data)
+            plugin = load(data, PluginInfo)
             mod_dependencies, plugin_dependencies = plugin.mod_dependencies, plugin.plugin_dependencies
         else:
             mod_dependencies = mod_dependencies_from_dict(data)

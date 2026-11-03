@@ -9,8 +9,13 @@ from typing import Callable, List, Optional, Tuple, override
 
 from semver import Version
 
-from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_releases
+from generated_models.dependencies import Dependency
+from generated_models.metadata import DllRelease, Mod, Plugin, Release
+from zero_infra_mod_registry.models import Repo
+from zero_infra_mod_registry.models.dll_metadata import (
+    dll_release_key, plugin_from_dict, validate_dll_release, validate_dll_releases,
+)
+from zero_infra_mod_registry.models.loading import load, serialize
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
 from mod_registry_core.json_types import JsonValue, decode_json
@@ -90,7 +95,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             path = os.path.join(self.plugin_packages_dir, org, name + ".json")
             with validation_context(path), open(path) as file:
                 data = decode_json(file.read())
-                plugin = Plugin.from_dict(org, name, data)
+                plugin = plugin_from_dict(org, name, data)
             releases.extend(plugin.releases)
         validate_dll_releases(releases)
         return releases
@@ -119,10 +124,10 @@ class FilesystemPackageRegistry(PackageRegistry):
         try:
             entries = self._load_dll_releases()
             entry = self._require_retriever().fetch_dll_release(repo, release_tag, dll_file)
-            entry.validate()
+            validate_dll_release(entry)
             if entry.info is None:
                 raise ValueError("New DLL releases require plugin.json metadata")
-            if entry.key in {existing.key for existing in entries}:
+            if dll_release_key(entry) in {dll_release_key(existing) for existing in entries}:
                 raise ValueError("Duplicate DLL release")
             validate_dll_releases(entries + [entry])
             self._validate_plugin_mod_dependencies(entries + [entry])
@@ -132,7 +137,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             package = next((value for value in packages if value.lower() == str(repo).lower()), str(repo))
             org, name = package.split("/")
             releases = [entry] + [old for old in entries if old.organization.lower() == repo.org.lower() and old.name.lower() == repo.name.lower()]
-            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): json.dumps(Plugin(releases).asdict(), indent=2) + "\n",
+            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): json.dumps(serialize(Plugin(releases)), indent=2) + "\n",
                      self.plugin_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n"}
             self._write_registry_files(paths)
             return True
@@ -257,7 +262,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             if not any(repo_to_index_entry(value).lower() == package.lower() for value in urls if not value.startswith("#")):
                 urls.append(url)
             paths = {
-                os.path.join(self.packages_dir, org, name + ".json"): self.json_encoder.encode(updated_mod.asdict()) + "\n",
+                os.path.join(self.packages_dir, org, name + ".json"): self.json_encoder.encode(serialize(updated_mod)) + "\n",
                 self.mod_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n",
                 org_index_path: "\n".join(urls) + "\n",
             }
@@ -336,7 +341,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             mod_file_path = os.path.join(org_dir, f"{repo.name}.json")
             with validation_context(f"{repo} ({mod_file_path})"), open(mod_file_path, "r") as file:
                 mod_dict = decode_json(file.read())
-                return Mod.from_dict(mod_dict)
+                return load(mod_dict, Mod)
         except FileNotFoundError:
             return None
 
@@ -371,7 +376,7 @@ class FilesystemPackageRegistry(PackageRegistry):
                 try:
                     with validation_context(f"{package} ({package_path})"), open(package_path, "r") as file:
                         mod_dict = decode_json(file.read())
-                        mod = Mod.from_dict(mod_dict)
+                        mod = load(mod_dict, Mod)
 
                         mods.append(mod)
 

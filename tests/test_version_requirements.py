@@ -1,6 +1,6 @@
 import pytest
 
-from zero_infra_mod_registry.models import Dependency
+from generated_models.dependencies import Dependency
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches, parse_version_requirement
 from tests.fakes import FakeGithub

@@ -3,10 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from mod_registry_core.json_types import JsonObject, json_array
-from zero_infra_mod_registry.models.generated_dependencies import Dependency as Dependency
-from zero_infra_mod_registry.models.generated import (
-    Mod as Mod, ModInfo as ModInfo, Release as Release,
-)
+from generated_models.dependencies import Dependency
 
 
 @dataclass(frozen=True)
@@ -25,7 +22,9 @@ class Repo:
 
 
 def dependencies_from_dict(data: JsonObject, field_name: str) -> list[Dependency]:
-    return [Dependency.from_dict(item) for item in json_array(data.get(field_name, []))]
+    from zero_infra_mod_registry.models.loading import load
+
+    return [load(item, Dependency) for item in json_array(data.get(field_name, []))]
 
 
 def mod_dependencies_from_dict(data: JsonObject) -> list[Dependency]:

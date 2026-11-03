@@ -6,7 +6,7 @@ import re
 from cattrs import Converter
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
-from mod_registry_core.generated_requests import RegistrationRequest
+from generated_models.requests import RegistrationRequest
 
 from mod_registry_core.json_types import JsonObject, decode_json, json_object, json_string
 

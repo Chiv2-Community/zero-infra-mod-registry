@@ -13,6 +13,8 @@ resolution-markers = [
 [manifest]
 members = [
     "automated-registry-gateway",
+    "code-gen",
+    "generated-models",
     "mod-registry-core",
     "zero-infra-mod-registry",
 ]
@@ -263,6 +265,21 @@ wheels = [
 ]
 
 [[package]]
+name = "code-gen"
+version = "1.0.0"
+source = { editable = "src/code_gen" }
+dependencies = [
+    { name = "datamodel-code-generator", extra = ["black", "isort"] },
+    { name = "mod-registry-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "datamodel-code-generator", extras = ["black", "isort"], specifier = "==0.88.0" },
+    { name = "mod-registry-core", editable = "src/core" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -437,6 +454,11 @@ sdist = { url = "https://files.pythonhosted.org/packages/02/01/248d44fbda9e78fa1
 wheels = [
     { url = "https://files.pythonhosted.org/packages/15/d5/a8f9149b97cced9e1f4bff92ff0b6206120e2c853ae774d7020d6ecd8fa8/fqdn-1.6.0-py3-none-any.whl", hash = "sha256:6c793c312ccfa29981e1135b3ef5e1277ebe639731a6b0f7350d90e96e63f0b4", size = 12569, upload-time = "2026-09-28T05:43:33.951Z" },
 ]
+
+[[package]]
+name = "generated-models"
+version = "1.0.0"
+source = { editable = "src/generated_models" }
 
 [[package]]
 name = "genson"
@@ -769,12 +791,14 @@ version = "1.0.0"
 source = { editable = "src/core" }
 dependencies = [
     { name = "cattrs" },
+    { name = "generated-models" },
     { name = "jsonschema" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "cattrs", specifier = ">=26.2.1" },
+    { name = "generated-models", editable = "src/generated_models" },
     { name = "jsonschema", specifier = ">=4.26.0" },
 ]
 
@@ -1501,6 +1525,7 @@ source = { editable = "." }
 dependencies = [
     { name = "argparse" },
     { name = "cattrs" },
+    { name = "generated-models" },
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "mod-registry-core" },
     { name = "pygithub" },
@@ -1514,7 +1539,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "automated-registry-gateway" },
-    { name = "datamodel-code-generator", extra = ["black", "isort"] },
+    { name = "code-gen" },
     { name = "hatchling" },
     { name = "mypy" },
     { name = "pytest" },
@@ -1526,6 +1551,7 @@ dev = [
 requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
     { name = "cattrs", specifier = ">=26.2.1" },
+    { name = "generated-models", editable = "src/generated_models" },
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26.0" },
     { name = "mod-registry-core", editable = "src/core" },
     { name = "pygithub", specifier = ">=2.8.1" },
@@ -1539,7 +1565,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "automated-registry-gateway", editable = "src/automated-registry-gateway" },
-    { name = "datamodel-code-generator", extras = ["black", "isort"], specifier = "==0.88.0" },
+    { name = "code-gen", editable = "src/code_gen" },
     { name = "hatchling", specifier = ">=1.33.0" },
     { name = "mypy", specifier = ">=1.19.1" },
     { name = "pytest", specifier = ">=7.4.0" },

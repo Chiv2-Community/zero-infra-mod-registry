@@ -17,6 +17,7 @@ dependencies = [
     "semver>=3.0.4",
     "jsonschema[format-nongpl]>=4.26.0",
     "mod-registry-core==1.0.0",
+    "generated-models==1.0.0",
     "cattrs>=26.2.1",
 ]
 [project.scripts]
@@ -25,7 +26,7 @@ zero-infra-mod-registry = "zero_infra_mod_registry.main:main"
 [dependency-groups]
 dev = [
     "automated-registry-gateway==1.0.0",
-    "datamodel-code-generator[black,isort]==0.88.0",
+    "code-gen==1.0.0",
     "hatchling>=1.33.0",
     "mypy>=1.19.1",
     "pytest>=7.4.0",
@@ -34,11 +35,13 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["src/core", "src/automated-registry-gateway"]
+members = ["src/core", "src/automated-registry-gateway", "src/generated_models", "src/code_gen"]
 
 [tool.uv.sources]
 mod-registry-core = { workspace = true }
 automated-registry-gateway = { workspace = true }
+generated-models = { workspace = true }
+code-gen = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -48,7 +51,7 @@ python_functions = "test_*"
 pythonpath = ["src"]
 
 [tool.coverage.run]
-source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_core"]
+source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_core", "generated_models"]
 omit = ["tests/*"]
 
 [build-system]

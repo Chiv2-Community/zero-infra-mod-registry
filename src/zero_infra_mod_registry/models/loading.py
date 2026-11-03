@@ -7,9 +7,10 @@ from collections.abc import Callable
 from typing import TypeVar, cast
 
 from cattrs import Converter
-from mod_registry_core.generated_requests import RegistrationRequest
+from generated_models.requests import RegistrationRequest
 from mod_registry_core.json_types import JsonObject, JsonValue, json_object
-from zero_infra_mod_registry.models.generated import (
+from generated_models.metadata import (
+    DllRelease, Plugin,
     ModInfo, ModMarkerInfo, PluginInfo,
     PluginRelease, Release,
 )
@@ -96,6 +97,10 @@ def load(value: JsonValue, cls: type[T]) -> T:
 
 
 def serialize(value: T) -> JsonObject:
+    if isinstance(value, (Plugin, DllRelease)):
+        from zero_infra_mod_registry.models.dll_metadata import dll_package_dict, plugin_dict
+
+        return plugin_dict(value) if isinstance(value, Plugin) else dll_package_dict(value)
     data = json_object(cast(JsonValue, CONVERTER.unstructure(value)))
     if isinstance(value, PluginInfo):
         data = {"$schema" if key == "field_schema" else key: item for key, item in data.items()
@@ -109,8 +114,8 @@ def _unstructure_mod_info(value: ModInfo) -> JsonObject:
 
     data = _raw_mod_info(value)
     merged = mod_dependencies_from_dict(data)
-    return {**data, "mod_dependencies": [dependency.asdict() for dependency in merged],
-            "dependencies": [dependency.asdict() for dependency in merged]}
+    return {**data, "mod_dependencies": [serialize(dependency) for dependency in merged],
+            "dependencies": [serialize(dependency) for dependency in merged]}
 
 
 _raw_mod_info = cast(Callable[[ModInfo], JsonObject], CONVERTER.get_unstructure_hook(ModInfo))

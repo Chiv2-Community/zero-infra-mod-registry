@@ -9,7 +9,8 @@ import pytest
 
 from tests.fakes import FakeRetriever, mod_fixture
 from tests.test_dll_registry import DLL
-from zero_infra_mod_registry.models import Dependency, Repo
+from generated_models.dependencies import Dependency
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 
 

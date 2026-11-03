@@ -9,7 +9,8 @@ import pytest
 
 from zero_infra_mod_registry.metadata_validation import main, validate_metadata
 from zero_infra_mod_registry.models import Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo, PluginTarget
+from zero_infra_mod_registry.models.loading import serialize
+from generated_models.metadata import DllRelease, PluginInfo, PluginTarget
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from mod_registry_core.json_types import JsonObject
 from tests.fakes import FakeRetriever, mod_fixture
@@ -122,7 +123,7 @@ def test_mod_registry_error_identifies_package_tag_and_field(tmp_path: Path, cap
         package_db_path=str(tmp_path / "package_db"), dll_db_path=str(tmp_path / "dll_db"))
     path = Path(instance.packages_dir) / "Test/Pak.json"
     path.parent.mkdir(parents=True)
-    data = mod_fixture("Pak").asdict()
+    data = serialize(mod_fixture("Pak"))
     releases = data["releases"]
     assert isinstance(releases, list) and isinstance(releases[0], dict)
     info = releases[0]["info"]
