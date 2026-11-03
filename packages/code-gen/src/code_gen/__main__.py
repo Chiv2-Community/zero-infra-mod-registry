@@ -13,7 +13,7 @@ from datamodel_code_generator.format import DatetimeClassType, Formatter
 from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, json_object, json_string
 
 ROOT = Path.cwd()
-OUTPUT = ROOT / "src/generated_models/src/generated_models"
+OUTPUT = ROOT / "packages/generated-models/src/generated_models"
 
 
 def render(filenames: tuple[str, ...], *, dependency: bool = False, overrides: dict[str, str] | None = None) -> str:

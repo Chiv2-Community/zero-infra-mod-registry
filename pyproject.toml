@@ -35,7 +35,7 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["src/core", "src/automated-registry-gateway", "src/generated_models", "src/code_gen"]
+members = ["packages/mod-registry-core", "packages/automated-registry-gateway", "packages/generated-models", "packages/code-gen"]
 
 [tool.uv.sources]
 mod-registry-core = { workspace = true }

@@ -4,6 +4,7 @@ COPY --from=uv /uv /bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 COPY src/ ./src/
+COPY packages/ ./packages/
 COPY schemas/ ./schemas/
 RUN uv sync --frozen --no-dev --no-editable --package automated-registry-gateway
 

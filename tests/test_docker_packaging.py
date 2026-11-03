@@ -11,7 +11,7 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
     root = Path(__file__).resolve().parents[1]
     context = tmp_path / "build"
     context.mkdir()
-    builder = (root / "Dockerfile").read_text().split("RUN uv build --wheel", 1)[0]
+    builder = (root / "docker/zero-infra-mod-registry/Dockerfile").read_text().split("RUN uv build --wheel", 1)[0]
     for line in builder.splitlines():
         if not line.startswith("COPY ") or "--from=" in line:
             continue

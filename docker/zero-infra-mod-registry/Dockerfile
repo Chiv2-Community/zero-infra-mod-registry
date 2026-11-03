@@ -14,6 +14,7 @@ WORKDIR /build
 COPY pyproject.toml uv.lock ./
 COPY README.md ./
 COPY src/ ./src/
+COPY packages/ ./packages/
 COPY bin/ ./bin/
 COPY schemas/ ./schemas/
 
@@ -42,7 +43,7 @@ COPY --from=builder /build/dist/*.whl /tmp/
 RUN pip install /tmp/*.whl && rm /tmp/*.whl
 
 # Copy entrypoint scripts
-COPY github-action-entrypoint.sh /github-action-entrypoint.sh
+COPY docker/zero-infra-mod-registry/github-action-entrypoint.sh /github-action-entrypoint.sh
 RUN chmod +x /github-action-entrypoint.sh
 
 RUN apk add --no-cache dotnet10-runtime gcompat

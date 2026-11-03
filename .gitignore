@@ -1,5 +1,5 @@
 __pycache__
 dist
 .idea
-automated-registry-gateway/gateway.env
-automated-registry-gateway/github-app.pem
+docker/automated-registry-gateway/gateway.env
+docker/automated-registry-gateway/github-app.pem

@@ -22,7 +22,7 @@ def workspace_wheels(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_request_schema_is_bundled_from_the_root_source(workspace_wheels: Path) -> None:
     root = Path(__file__).resolve().parents[1]
-    assert not (root / "src/core/src/mod_registry_core/schemas/request.schema.json").exists()
+    assert not (root / "packages/mod-registry-core/src/mod_registry_core/schemas/request.schema.json").exists()
     wheel, = workspace_wheels.glob("mod_registry_core-*.whl")
     with ZipFile(wheel) as archive:
         assert archive.read("mod_registry_core/schemas/request.schema.json") == (root / "schemas/request.schema.json").read_bytes()
@@ -32,7 +32,7 @@ def test_gateway_image_inputs_bundle_the_request_schema(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     context = tmp_path / "build"
     context.mkdir()
-    builder = (root / "automated-registry-gateway/Dockerfile").read_text().split("RUN uv sync", 1)[0]
+    builder = (root / "docker/automated-registry-gateway/Dockerfile").read_text().split("RUN uv sync", 1)[0]
     for line in builder.splitlines():
         if not line.startswith("COPY ") or "--from=" in line:
             continue

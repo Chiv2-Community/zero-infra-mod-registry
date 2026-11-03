@@ -71,7 +71,7 @@ wheels = [
 [[package]]
 name = "automated-registry-gateway"
 version = "1.0.0"
-source = { editable = "src/automated-registry-gateway" }
+source = { editable = "packages/automated-registry-gateway" }
 dependencies = [
     { name = "cryptography" },
     { name = "mod-registry-core" },
@@ -82,7 +82,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=46.0.0" },
-    { name = "mod-registry-core", editable = "src/core" },
+    { name = "mod-registry-core", editable = "packages/mod-registry-core" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "semver", specifier = ">=3.0.4" },
 ]
@@ -267,7 +267,7 @@ wheels = [
 [[package]]
 name = "code-gen"
 version = "1.0.0"
-source = { editable = "src/code_gen" }
+source = { editable = "packages/code-gen" }
 dependencies = [
     { name = "datamodel-code-generator", extra = ["black", "isort"] },
     { name = "mod-registry-core" },
@@ -276,7 +276,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "datamodel-code-generator", extras = ["black", "isort"], specifier = "==0.88.0" },
-    { name = "mod-registry-core", editable = "src/core" },
+    { name = "mod-registry-core", editable = "packages/mod-registry-core" },
 ]
 
 [[package]]
@@ -458,7 +458,7 @@ wheels = [
 [[package]]
 name = "generated-models"
 version = "1.0.0"
-source = { editable = "src/generated_models" }
+source = { editable = "packages/generated-models" }
 
 [[package]]
 name = "genson"
@@ -788,7 +788,7 @@ wheels = [
 [[package]]
 name = "mod-registry-core"
 version = "1.0.0"
-source = { editable = "src/core" }
+source = { editable = "packages/mod-registry-core" }
 dependencies = [
     { name = "cattrs" },
     { name = "generated-models" },
@@ -798,7 +798,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cattrs", specifier = ">=26.2.1" },
-    { name = "generated-models", editable = "src/generated_models" },
+    { name = "generated-models", editable = "packages/generated-models" },
     { name = "jsonschema", specifier = ">=4.26.0" },
 ]
 
@@ -1551,9 +1551,9 @@ dev = [
 requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
     { name = "cattrs", specifier = ">=26.2.1" },
-    { name = "generated-models", editable = "src/generated_models" },
+    { name = "generated-models", editable = "packages/generated-models" },
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26.0" },
-    { name = "mod-registry-core", editable = "src/core" },
+    { name = "mod-registry-core", editable = "packages/mod-registry-core" },
     { name = "pygithub", specifier = ">=2.8.1" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "semver", specifier = ">=3.0.4" },
@@ -1564,8 +1564,8 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "automated-registry-gateway", editable = "src/automated-registry-gateway" },
-    { name = "code-gen", editable = "src/code_gen" },
+    { name = "automated-registry-gateway", editable = "packages/automated-registry-gateway" },
+    { name = "code-gen", editable = "packages/code-gen" },
     { name = "hatchling", specifier = ">=1.33.0" },
     { name = "mypy", specifier = ">=1.19.1" },
     { name = "pytest", specifier = ">=7.4.0" },

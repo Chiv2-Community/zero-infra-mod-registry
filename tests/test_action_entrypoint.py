@@ -20,7 +20,7 @@ def test_entrypoint_preserves_arguments_and_status(
     output = tmp_path / "output"
     summary = tmp_path / "summary"
     result = subprocess.run(
-        ["bash", str(Path(__file__).resolve().parents[1] / "github-action-entrypoint.sh"),
+        ["bash", str(Path(__file__).resolve().parents[1] / "docker/zero-infra-mod-registry/github-action-entrypoint.sh"),
          "add-package-release", "", "repo with spaces", "v1.0.0"],
         env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}",
              "GITHUB_WORKSPACE": str(tmp_path) if workspace else "", "GITHUB_OUTPUT": str(output),
@@ -58,7 +58,7 @@ def test_docker_generated_directories_allow_git_checkout(
         f'sys.exit({exit_code})\n'
     )
     command.chmod(0o755)
-    entrypoint = Path(__file__).resolve().parents[1] / "github-action-entrypoint.sh"
+    entrypoint = Path(__file__).resolve().parents[1] / "docker/zero-infra-mod-registry/github-action-entrypoint.sh"
     result = subprocess.run([
         "docker", "run", "--rm", "--user", "0:0" if root else f"{os.getuid()}:{os.getgid()}",
         "-v", f"{tmp_path}:/github/workspace", "-v", f"{entrypoint}:/entrypoint.sh:ro",
