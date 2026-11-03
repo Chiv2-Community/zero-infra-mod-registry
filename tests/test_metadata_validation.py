@@ -132,7 +132,7 @@ def test_mod_registry_error_identifies_package_tag_and_field(tmp_path: Path, cap
     path.write_text(json.dumps(data))
     Path(instance.mod_list_index_path).write_text("Test/Pak\n")
     assert not instance.validate_package_db([])
-    for detail in [str(path), "Test/Pak", "v1.0.0", "releases[0]", "authors[0]", "Expected a JSON string"]:
+    for detail in [str(path), "Test/Pak", "v1.0.0", "releases[0]", "authors[0]", "not of type 'string'"]:
         assert detail in caplog.text
 
 

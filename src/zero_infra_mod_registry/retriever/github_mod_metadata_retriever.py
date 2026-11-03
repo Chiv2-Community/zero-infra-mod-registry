@@ -20,6 +20,7 @@ from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
 from zero_infra_mod_registry.utils.validation_errors import validation_context
+from zero_infra_mod_registry.utils.schema_validation import validate_schema
 from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
 from mod_registry_core.registration import selected_dll_name, single_pak_name
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
@@ -100,7 +101,9 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
 
     def fetch_plugin_info(self, repo: Repo, release: GitRelease) -> PluginInfo:
         with validation_context(f"{repo} {release.tag_name} plugin.json"):
-            info = PluginInfo.from_dict(self._fetch_release_json(repo, release, "plugin.json"))
+            data = self._fetch_release_json(repo, release, "plugin.json")
+            validate_schema(data, "plugin")
+            info = PluginInfo.from_dict(data)
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return replace(info, repo_url=repo.github_url())
@@ -171,6 +174,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             raise ValueError("Draft pak releases cannot be registered")
         with validation_context(f"{repo} {release.tag_name} mod.json"):
             response_json = self._fetch_release_json(repo, release, "mod.json")
+            validate_schema(response_json, "mod")
             response_json["repo_url"] = repo.github_url()
             mod_info = ModInfo.from_dict(response_json)
         pak = self.find_pak_file(release)

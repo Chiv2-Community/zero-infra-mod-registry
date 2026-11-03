@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/registry.schema.json",
+  "title": "Stored registry records, including legacy releases",
+  "$defs": {
+    "nullableString": {"type": ["string", "null"]},
+    "timestamp": {"type": ["string", "null"]},
+    "dependency": {
+      "type": "object", "required": ["repo_url", "version"],
+      "properties": {"repo_url": {"type": "string"}, "version": {"type": "string"}}
+    },
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/dependency"}},
+    "asset": {
+      "type": "object", "required": ["path", "hash"],
+      "properties": {
+        "path": {"type": "string"}, "hash": {"type": "string"},
+        "object_class": {"$ref": "#/$defs/nullableString"}, "class_path": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "blueprint": {
+      "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {
+        "mod_name": {"$ref": "#/$defs/nullableString"}, "version": {"$ref": "#/$defs/nullableString"},
+        "author": {"$ref": "#/$defs/nullableString"}, "mod_description": {"$ref": "#/$defs/nullableString"},
+        "mod_repo_url": {"$ref": "#/$defs/nullableString"},
+        "silent_load": {"type": "boolean"}, "show_in_gui": {"type": "boolean"}, "enable_by_default": {"type": "boolean"},
+        "is_client_side": {"type": "boolean"}, "online_only": {"type": "boolean"}, "host_only": {"type": "boolean"},
+        "allow_on_frontend": {"type": "boolean"}, "is_hidden": {"type": "boolean"}
+      }
+    },
+    "map": {
+      "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {
+        "game_mode": {"$ref": "#/$defs/nullableString"}, "map_name": {"$ref": "#/$defs/nullableString"},
+        "defending_faction": {"$ref": "#/$defs/nullableString"}, "attacking_faction": {"$ref": "#/$defs/nullableString"},
+        "game_mode_type": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "marker": {
+      "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {"associated_blueprints": {"type": ["array", "null"], "items": {"type": "string"}}}
+    },
+    "arbitrary": {
+      "allOf": [{"$ref": "#/$defs/asset"}], "properties": {"mod_name": {"$ref": "#/$defs/nullableString"}}
+    },
+    "manifest": {
+      "type": "object",
+      "properties": {
+        "markers": {"type": "array", "items": {"$ref": "#/$defs/marker"}},
+        "blueprints": {"type": "array", "items": {"$ref": "#/$defs/blueprint"}},
+        "maps": {"type": "array", "items": {"$ref": "#/$defs/map"}},
+        "replacements": {"type": "array", "items": {"$ref": "#/$defs/asset"}},
+        "arbitrary": {"type": "array", "items": {"$ref": "#/$defs/arbitrary"}}
+      }
+    },
+    "modInfo": {
+      "type": "object", "required": ["repo_url", "name", "description", "authors"],
+      "properties": {
+        "repo_url": {"type": "string"}, "name": {"type": "string"}, "description": {"type": "string"},
+        "authors": {"type": "array", "items": {"type": "string"}},
+        "icon_url": {"$ref": "#/$defs/nullableString"},
+        "image_urls": {"type": "array", "items": {"type": "string"}},
+        "dependencies": {"$ref": "#/$defs/dependencies"},
+        "mod_dependencies": {"$ref": "#/$defs/dependencies"},
+        "plugin_dependencies": {"$ref": "#/$defs/dependencies"}
+      }
+    },
+    "pluginInfo": {
+      "description": "Stored metadata keeps legacy nullable repository URLs and does not apply new-submission URL rules.",
+      "type": "object", "required": ["name", "description", "authors"], "additionalProperties": false,
+      "properties": {
+        "$schema": {"type": "string"},
+        "name": {"type": "string"}, "description": {"type": "string"},
+        "authors": {"type": "array", "items": {"type": "string"}},
+        "target": {"enum": ["server", "client", "shared"]},
+        "repo_url": {"$ref": "#/$defs/nullableString"}, "icon_url": {"$ref": "#/$defs/nullableString"},
+        "image_urls": {"type": "array", "items": {"type": "string"}},
+        "mod_dependencies": {"$ref": "#/$defs/dependencies"}, "plugin_dependencies": {"$ref": "#/$defs/dependencies"}
+      }
+    },
+    "dllRelease": {
+      "type": "object", "required": ["organization", "name", "version", "download_url", "sha256", "size"],
+      "additionalProperties": false,
+      "properties": {
+        "organization": {"type": "string"}, "name": {"type": "string"}, "version": {"type": "string"},
+        "download_url": {"type": "string"}, "sha256": {"type": "string"}, "size": {"type": "integer"},
+        "info": {"$ref": "#/$defs/pluginInfo"}, "tag": {"$ref": "#/$defs/nullableString"},
+        "release_date": {"$ref": "#/$defs/timestamp"},
+        "release_notes_markdown": {"$ref": "#/$defs/nullableString"}, "dll_file_name": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "dllIndex": {"type": "array", "items": {"$ref": "#/$defs/dllRelease"}},
+    "pluginRelease": {
+      "type": "object", "required": ["tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"],
+      "additionalProperties": false,
+      "properties": {
+        "tag": {"type": "string"}, "hash": {"type": "string"}, "download_url": {"type": "string"}, "size": {"type": "integer"},
+        "dll_file_name": {"$ref": "#/$defs/nullableString"}, "release_date": {"$ref": "#/$defs/timestamp"},
+        "info": {"anyOf": [{"$ref": "#/$defs/pluginInfo"}, {"type": "null"}]},
+        "release_notes_markdown": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "plugin": {
+      "type": "object", "required": ["latest_release_info", "releases"], "additionalProperties": false,
+      "properties": {
+        "latest_release_info": {"$ref": "#/$defs/pluginInfo"},
+        "releases": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/pluginRelease"}}
+      }
+    },
+    "modRelease": {
+      "type": "object", "required": ["tag", "hash", "pak_file_name", "release_date", "info", "release_notes_markdown", "manifest"],
+      "properties": {
+        "tag": {"type": "string"}, "hash": {"type": "string"}, "pak_file_name": {"type": "string"},
+        "release_date": {"type": "string"}, "info": {"$ref": "#/$defs/modInfo"},
+        "release_notes_markdown": {"$ref": "#/$defs/nullableString"}, "manifest": {"$ref": "#/$defs/manifest"}
+      }
+    },
+    "mod": {
+      "type": "object", "required": ["latest_release_info", "releases"],
+      "properties": {
+        "latest_release_info": {"$ref": "#/$defs/modInfo"},
+        "releases": {"type": "array", "items": {"$ref": "#/$defs/modRelease"}}
+      }
+    }
+  }
+}

@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import List, override
 
 from zero_infra_mod_registry.models.pak_manifest import Manifest
-from zero_infra_mod_registry.utils.validation_errors import require_fields, validation_context
+from zero_infra_mod_registry.utils.schema_validation import validate_schema
+from zero_infra_mod_registry.utils.validation_errors import validation_context
 from mod_registry_core.json_types import (
     JsonObject, JsonValue, json_array, json_object, json_string, optional_string, string_array,
 )
@@ -32,19 +33,14 @@ class Dependency:
     @staticmethod
     def from_dict(value: JsonValue) -> Dependency:
         data = json_object(value)
-        require_fields(data, {"repo_url", "version"}, set(data), "dependency")
-        return Dependency(json_string(data["repo_url"], "repo_url"), json_string(data["version"], "version"))
+        return Dependency(json_string(data["repo_url"]), json_string(data["version"]))
 
     def asdict(self) -> JsonObject:
         return {"repo_url": self.repo_url, "version": self.version}
 
 
 def dependencies_from_dict(data: JsonObject, field_name: str) -> List[Dependency]:
-    dependencies: List[Dependency] = []
-    for index, item in enumerate(json_array(data.get(field_name, []), field_name)):
-        with validation_context(f"{field_name}[{index}]"):
-            dependencies.append(Dependency.from_dict(item))
-    return dependencies
+    return [Dependency.from_dict(item) for item in json_array(data.get(field_name, []))]
 
 
 def mod_dependencies_from_dict(data: JsonObject) -> List[Dependency]:
@@ -74,12 +70,12 @@ class ModInfo:
 
     @staticmethod
     def from_dict(value: JsonValue) -> ModInfo:
+        validate_schema(value, "registry", "modInfo")
         data = json_object(value)
-        require_fields(data, {"repo_url", "name", "description", "authors"}, set(data), "mod metadata")
         return ModInfo(
-            repo_url=json_string(data["repo_url"], "repo_url"), name=json_string(data["name"], "name"),
-            description=json_string(data["description"], "description"), icon_url=optional_string(data.get("icon_url"), "icon_url"),
-            image_urls=string_array(data.get("image_urls", []), "image_urls"), authors=string_array(data["authors"], "authors"),
+            repo_url=json_string(data["repo_url"]), name=json_string(data["name"]),
+            description=json_string(data["description"]), icon_url=optional_string(data.get("icon_url")),
+            image_urls=string_array(data.get("image_urls", [])), authors=string_array(data["authors"]),
             mod_dependencies=mod_dependencies_from_dict(data),
             plugin_dependencies=dependencies_from_dict(data, "plugin_dependencies"),
         )
@@ -104,17 +100,16 @@ class Release:
 
     @staticmethod
     def from_dict(value: JsonValue) -> Release:
+        validate_schema(value, "registry", "modRelease")
         data = json_object(value)
-        require_fields(data, {"tag", "hash", "pak_file_name", "release_date", "info", "release_notes_markdown", "manifest"}, set(data), "mod release")
-        date = json_string(data["release_date"], "release_date")
         with validation_context("release_date"):
-            release_date = datetime.fromisoformat(date)
+            date = datetime.fromisoformat(json_string(data["release_date"]))
         return Release(
-            tag=json_string(data["tag"], "tag"), hash=json_string(data["hash"], "hash"),
-            pak_file_name=json_string(data["pak_file_name"], "pak_file_name"),
-            release_date=release_date,
+            tag=json_string(data["tag"]), hash=json_string(data["hash"]),
+            pak_file_name=json_string(data["pak_file_name"]),
+            release_date=date,
             info=ModInfo.from_dict(data["info"]),
-            release_notes_markdown=optional_string(data["release_notes_markdown"], "release_notes_markdown"),
+            release_notes_markdown=optional_string(data["release_notes_markdown"]),
             manifest=Manifest.from_dict(data["manifest"]),
         )
 
@@ -131,14 +126,12 @@ class Mod:
 
     @staticmethod
     def from_dict(value: JsonValue) -> Mod:
+        validate_schema(value, "registry", "mod")
         data = json_object(value)
-        require_fields(data, {"latest_release_info", "releases"}, set(data), "mod package")
-        with validation_context("latest_release_info"):
-            latest = ModInfo.from_dict(data["latest_release_info"])
+        latest = ModInfo.from_dict(data["latest_release_info"])
         releases: List[Release] = []
-        for index, item in enumerate(json_array(data["releases"], "releases")):
-            tag = item.get("tag", "unknown tag") if isinstance(item, dict) else "unknown tag"
-            with validation_context(f"{tag} releases[{index}]"):
+        for item in json_array(data["releases"]):
+            with validation_context(f"release {json_object(item)['tag']}"):
                 releases.append(Release.from_dict(item))
         return Mod(latest, releases)
 

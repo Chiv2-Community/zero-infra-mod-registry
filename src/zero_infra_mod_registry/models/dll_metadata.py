@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 from semver import Version
 from zero_infra_mod_registry.models.mod_metadata import Dependency, dependencies_from_dict
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches as dependency_matches, parse_version_requirement
-from zero_infra_mod_registry.utils.validation_errors import require_fields, validation_context
+from zero_infra_mod_registry.utils.validation_errors import validation_context
+from zero_infra_mod_registry.utils.schema_validation import validate_schema
 
 from mod_registry_core.json_types import JsonObject, JsonValue, json_array, json_int, json_object, json_string, optional_string, string_array
 
@@ -71,18 +72,13 @@ class PluginInfo:
 
     @staticmethod
     def from_dict(value: JsonValue) -> PluginInfo:
+        validate_schema(value, "registry", "pluginInfo")
         data = json_object(value)
-        required = {"name", "description", "authors"}
-        require_fields(data, required, {"$schema", "mod_dependencies", "plugin_dependencies", "icon_url", "image_urls", "repo_url", "target"}, "plugin.json")
-        if "$schema" in data:
-            json_string(data["$schema"], "$schema")
-        with validation_context("target"):
-            target = PluginTarget(json_string(data.get("target", "shared"), "target"))
-        info = PluginInfo(json_string(data["name"], "name"), json_string(data["description"], "description"), string_array(data["authors"], "authors"),
+        info = PluginInfo(json_string(data["name"]), json_string(data["description"]), string_array(data["authors"]),
                           dependencies_from_dict(data, "plugin_dependencies"),
-                          optional_string(data.get("icon_url"), "icon_url"), string_array(data.get("image_urls", []), "image_urls"),
+                          optional_string(data.get("icon_url")), string_array(data.get("image_urls", [])),
                           dependencies_from_dict(data, "mod_dependencies"),
-                          optional_string(data.get("repo_url"), "repo_url"), target)
+                          optional_string(data.get("repo_url")), PluginTarget(json_string(data.get("target", "shared"))))
         info.validate()
         return info
 
@@ -142,20 +138,17 @@ class DllRelease:
 
     @staticmethod
     def from_dict(value: JsonValue) -> DllRelease:
+        validate_schema(value, "registry", "dllRelease")
         data = json_object(value)
-        fields = {"organization", "name", "version", "download_url", "sha256", "size"}
-        optional = {"info", "tag", "release_date", "release_notes_markdown", "dll_file_name"}
-        require_fields(data, fields, optional, "DLL metadata")
-        date = optional_string(data.get("release_date"), "release_date")
         with validation_context("release_date"):
-            release_date = datetime.fromisoformat(date) if date is not None else None
-        release = DllRelease(json_string(data["organization"], "organization"), json_string(data["name"], "name"),
-                             json_string(data["version"], "version"), json_string(data["download_url"], "download_url"),
-                              json_string(data["sha256"], "sha256"), json_int(data["size"], "size"),
+            date = datetime.fromisoformat(json_string(data["release_date"])) if data.get("release_date") is not None else None
+        release = DllRelease(json_string(data["organization"]), json_string(data["name"]),
+                             json_string(data["version"]), json_string(data["download_url"]),
+                              json_string(data["sha256"]), json_int(data["size"]),
                               PluginInfo.from_dict(data["info"]) if "info" in data else None,
-                              optional_string(data.get("tag"), "tag"), release_date,
-                              optional_string(data.get("release_notes_markdown"), "release_notes_markdown"),
-                              optional_string(data.get("dll_file_name"), "dll_file_name"))
+                              optional_string(data.get("tag")),
+                              date,
+                              optional_string(data.get("release_notes_markdown")), optional_string(data.get("dll_file_name")))
         release.validate()
         return release
 
@@ -183,18 +176,16 @@ class DllRelease:
 
     @staticmethod
     def from_package_dict(org: str, name: str, value: JsonValue) -> DllRelease:
+        validate_schema(value, "registry", "pluginRelease")
         data = json_object(value)
-        require_fields(data, {"tag", "hash", "dll_file_name", "download_url", "size", "release_date", "info", "release_notes_markdown"}, set(), "plugin release")
-        tag = json_string(data["tag"], "tag")
-        date = optional_string(data["release_date"], "release_date")
         with validation_context("release_date"):
-            release_date = datetime.fromisoformat(date) if date is not None else None
-        release = DllRelease(org, name, str(Version.parse(tag.removeprefix("v"))), json_string(data["download_url"], "download_url"),
-                             json_string(data["hash"], "hash"), json_int(data["size"], "size"),
+            date = datetime.fromisoformat(json_string(data["release_date"])) if data["release_date"] is not None else None
+        tag = json_string(data["tag"])
+        release = DllRelease(org, name, str(Version.parse(tag.removeprefix("v"))), json_string(data["download_url"]),
+                             json_string(data["hash"]), json_int(data["size"]),
                              PluginInfo.from_dict(data["info"]) if data["info"] is not None else None,
-                             tag, release_date,
-                             optional_string(data["release_notes_markdown"], "release_notes_markdown"),
-                             optional_string(data["dll_file_name"], "dll_file_name"))
+                             tag, date,
+                             optional_string(data["release_notes_markdown"]), optional_string(data["dll_file_name"]))
         release.validate()
         return release
 
@@ -225,12 +216,13 @@ class Plugin:
 
     @staticmethod
     def from_dict(org: str, name: str, value: JsonValue) -> Plugin:
+        with validation_context(f"{org}/{name}"):
+            validate_schema(value, "registry", "plugin")
         data = json_object(value)
-        require_fields(data, {"latest_release_info", "releases"}, set(), f"{org}/{name}")
         with validation_context(f"{org}/{name} latest_release_info"):
             latest = PluginInfo.from_dict(data["latest_release_info"])
         releases: List[DllRelease] = []
-        for index, item in enumerate(json_array(data["releases"], "releases")):
+        for index, item in enumerate(json_array(data["releases"])):
             tag = item.get("tag", "unknown tag") if isinstance(item, dict) else "unknown tag"
             with validation_context(f"{org}/{name} {tag} releases[{index}]"):
                 releases.append(DllRelease.from_package_dict(org, name, item))

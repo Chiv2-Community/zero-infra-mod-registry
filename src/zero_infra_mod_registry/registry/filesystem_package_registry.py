@@ -12,6 +12,7 @@ from semver import Version
 from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
 from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_entries, validate_dll_releases
 from zero_infra_mod_registry.utils.validation_errors import validation_context
+from zero_infra_mod_registry.utils.schema_validation import validate_schema
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
 from mod_registry_core.json_types import JsonValue, decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
@@ -84,7 +85,9 @@ class FilesystemPackageRegistry(PackageRegistry):
         entries: List[DllRelease] = []
         if os.path.exists(self.dll_index_path):
             with validation_context(self.dll_index_path), open(self.dll_index_path) as file:
-                entries = validate_dll_entries(decode_json(file.read()))
+                data = decode_json(file.read())
+                validate_schema(data, "registry", "dllIndex")
+                entries = validate_dll_entries(data)
         legacy = {entry.key: entry for entry in entries}
         merged = legacy.copy()
         seen: set[str] = set()
@@ -95,7 +98,8 @@ class FilesystemPackageRegistry(PackageRegistry):
             org, name = package.split("/")
             path = os.path.join(self.plugin_packages_dir, org, name + ".json")
             with validation_context(path), open(path) as file:
-                plugin = Plugin.from_dict(org, name, decode_json(file.read()))
+                data = decode_json(file.read())
+                plugin = Plugin.from_dict(org, name, data)
             package_keys: set[Tuple[str, str, str]] = set()
             for entry in plugin.releases:
                 if entry.key in package_keys:

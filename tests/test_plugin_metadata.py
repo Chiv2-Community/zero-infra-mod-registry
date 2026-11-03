@@ -40,10 +40,10 @@ def test_missing_or_invalid_plugin_json_is_rejected(monkeypatch: pytest.MonkeyPa
 
 
 INVALID_METADATA_CASES: list[tuple[JsonObject, list[str]]] = [
-    ({"name": "Plugin", "typo": True}, ["missing required fields: authors, description", "unexpected fields: typo"]),
-    ({**INFO.asdict(), "authors": [True]}, ["authors[0]", "Expected a JSON string"]),
+    ({"name": "Plugin", "typo": True}, ["'authors' is a required property", "'description' is a required property", "'typo' was unexpected"]),
+    ({**INFO.asdict(), "authors": [True]}, ["authors[0]", "not of type 'string'"]),
     ({**INFO.asdict(), "plugin_dependencies": [{"repo_url": True, "version": "1.0.0"}]},
-     ["plugin_dependencies[0]", "repo_url", "Expected a JSON string"]),
+     ["plugin_dependencies[0]", "repo_url", "not of type 'string'"]),
 ]
 
 
@@ -75,7 +75,7 @@ def test_registry_summary_identifies_invalid_stored_release(tmp_path: Path, capl
     path.write_text(json.dumps(package))
     Path(registry.plugin_list_index_path).write_text("Test/Plugin\n")
     assert not registry.validate_dll_db()
-    for detail in [str(path), "Test/Plugin", "1.0.0", "releases[0]", "missing required fields: hash", "unexpected fields: unexpected"]:
+    for detail in [str(path), "Test/Plugin", "1.0.0", "releases[0]", "'hash' is a required property", "'unexpected' was unexpected"]:
         assert detail in caplog.text
 
 
