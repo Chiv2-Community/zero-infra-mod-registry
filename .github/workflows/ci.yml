@@ -41,6 +41,9 @@ jobs:
       - name: Build workspace packages
         run: uv build --all-packages
 
+      - name: Check generated models
+        run: uv run python -m code_gen --check
+
       - name: Run mypy
         run: uv run mypy .
 
@@ -59,6 +62,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: docker/zero-infra-mod-registry/Dockerfile
           push: false
           tags: zero-infra-mod-registry:${{ github.run_number }}
           load: true
@@ -88,7 +92,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: automated-registry-gateway/Dockerfile
+          file: docker/automated-registry-gateway/Dockerfile
           push: false
           load: true
           tags: automated-registry-gateway:test

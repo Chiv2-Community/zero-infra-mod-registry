@@ -8,7 +8,7 @@ Use it with optional `actions/automated-publish` for automatic release requests.
 Publishers need no registry token. Manual registration issues work without either.
 
 Its Python package is a separate [uv workspace member](../development.md).
-The image installs only gateway dependencies and shared core.
+The image installs only gateway dependencies and registration core.
 
 ```mermaid
 sequenceDiagram
@@ -67,8 +67,8 @@ For an enrolled repository, obtain its immutable ID with
 
 ## Deploy with Docker Compose
 
-Copy `automated-registry-gateway/compose.yml` and
-`automated-registry-gateway/gateway.env.example` from this repository
+Copy `docker/automated-registry-gateway/compose.yml` and
+`docker/automated-registry-gateway/gateway.env.example` from this repository
 into a directory on your server. Put the downloaded key there as `github-app.pem`.
 Do not commit keys or populated environment files.
 
@@ -167,7 +167,7 @@ or `registry_token`, never both. Token-based callers can omit `endpoint`.
 
 `.github/workflows/publish-automated-registry-gateway.yml` runs gateway tests,
 strict mypy and a Docker smoke test, then publishes amd64/arm64 images built from
-`automated-registry-gateway/Dockerfile` to
+`docker/automated-registry-gateway/Dockerfile` to
 `ghcr.io/<owner>/automated-registry-gateway`. It uses the repository's `GITHUB_TOKEN`
 with Packages write permission.
 
@@ -184,7 +184,7 @@ Actions access. PR CI builds and smoke-tests the image without publishing it.
 Local build and tests:
 
 ```sh
-docker build -f automated-registry-gateway/Dockerfile -t automated-registry-gateway:local .
+docker build -f docker/automated-registry-gateway/Dockerfile -t automated-registry-gateway:local .
 bash tests/actions/test-gateway-image.sh automated-registry-gateway:local
 uv run pytest tests/test_gateway.py
 uv run mypy .

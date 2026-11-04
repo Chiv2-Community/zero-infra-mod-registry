@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: automated-registry-gateway/Dockerfile
+          file: docker/automated-registry-gateway/Dockerfile
           push: false
           load: true
           tags: automated-registry-gateway:candidate
@@ -55,7 +55,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          file: automated-registry-gateway/Dockerfile
+          file: docker/automated-registry-gateway/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.metadata.outputs.tags }}

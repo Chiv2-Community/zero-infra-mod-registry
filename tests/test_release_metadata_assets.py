@@ -5,7 +5,7 @@ import requests
 
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
-from mod_registry_core.json_types import JsonObject
+from generated_models.json_types import JsonObject
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 

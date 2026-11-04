@@ -11,7 +11,7 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
     root = Path(__file__).resolve().parents[1]
     context = tmp_path / "build"
     context.mkdir()
-    builder = (root / "Dockerfile").read_text().split("RUN uv build --wheel", 1)[0]
+    builder = (root / "docker/zero-infra-mod-registry/Dockerfile").read_text().split("RUN uv build --wheel", 1)[0]
     for line in builder.splitlines():
         if not line.startswith("COPY ") or "--from=" in line:
             continue
@@ -26,18 +26,24 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
                 shutil.copy2(original, target / original.name)
     result = subprocess.run(["uv", "build", "--wheel", "--package", "zero-infra-mod-registry"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    result = subprocess.run(["uv", "build", "--wheel", "--package", "mod-registry-core"], cwd=context, capture_output=True, text=True)
+    result = subprocess.run(["uv", "build", "--wheel", "--package", "mod-registry-registration-core"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     wheel, = (context / "dist").glob("zero_infra_mod_registry-*.whl")
-    core_wheel, = (context / "dist").glob("mod_registry_core-*.whl")
+    result = subprocess.run(["uv", "build", "--wheel", "--package", "generated-models"], cwd=context, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    models_wheel, = (context / "dist").glob("generated_models-*.whl")
+    core_wheel, = (context / "dist").glob("mod_registry_registration_core-*.whl")
     installed = tmp_path / "installed"
     with ZipFile(wheel) as archive:
-        for kind in ("common", "mod", "plugin"):
-            assert f"zero_infra_mod_registry/schemas/{kind}.schema.json" in archive.namelist()
         assert not any("gateway" in name for name in archive.namelist())
         archive.extractall(installed)
+    with ZipFile(models_wheel) as archive:
+        assert "generated_models/json_types.py" in archive.namelist()
+        for kind in ("common", "mod", "plugin", "request"):
+            assert f"generated_models/schemas/{kind}.schema.json" in archive.namelist()
+        archive.extractall(installed)
     with ZipFile(core_wheel) as archive:
-        assert "mod_registry_core/json_types.py" in archive.namelist()
+        assert "mod_registry_registration_core/json_types.py" not in archive.namelist()
         archive.extractall(installed)
     # -I prevents cwd/PYTHONPATH from providing source-tree schemas. Dependencies
     # come from the test environment, but production modules come only from the wheel.
@@ -47,7 +53,8 @@ from pathlib import Path
 import sys
 sys.path.insert(0, sys.argv[1])
 from zero_infra_mod_registry.metadata_validation import validate_metadata
-from zero_infra_mod_registry.models.dll_metadata import PluginInfo, PluginTarget
+from generated_models.metadata import PluginInfo, PluginTarget
+from zero_infra_mod_registry.models.loading import load
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 registry = FilesystemPackageRegistry(registry_path='registry', package_db_path='package_db', dll_db_path='dll_db')
 for target in ('server', 'client', 'shared'):
@@ -55,9 +62,9 @@ for target in ('server', 'client', 'shared'):
     path = Path('plugin.json')
     path.write_text(json.dumps(data))
     validate_metadata(path, 'plugin', registry)
-    assert PluginInfo.from_dict(data).target is PluginTarget(target)
+    assert load(data, PluginInfo).target is PluginTarget(target)
 path = Path('mod.json')
-path.write_text(json.dumps({'name': 'Pak', 'description': 'Description', 'authors': ['Author']}))
+path.write_text(json.dumps({'name': 'Pak', 'description': 'Description', 'authors': ['Author'], 'mod_dependencies': []}))
 validate_metadata(path, 'mod', registry)
 from zero_infra_mod_registry.metadata_validation import metadata_validator
 for kind in ('mod', 'plugin'):

@@ -1,7 +1,7 @@
 """Keep every Python JSON boundary on the strict shared decoder."""
 import pytest
 
-from mod_registry_core.json_types import decode_json, json_bool, json_int, json_string
+from generated_models.json_types import decode_json, json_bool, json_int, json_string
 
 
 @pytest.mark.parametrize("constant", ["NaN", "Infinity", "-Infinity"])

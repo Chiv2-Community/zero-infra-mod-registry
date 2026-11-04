@@ -15,8 +15,9 @@ dependencies = [
     "types-urllib3>=1.26.25.14",
     "urllib3>=2.0.5",
     "semver>=3.0.4",
-    "jsonschema>=4.26.0",
-    "mod-registry-core==1.0.0",
+    "jsonschema[format-nongpl]>=4.26.0",
+    "mod-registry-registration-core==1.0.0",
+    "generated-models==1.0.0",
 ]
 [project.scripts]
 zero-infra-mod-registry = "zero_infra_mod_registry.main:main"
@@ -24,6 +25,8 @@ zero-infra-mod-registry = "zero_infra_mod_registry.main:main"
 [dependency-groups]
 dev = [
     "automated-registry-gateway==1.0.0",
+    "code-gen==1.0.0",
+    "hatchling>=1.33.0",
     "mypy>=1.19.1",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
@@ -31,11 +34,13 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["src/core", "src/automated-registry-gateway"]
+members = ["packages/mod-registry-registration-core", "packages/automated-registry-gateway", "packages/generated-models", "packages/code-gen"]
 
 [tool.uv.sources]
-mod-registry-core = { workspace = true }
+mod-registry-registration-core = { workspace = true }
 automated-registry-gateway = { workspace = true }
+generated-models = { workspace = true }
+code-gen = { workspace = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -45,7 +50,7 @@ python_functions = "test_*"
 pythonpath = ["src"]
 
 [tool.coverage.run]
-source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_core"]
+source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_registration_core", "generated_models"]
 omit = ["tests/*"]
 
 [build-system]
@@ -54,9 +59,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zero_infra_mod_registry"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"schemas" = "zero_infra_mod_registry/schemas"
 
 [tool.mypy]
 python_version = "3.12"

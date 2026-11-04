@@ -4,6 +4,8 @@
   "title": "Pak mod metadata (mod.json)",
   "type": "object",
   "required": ["name", "description", "authors"],
+  "if": {"not": {"required": ["dependencies"]}},
+  "then": {"required": ["mod_dependencies"]},
   "properties": {
     "$schema": {"type": "string", "format": "uri"},
     "repo_url": {"$ref": "common.schema.json#/$defs/pakRepository", "description": "Optional in mod.json; the registry supplies the source repository URL."},

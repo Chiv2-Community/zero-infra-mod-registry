@@ -15,12 +15,16 @@ from github import Auth, Github, GitReleaseAsset
 from github.GitRelease import GitRelease
 from semver import Version
 
-from zero_infra_mod_registry.models import Dependency, ModInfo, Mod, Release, Repo
-from zero_infra_mod_registry.models.pak_manifest import Manifest, PakInventory
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, PluginInfo
+from generated_models.dependencies import Dependency
+from generated_models.metadata import DllRelease, Manifest, ModInfo, Mod, PakInventory, PluginInfo, Release
+from zero_infra_mod_registry.models import Repo
+from zero_infra_mod_registry.models.dll_metadata import validate_dll_release
+from zero_infra_mod_registry.models.loading import load
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
-from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
-from mod_registry_core.registration import selected_dll_name, single_pak_name
+from zero_infra_mod_registry.utils.validation_errors import validation_context
+from zero_infra_mod_registry.utils.schema_validation import validate_schema
+from generated_models.json_types import JsonObject, decode_json, json_array, json_object
+from mod_registry_registration_core.release_assets import selected_dll_name, single_pak_name
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 
 
@@ -66,12 +70,12 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         name = selected_dll_name((asset.name for asset in release_assets), dll_file)
         assets = [asset for asset in release_assets if asset.name == name]
         url = assets[0].browser_download_url
-        DllRelease(repo.org, repo.name, version, url, "0" * 64, 1).validate()
+        validate_dll_release(DllRelease(repo.org, repo.name, version, url, "0" * 64, 1))
         info = self.fetch_plugin_info(repo, release)
         digest, size = self.measure_dll(url)
         entry = DllRelease(repo.org, repo.name, version, url, digest, size, info,
                            release.tag_name, release.published_at, release.body, assets[0].name)
-        entry.validate()
+        validate_dll_release(entry)
         if entry.size != assets[0].size:
             raise ValueError("Downloaded DLL size differs from release asset")
         return entry
@@ -98,7 +102,10 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             return json_object(decode_json(response.text))
 
     def fetch_plugin_info(self, repo: Repo, release: GitRelease) -> PluginInfo:
-        info = PluginInfo.from_dict(self._fetch_release_json(repo, release, "plugin.json"))
+        with validation_context(f"{repo} {release.tag_name} plugin.json"):
+            data = self._fetch_release_json(repo, release, "plugin.json")
+            validate_schema(data, "plugin")
+            info = load(data, PluginInfo)
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return replace(info, repo_url=repo.github_url())
@@ -167,9 +174,11 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         """
         if release.draft:
             raise ValueError("Draft pak releases cannot be registered")
-        response_json = self._fetch_release_json(repo, release, "mod.json")
-        response_json["repo_url"] = repo.github_url()
-        mod_info = ModInfo.from_dict(response_json)
+        with validation_context(f"{repo} {release.tag_name} mod.json"):
+            response_json = self._fetch_release_json(repo, release, "mod.json")
+            validate_schema(response_json, "mod")
+            response_json["repo_url"] = repo.github_url()
+            mod_info = load(response_json, ModInfo)
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
@@ -246,7 +255,7 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
                 raise Exception(f"Pak scanner returned no .pak files for {pak_path}")
 
             pak_inventory_data = paks[0]
-            pak_inventory = PakInventory.from_dict(pak_inventory_data)
+            pak_inventory = load(pak_inventory_data, PakInventory)
             blueprint_count = len(pak_inventory.inventory.blueprints)
             replacement_count = len(pak_inventory.inventory.replacements)
             marker_count = len(pak_inventory.inventory.markers)

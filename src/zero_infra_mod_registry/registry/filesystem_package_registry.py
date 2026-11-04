@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -9,23 +8,22 @@ from typing import Callable, List, Optional, Tuple, override
 
 from semver import Version
 
-from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease, Plugin, validate_dll_entries, validate_dll_releases
+from generated_models.dependencies import Dependency
+from generated_models.metadata import DllRelease, Mod, Plugin, Release
+from zero_infra_mod_registry.models import Repo
+from zero_infra_mod_registry.models.dll_metadata import (
+    dll_release_key, plugin_from_dict, validate_dll_release, validate_dll_releases,
+)
+from zero_infra_mod_registry.models.loading import dumps, loads
+from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
-from mod_registry_core.json_types import JsonValue, decode_json
+from generated_models.json_types import decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
     ModMetadataRetriever,
 )
 from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
 from zero_infra_mod_registry.utils.redirect_manager import SimpleRedirectManager
-
-
-class PackageManagerJsonEncoder:
-    """Encode model-produced JSON values; dates are serialized by Release."""
-
-    def encode(self, value: JsonValue) -> str:
-        return json.dumps(value, indent=4)
 
 
 class FilesystemPackageRegistry(PackageRegistry):
@@ -51,7 +49,6 @@ class FilesystemPackageRegistry(PackageRegistry):
         """
         self.registry_path = registry_path
         self.package_db_path = package_db_path
-        self.dll_index_path = os.path.join(dll_db_path, "index.json")
         self.plugin_list_index_path = os.path.join(dll_db_path, "plugin_list_index.txt")
         self.plugin_packages_dir = os.path.join(dll_db_path, "packages")
         self.packages_dir = os.path.join(package_db_path, "packages")
@@ -66,9 +63,6 @@ class FilesystemPackageRegistry(PackageRegistry):
         if mod_retriever is not None and not os.path.exists(self.packages_dir):
             os.makedirs(self.packages_dir, exist_ok=True)
 
-        # Setup JSON encoder
-        self.json_encoder = PackageManagerJsonEncoder()
-
         self.mod_retriever = mod_retriever
 
         # Load redirect manager
@@ -79,45 +73,37 @@ class FilesystemPackageRegistry(PackageRegistry):
             raise ValueError("This registry has no release retriever; only local validation is available")
         return self.mod_retriever
 
-    def _load_dll_index(self) -> List[DllRelease]:
-        entries: List[DllRelease] = []
-        if os.path.exists(self.dll_index_path):
-            with open(self.dll_index_path) as file:
-                entries = validate_dll_entries(decode_json(file.read()))
-        legacy = {entry.key: entry for entry in entries}
-        merged = legacy.copy()
+    def _load_dll_releases(self) -> List[DllRelease]:
+        releases: List[DllRelease] = []
         seen: set[str] = set()
         for package in self._load_package_list(self.plugin_list_index_path):
             if not re.fullmatch(r"[A-Za-z0-9_-]+/[A-Za-z0-9_-]+", package) or package.lower() in seen:
                 raise ValueError("Invalid or duplicate plugin index entry")
             seen.add(package.lower())
             org, name = package.split("/")
-            with open(os.path.join(self.plugin_packages_dir, org, name + ".json")) as file:
-                plugin = Plugin.from_dict(org, name, decode_json(file.read()))
-            package_keys: set[Tuple[str, str, str]] = set()
-            for entry in plugin.releases:
-                if entry.key in package_keys:
-                    raise ValueError("Duplicate DLL release")
-                package_keys.add(entry.key)
-                old = legacy.get(entry.key)
-                if old is not None and old.package_dict() != entry.package_dict():
-                    raise ValueError("Plugin package conflicts with legacy DLL entry")
-                if entry.info is None and old is None:
-                    raise ValueError("Plugin package release is missing metadata")
-                merged[entry.key] = entry
-        releases = list(merged.values())
+            path = os.path.join(self.plugin_packages_dir, org, name + ".json")
+            with validation_context(path), open(path) as file:
+                data = decode_json(file.read())
+                plugin = plugin_from_dict(org, name, data)
+            releases.extend(plugin.releases)
         validate_dll_releases(releases)
         return releases
 
     def validate_dll_db(self, verify_downloads: bool = False) -> bool:
         try:
-            entries = self._load_dll_index()
+            entries = self._load_dll_releases()
             self._validate_plugin_mod_dependencies(entries)
             if verify_downloads:
                 for entry in entries:
                     actual = self._require_retriever().measure_dll(entry.download_url)
                     if actual != (entry.sha256, entry.size):
                         raise ValueError(f"DLL content mismatch: {entry.organization}/{entry.name}:{entry.version}")
+                if entries:
+                    logging.info("DLL download verification passed for %d registered release(s).", len(entries))
+                else:
+                    logging.info("DLL download verification skipped: no registered DLL releases.")
+            else:
+                logging.info("DLL download verification skipped: not requested.")
             return True
         except Exception as error:
             logging.error(f"DLL registry validation failed: {error}")
@@ -125,12 +111,12 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def add_dll_release(self, repo: Repo, release_tag: str, dry_run: bool = False, dll_file: str | None = None) -> bool:
         try:
-            entries = self._load_dll_index()
+            entries = self._load_dll_releases()
             entry = self._require_retriever().fetch_dll_release(repo, release_tag, dll_file)
-            entry.validate()
+            validate_dll_release(entry)
             if entry.info is None:
                 raise ValueError("New DLL releases require plugin.json metadata")
-            if entry.key in {existing.key for existing in entries}:
+            if dll_release_key(entry) in {dll_release_key(existing) for existing in entries}:
                 raise ValueError("Duplicate DLL release")
             validate_dll_releases(entries + [entry])
             self._validate_plugin_mod_dependencies(entries + [entry])
@@ -140,12 +126,12 @@ class FilesystemPackageRegistry(PackageRegistry):
             package = next((value for value in packages if value.lower() == str(repo).lower()), str(repo))
             org, name = package.split("/")
             releases = [entry] + [old for old in entries if old.organization.lower() == repo.org.lower() and old.name.lower() == repo.name.lower()]
-            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): json.dumps(Plugin(releases).asdict(), indent=2) + "\n",
+            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): dumps(Plugin(releases), indent=2) + "\n",
                      self.plugin_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n"}
             self._write_registry_files(paths)
             return True
         except Exception as error:
-            logging.error(f"Failed to register DLL release: {error}")
+            logging.error(f"Failed to register DLL release {repo} {release_tag}: {error}")
             return False
 
     @staticmethod
@@ -187,7 +173,7 @@ class FilesystemPackageRegistry(PackageRegistry):
 
     def validate_metadata_dependencies(self, mod_dependencies: List[Dependency], plugin_dependencies: List[Dependency]) -> None:
         """Validate release metadata dependencies against this published database."""
-        plugins = self._load_dll_index() if plugin_dependencies else []
+        plugins = self._load_dll_releases() if plugin_dependencies else []
         for dependency in plugin_dependencies:
             if not self._has_plugin_dependency(plugins, dependency):
                 raise ValueError(f"Unregistered plugin dependency: {dependency.repo_url} {dependency.version}")
@@ -265,7 +251,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             if not any(repo_to_index_entry(value).lower() == package.lower() for value in urls if not value.startswith("#")):
                 urls.append(url)
             paths = {
-                os.path.join(self.packages_dir, org, name + ".json"): self.json_encoder.encode(updated_mod.asdict()) + "\n",
+                os.path.join(self.packages_dir, org, name + ".json"): dumps(updated_mod, indent=4) + "\n",
                 self.mod_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n",
                 org_index_path: "\n".join(urls) + "\n",
             }
@@ -273,7 +259,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             logging.info(f"Successfully added release {release_tag} to repo {repo}.")
             return True
         except Exception as error:
-            logging.error(f"Failed to register pak release: {error}")
+            logging.error(f"Failed to register pak release {repo} {release_tag}: {error}")
             return False
 
     @override
@@ -342,9 +328,8 @@ class FilesystemPackageRegistry(PackageRegistry):
         try:
             org_dir = os.path.join(self.packages_dir, repo.org)
             mod_file_path = os.path.join(org_dir, f"{repo.name}.json")
-            with open(mod_file_path, "r") as file:
-                mod_dict = decode_json(file.read())
-                return Mod.from_dict(mod_dict)
+            with validation_context(f"{repo} ({mod_file_path})"), open(mod_file_path, "r") as file:
+                return loads(file.read(), Mod)
         except FileNotFoundError:
             return None
 
@@ -377,20 +362,22 @@ class FilesystemPackageRegistry(PackageRegistry):
             package_path = os.path.join(self.packages_dir, org, f"{name}.json")
             if mod_path_filter(package_path):
                 try:
-                    with open(package_path, "r") as file:
-                        mod_dict = decode_json(file.read())
-                        mod = Mod.from_dict(mod_dict)
+                    with validation_context(f"{package} ({package_path})"), open(package_path, "r") as file:
+                        mod = loads(file.read(), Mod)
 
                         mods.append(mod)
 
                 except FileNotFoundError:
                     logging.error(f"Package {package} not found during validation.")
                     return False
+                except ValueError as error:
+                    logging.error("Package validation failed: %s", error)
+                    return False
 
         # Check for missing dependencies
         missing_deps: List[Tuple[Release, Dependency]] = []
         try:
-            plugins = self._load_dll_index()
+            plugins = self._load_dll_releases()
         except ValueError as error:
             logging.error("DLL registry is invalid: %s", error)
             return False

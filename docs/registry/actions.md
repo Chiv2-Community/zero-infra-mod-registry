@@ -54,7 +54,7 @@ uv run zero-infra-mod-registry validate --verify-dll-downloads
 uv run zero-infra-mod-registry remove https://github.com/Owner/Mod
 ```
 
-For Docker, build `docker build -t registry-tool .`, then run:
+For Docker, build `docker build -f docker/zero-infra-mod-registry/Dockerfile -t registry-tool .` from the repository root, then run:
 
 ```sh
 docker run --rm -e GITHUB_TOKEN -v "$PWD:/github/workspace" \

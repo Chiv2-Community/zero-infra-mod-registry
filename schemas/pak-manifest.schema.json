@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/pak-manifest.schema.json",
+  "$ref": "#/$defs/manifest",
+  "$defs": {
+    "asset": {
+      "title": "BaseAsset", "type": "object", "required": ["path", "hash"],
+      "properties": {
+        "path": {"type": "string"}, "hash": {"type": "string"},
+        "object_class": {"type": ["string", "null"], "default": null},
+        "class_path": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "blueprint": {
+      "title": "BlueprintModInfo", "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {
+        "mod_name": {"type": ["string", "null"], "default": null},
+        "version": {"type": ["string", "null"], "default": null},
+        "author": {"type": ["string", "null"], "default": null},
+        "mod_description": {"type": ["string", "null"], "default": null},
+        "mod_repo_url": {"type": ["string", "null"], "default": null},
+        "silent_load": {"type": "boolean", "default": false},
+        "show_in_gui": {"type": "boolean", "default": false},
+        "enable_by_default": {"type": "boolean", "default": false},
+        "is_client_side": {"type": "boolean", "default": false},
+        "online_only": {"type": "boolean", "default": false},
+        "host_only": {"type": "boolean", "default": false},
+        "allow_on_frontend": {"type": "boolean", "default": false},
+        "is_hidden": {"type": "boolean", "default": false}
+      }
+    },
+    "map": {
+      "title": "GameMapInfo", "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {
+        "game_mode": {"type": ["string", "null"], "default": null},
+        "map_name": {"type": ["string", "null"], "default": null},
+        "defending_faction": {"type": ["string", "null"], "default": null},
+        "attacking_faction": {"type": ["string", "null"], "default": null},
+        "game_mode_type": {"type": ["string", "null"], "default": null}
+      }
+    },
+    "replacement": {"title": "AssetReplacementInfo", "allOf": [{"$ref": "#/$defs/asset"}]},
+    "arbitrary": {
+      "title": "ArbitraryAssetInfo", "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {"mod_name": {"type": ["string", "null"], "default": null}}
+    },
+    "marker": {
+      "title": "ModMarkerInfo", "allOf": [{"$ref": "#/$defs/asset"}],
+      "properties": {"associated_blueprints": {"type": ["array", "null"], "items": {"type": "string"}, "default": [], "x-python-null-as-default": true}}
+    },
+    "manifest": {
+      "title": "Manifest", "type": "object",
+      "properties": {
+        "markers": {"type": "array", "items": {"$ref": "#/$defs/marker"}, "default": []},
+        "blueprints": {"type": "array", "items": {"$ref": "#/$defs/blueprint"}, "default": []},
+        "maps": {"type": "array", "items": {"$ref": "#/$defs/map"}, "default": []},
+        "replacements": {"type": "array", "items": {"$ref": "#/$defs/replacement"}, "default": []},
+        "arbitrary": {"type": "array", "items": {"$ref": "#/$defs/arbitrary"}, "default": []}
+      }
+    },
+    "inventory": {
+      "title": "PakInventory", "type": "object", "required": ["pak_name", "pak_path"],
+      "properties": {
+        "pak_name": {"type": "string"}, "pak_path": {"type": "string"},
+        "pak_hash": {"type": ["string", "null"], "default": null},
+        "inventory": {"$ref": "#/$defs/manifest", "default": {}}
+      }
+    }
+  }
+}

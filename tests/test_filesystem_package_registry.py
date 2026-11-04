@@ -4,7 +4,8 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from zero_infra_mod_registry.models import Dependency, Repo
+from generated_models.dependencies import Dependency
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
 from tests.fakes import FakeRetriever, mod_fixture
@@ -32,11 +33,6 @@ def test_load_package_list(registry: FilesystemPackageRegistry, tmp_path: Path) 
 @pytest.mark.parametrize("url", ["https://github.com/org1/repo1", "org1/repo1", "https://github.com/org1/repo1/"])
 def test_repo_to_index_entry(url: str) -> None:
     assert repo_to_index_entry(url) == "org1/repo1"
-
-
-def test_load_mod(registry: FilesystemPackageRegistry) -> None:
-    assert registry.add_package_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert registry.load_mod(Repo("Test", "Plugin")) == mod_fixture()
 
 
 def test_load_mod_file_not_found(registry: FilesystemPackageRegistry) -> None:

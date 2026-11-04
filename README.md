@@ -129,8 +129,9 @@ public repository to request registration. Maintainer approval remains required.
 
 ## Local development
 
-The uv workspace builds three packages: the registry, gateway, and shared core.
-See [package layout](docs/development.md).
+The uv workspace builds five packages: registry, gateway, registration core, generated models,
+and development-only code generation.
+See [package layout](docs/development.md) and [schema-generated models](docs/models.md).
 
 ```sh
 uv sync --all-groups

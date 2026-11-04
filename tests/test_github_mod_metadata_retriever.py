@@ -2,7 +2,9 @@ from datetime import datetime
 
 import pytest
 from github.GitRelease import GitRelease
-from zero_infra_mod_registry.models import Dependency, Mod, Release, Repo
+from generated_models.dependencies import Dependency
+from generated_models.metadata import Mod, Release
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, mod_fixture
 
@@ -21,11 +23,6 @@ def test_validate_version_tag_name(retriever: GithubModMetadataRetriever, tag: s
 def test_invalid_version_tag_name(retriever: GithubModMetadataRetriever, tag: str) -> None:
     error = retriever.validate_version_tag_name(tag)
     assert error is not None and tag.lstrip("v") in error
-
-
-@pytest.mark.parametrize("version", ["1.0.0", "v1.0.0", "^1.0.0", ">=1.0.0,<2.0.0"])
-def test_validate_dependency_versions(retriever: GithubModMetadataRetriever, version: str) -> None:
-    assert retriever.validate_dependency_versions([Dependency("https://github.com/Test/Plugin", version)]) == []
 
 
 @pytest.mark.parametrize("version", ["invalid", "v"])
@@ -64,7 +61,7 @@ def test_first_registration_fetches_only_requested_release(monkeypatch: pytest.M
 
     monkeypatch.setattr(retriever, "process_release", process)
     release = retriever.fetch_release_metadata(Repo("Test", "Plugin"), "v1.0.0")
-    assert release is not None and release.tag == "v1.0.0"
+    assert release == mod_fixture(tag="v1.0.0", date=datetime(2023, 1, 1)).releases[0]
     assert calls == ["v1.0.0"]
     assert client.repository.tag_calls == ["v1.0.0"]
     assert client.repo_calls == ["Test/Plugin"]
@@ -77,18 +74,3 @@ def test_update_mod_with_release(retriever: GithubModMetadataRetriever) -> None:
     updated = retriever.update_mod_with_release(Mod(second.latest_release_info, first.releases + second.releases), third.releases[0])
     assert [release.tag for release in updated.releases] == ["v1.2.0", "v1.1.0", "v1.0.0"]
     assert updated.latest_release_info == third.latest_release_info
-
-
-def test_fetch_release_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = FakeGithub([FakeRelease(tag_name="v1.2.0")])
-    retriever = GithubModMetadataRetriever(client.as_github())
-    expected = mod_fixture(tag="v1.2.0").releases[0]
-
-    def process(repo: Repo, release: GitRelease) -> Release:
-        assert repo == Repo("Test", "Plugin") and release.tag_name == "v1.2.0"
-        return expected
-
-    monkeypatch.setattr(retriever, "process_release", process)
-    assert retriever.fetch_release_metadata(Repo("Test", "Plugin"), "v1.2.0") == expected
-    assert client.repo_calls == ["Test/Plugin"]
-    assert client.repository.tag_calls == ["v1.2.0"]

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 
-from zero_infra_mod_registry.models import Mod, Release, Repo
-from zero_infra_mod_registry.models.dll_metadata import DllRelease
+from generated_models.metadata import DllRelease, Mod, Release
+from zero_infra_mod_registry.models import Repo
 
 class ModMetadataRetriever(ABC):
     """

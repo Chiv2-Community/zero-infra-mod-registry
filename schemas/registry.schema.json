@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/prepare-v1/schemas/registry.schema.json",
+  "title": "Stored registry records",
+  "$defs": {
+    "modInfo": {"$ref": "mod-metadata.schema.json#/$defs/modInfo"},
+    "modRelease": {"$ref": "mod-metadata.schema.json#/$defs/modRelease"},
+    "mod": {"$ref": "mod-metadata.schema.json#/$defs/mod"},
+    "pluginInfo": {"$ref": "dll-metadata.schema.json#/$defs/pluginInfo"},
+    "pluginRelease": {"$ref": "dll-metadata.schema.json#/$defs/pluginRelease"},
+    "plugin": {"$ref": "dll-metadata.schema.json#/$defs/pluginPackage"},
+    "manifest": {"$ref": "pak-manifest.schema.json#/$defs/manifest"}
+  }
+}

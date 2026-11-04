@@ -13,15 +13,15 @@ from github.GitReleaseAsset import GitReleaseAsset
 from github.PaginatedList import PaginatedList
 from urllib3.response import HTTPResponse
 
-from zero_infra_mod_registry.models import DllRelease, Mod, ModInfo, Release, Repo
-from zero_infra_mod_registry.models.pak_manifest import Manifest
+from generated_models.metadata import DllRelease, Manifest, Mod, ModInfo, Release
+from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.retriever import ModMetadataRetriever
 
 T = TypeVar("T")
 
 
 def mod_fixture(name: str = "Plugin", tag: str = "v1.0.0", date: datetime = datetime(2023, 1, 1)) -> Mod:
-    info = ModInfo(f"https://github.com/Test/{name}", name, "Fixture", None, [], ["Author"], [])
+    info = ModInfo(repo_url=f"https://github.com/Test/{name}", name=name, description="Fixture", authors=["Author"])
     release = Release(tag, "a" * 128, f"{name}.pak", date, info, "Notes", Manifest([], [], [], [], []))
     return Mod(info, [release])
 
