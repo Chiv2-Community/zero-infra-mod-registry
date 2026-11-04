@@ -14,7 +14,8 @@ from datamodel_code_generator import InputFileType, PythonVersion, generate
 from datamodel_code_generator.enums import DataModelType, DefaultValueType
 from datamodel_code_generator.format import DatetimeClassType, Formatter
 
-from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object, json_string
+from generated_models.json_types import JsonObject, JsonValue, json_object, json_string
+from generated_models.schema_documents import read_document
 
 ROOT = Path.cwd()
 OUTPUT = ROOT / "packages/generated-models/src/generated_models"
@@ -23,7 +24,7 @@ OUTPUT = ROOT / "packages/generated-models/src/generated_models"
 def render(filenames: tuple[str, ...], *, dependency: bool = False, overrides: dict[str, str] | None = None) -> str:
     # Inline local references so generation never fetches a schema over the network.
     definitions: JsonObject = {}
-    documents = {path.name: json_object(decode_json(path.read_text())) for path in (ROOT / "schemas").glob("*.schema.json")}
+    documents = {path.name: read_document(path) for path in (ROOT / "schemas").glob("*.schema.yaml")}
 
     def inline(value: JsonValue, filename: str) -> JsonValue:
         if isinstance(value, list):
@@ -42,7 +43,7 @@ def render(filenames: tuple[str, ...], *, dependency: bool = False, overrides: d
             target, _, pointer = json_string(value["$ref"]).partition("#")
             target = target.rsplit("/", 1)[-1] if target else filename
             name = pointer.rsplit("/", 1)[-1] if pointer else "root"
-            key = target.removesuffix(".schema.json").replace("-", "_") + "_" + name
+            key = target.removesuffix(".schema.yaml").replace("-", "_") + "_" + name
             result["$ref"] = f"#/$defs/{key}"
             if key not in definitions:
                 definitions[key] = {}  # Break recursive references.
@@ -57,7 +58,7 @@ def render(filenames: tuple[str, ...], *, dependency: bool = False, overrides: d
         for name, definition in json_object(documents[filename]["$defs"]).items():
             if dependency and name != "dependency":
                 continue
-            key = filename.removesuffix(".schema.json").replace("-", "_") + "_" + name
+            key = filename.removesuffix(".schema.yaml").replace("-", "_") + "_" + name
             definitions[key] = inline(definition, filename)
     bundle: JsonObject = {"type": "object", "$defs": definitions}
     result = generate(
@@ -95,9 +96,9 @@ def render_loading(outputs: dict[Path, str]) -> str:
     contexts = []
     hooks: list[str] = []
     helpers: list[str] = []
-    filenames = sorted((ROOT / "schemas").glob("*.schema.json"))
+    filenames = sorted((ROOT / "schemas").glob("*.schema.yaml"))
     for path in filenames:
-        document = json_object(decode_json(path.read_text()))
+        document = read_document(path)
         for name, value in json_object(document.get("$defs", {})).items():
             definition = json_object(value)
             title = definition.get("title")
@@ -105,7 +106,7 @@ def render_loading(outputs: dict[Path, str]) -> str:
                 continue
             module = models[title]
             imports.setdefault(module, []).append(title)
-            bindings.append(f"    {title}: ({path.name.removesuffix('.schema.json')!r}, {name!r}),")
+            bindings.append(f"    {title}: ({path.name.removesuffix('.schema.yaml')!r}, {name!r}),")
             if context := definition.get("x-python-error-context"):
                 context = json_object(context)
                 contexts.append(f"    {title}: ({json_string(context['label'])!r}, {json_string(context['field'])!r}),")
@@ -119,7 +120,7 @@ def render_loading(outputs: dict[Path, str]) -> str:
               .replace("__SCHEMA_BINDINGS__", "SCHEMAS: dict[type[object], tuple[str, str]] = {\n"
                         + "\n".join(bindings) + "\n}\nCONTEXTS: dict[type[object], tuple[str, str]] = {\n"
                         + "\n".join(contexts) + "\n}\nSCHEMA_FILES = "
-                       + repr(tuple(path.name.removesuffix(".schema.json") for path in filenames)))
+                        + repr(tuple(path.name.removesuffix(".schema.yaml") for path in filenames)))
               .replace("__MODEL_HELPERS__", "\n".join(helpers))
               .replace("__CONVERTER_HOOKS__", "\n".join(hooks)))
     return black.format_str(source, mode=black.Mode(target_versions={TargetVersion.PY312}))
@@ -188,11 +189,11 @@ def main() -> None:
     args = parser.parse_args()
     outputs = {
         OUTPUT / "metadata.py": render(
-            ("mod-metadata.schema.json", "dll-metadata.schema.json", "pak-manifest.schema.json"),
+            ("mod-metadata.schema.yaml", "dll-metadata.schema.yaml", "pak-manifest.schema.yaml"),
             overrides={name: "generated_models.dependencies.Dependency"
                        for name in ("Dependency", "CommonDependency", "CommonPluginDependency")}),
-        OUTPUT / "requests.py": render(("request.schema.json",)),
-        OUTPUT / "dependencies.py": render(("mod-metadata.schema.json",), dependency=True),
+        OUTPUT / "requests.py": render(("request.schema.yaml",)),
+        OUTPUT / "dependencies.py": render(("mod-metadata.schema.yaml",), dependency=True),
     }
     outputs[OUTPUT / "loading.py"] = render_loading(outputs)
     outputs[OUTPUT / "json_types.py"] = black.format_str(

@@ -28,9 +28,11 @@ dev = [
     "code-gen==1.0.0",
     "hatchling>=1.33.0",
     "mypy>=1.19.1",
+    "openapi-spec-validator>=0.8,<0.9",
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "types-jsonschema>=4.26.0.20261006",
+    "types-pyyaml>=6.0.12",
 ]
 
 [tool.uv.workspace]

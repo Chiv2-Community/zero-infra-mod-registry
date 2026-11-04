@@ -1,0 +1,214 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/main/schemas/dll-metadata.schema.yaml
+$ref: '#/$defs/pluginInfo'
+$defs:
+  target:
+    title: PluginTarget
+    description: Execution side of a DLL plugin, as server, client, or shared.
+    type: string
+    enum:
+    - server
+    - client
+    - shared
+  pluginInfo:
+    title: PluginInfo
+    description: Descriptive metadata and dependencies of a DLL plugin.
+    type: object
+    required:
+    - name
+    - description
+    - authors
+    additionalProperties: false
+    x-python-omit-none: true
+    properties:
+      name:
+        description: Display name of the DLL plugin.
+        $ref: common.schema.yaml#/$defs/text
+      description:
+        description: Description of the DLL plugin.
+        $ref: common.schema.yaml#/$defs/text
+      authors:
+        description: Names of the DLL plugin's authors.
+        type: array
+        minItems: 1
+        items:
+          $ref: common.schema.yaml#/$defs/text
+      plugin_dependencies:
+        description: DLL plugins required by this plugin, with version requirements.
+        $ref: common.schema.yaml#/$defs/pluginDependencies
+        default: []
+      icon_url:
+        description: URL of the plugin icon.
+        anyOf:
+        - $ref: common.schema.yaml#/$defs/mediaUrl
+        - type: 'null'
+        default: null
+      image_urls:
+        description: URLs of plugin screenshots or other images.
+        type: array
+        items:
+          $ref: common.schema.yaml#/$defs/mediaUrl
+        default: []
+        x-python-omit-empty: true
+      mod_dependencies:
+        description: Pak packages required by this plugin, with version requirements.
+        $ref: common.schema.yaml#/$defs/dependencies
+        default: []
+      repo_url:
+        description: GitHub repository URL of the DLL plugin package.
+        type:
+        - string
+        - 'null'
+        default: null
+      target:
+        description: Execution side of the DLL plugin, as server, client, or shared.
+        $ref: '#/$defs/target'
+        default: shared
+      $schema:
+        description: URI of the schema describing this metadata document.
+        type: string
+        x-python-name: field_schema
+  pluginRelease:
+    title: PluginRelease
+    description: Registered DLL release with metadata and download details.
+    type: object
+    required:
+    - tag
+    - hash
+    - dll_file_name
+    - download_url
+    - size
+    - release_date
+    - info
+    - release_notes_markdown
+    additionalProperties: false
+    properties:
+      tag:
+        description: Exact GitHub release tag.
+        type: string
+      hash:
+        description: SHA-256 checksum of the DLL file.
+        type: string
+      download_url:
+        description: Download URL of the DLL release asset.
+        type: string
+      size:
+        description: DLL file size in bytes.
+        type: integer
+      dll_file_name:
+        description: Filename of the DLL asset in the release.
+        type:
+        - string
+        - 'null'
+      release_date:
+        description: Release publication timestamp.
+        type:
+        - string
+        - 'null'
+        x-python-datetime: true
+      info:
+        description: Plugin metadata for this release.
+        $ref: '#/$defs/pluginInfo'
+      release_notes_markdown:
+        description: Release notes in Markdown.
+        type:
+        - string
+        - 'null'
+  pluginPackage:
+    title: PluginPackage
+    description: DLL package metadata and registered releases.
+    type: object
+    required:
+    - latest_release_info
+    - releases
+    additionalProperties: false
+    properties:
+      latest_release_info:
+        description: Plugin metadata from the most recently published registered release.
+        $ref: '#/$defs/pluginInfo'
+      releases:
+        description: Registered releases of the DLL package.
+        type: array
+        minItems: 1
+        items:
+          $ref: '#/$defs/pluginRelease'
+  dllRelease:
+    title: DllRelease
+    description: DLL release with repository identity, version and download details.
+    type: object
+    required:
+    - organization
+    - name
+    - version
+    - download_url
+    - sha256
+    - size
+    properties:
+      organization:
+        description: GitHub account or organization that owns the plugin repository.
+        type: string
+        pattern: ^[A-Za-z0-9_-]+(?![\s\S])
+      name:
+        description: Name of the plugin's GitHub repository.
+        type: string
+        pattern: ^[A-Za-z0-9_-]+(?![\s\S])
+      version:
+        description: Semantic version of the DLL release.
+        type: string
+      download_url:
+        description: Download URL of the DLL release asset.
+        allOf:
+        - $ref: common.schema.yaml#/$defs/mediaUrl
+        pattern: ^https://[^/?#]+/[^?#]*\.[dD][lL][lL](?:\?[^#]*)?(?![\s\S])
+      sha256:
+        description: SHA-256 checksum of the DLL file.
+        type: string
+        pattern: ^[a-f0-9]{64}(?![\s\S])
+      size:
+        description: DLL file size in bytes.
+        type: integer
+        minimum: 1
+      info:
+        description: Plugin metadata for this release.
+        anyOf:
+        - $ref: '#/$defs/pluginInfo'
+        - type: 'null'
+        default: null
+      tag:
+        description: Exact GitHub release tag.
+        type:
+        - string
+        - 'null'
+        default: null
+      release_date:
+        description: Release publication timestamp.
+        type:
+        - string
+        - 'null'
+        default: null
+        x-python-datetime: true
+      release_notes_markdown:
+        description: Release notes in Markdown.
+        type:
+        - string
+        - 'null'
+        default: null
+      dll_file_name:
+        description: Filename of the DLL asset in the release.
+        type:
+        - string
+        - 'null'
+        pattern: ^[^/\\]*\.[dD][lL][lL](?![\s\S])
+        default: null
+  plugin:
+    title: Plugin
+    description: DLL plugin releases with repository identities and versions.
+    type: object
+    required:
+    - releases
+    properties:
+      releases:
+        description: DLL releases with repository identities and versions.
+        type: array
+        items:
+          $ref: '#/$defs/dllRelease'

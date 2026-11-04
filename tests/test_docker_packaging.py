@@ -40,7 +40,7 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
     with ZipFile(models_wheel) as archive:
         assert "generated_models/json_types.py" in archive.namelist()
         for kind in ("common", "mod", "plugin", "request"):
-            assert f"generated_models/schemas/{kind}.schema.json" in archive.namelist()
+            assert f"generated_models/schemas/{kind}.schema.yaml" in archive.namelist()
         archive.extractall(installed)
     with ZipFile(core_wheel) as archive:
         assert "mod_registry_registration_core/json_types.py" not in archive.namelist()

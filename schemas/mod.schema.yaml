@@ -1,0 +1,58 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/main/schemas/mod.schema.yaml
+title: Pak mod metadata (mod.json)
+type: object
+required:
+- name
+- description
+- authors
+if:
+  not:
+    required:
+    - dependencies
+then:
+  required:
+  - mod_dependencies
+properties:
+  $schema:
+    description: URI of the schema describing this metadata document.
+    type: string
+    format: uri
+  repo_url:
+    $ref: common.schema.yaml#/$defs/pakRepository
+    description: GitHub repository URL of the pak package.
+  name:
+    description: Display name of the pak package.
+    type: string
+  description:
+    description: Description of the pak package.
+    type: string
+  authors:
+    description: Names of the pak package's authors.
+    type: array
+    items:
+      type: string
+  icon_url:
+    type:
+    - string
+    - 'null'
+    description: URL of the package icon.
+  image_urls:
+    type: array
+    items:
+      type: string
+    default: []
+    description: URLs of package screenshots or other images.
+  mod_dependencies:
+    $ref: common.schema.yaml#/$defs/dependencies
+    default: []
+    description: Pak packages required by this package, with version requirements.
+  plugin_dependencies:
+    $ref: common.schema.yaml#/$defs/pluginDependencies
+    default: []
+    description: DLL plugins required by this package, with version requirements.
+  dependencies:
+    $ref: common.schema.yaml#/$defs/dependencies
+    deprecated: true
+    description: Legacy pak dependency list, combined with mod_dependencies.
+additionalProperties: true

@@ -132,6 +132,8 @@ public repository to request registration. Maintainer approval remains required.
 The uv workspace builds five packages: registry, gateway, registration core, generated models,
 and development-only code generation.
 See [package layout](docs/development.md) and [schema-generated models](docs/models.md).
+The [OpenAPI contract](docs/openapi.md) describes GitHub-hosted registry reads and
+release downloads; no registry server is required.
 
 ```sh
 uv sync --all-groups

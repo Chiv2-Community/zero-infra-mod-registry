@@ -1,0 +1,174 @@
+openapi: 3.1.0
+info:
+  title: GitHub-backed mod registry
+  version: '1.1'
+  description: Pak and DLL package metadata hosted in GitHub repositories, with publisher release assets.
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+servers:
+- url: https://raw.githubusercontent.com/{registryOwner}/{registryRepository}/{revision}
+  description: Registry metadata repository at a branch, tag or commit.
+  variables:
+    registryOwner:
+      default: Chiv2-Community
+      description: GitHub owner of the registry repository.
+    registryRepository:
+      default: C2ModRegistry
+      description: Name of the registry repository.
+    revision:
+      default: refs/heads/main
+      description: Registry revision as refs/heads/<branch>, refs/tags/<tag>, or a full commit SHA.
+security: []
+paths:
+  /package_db/mod_list_index.txt:
+    get:
+      operationId: listPakPackages
+      summary: Registered pak repository identifiers
+      description: Newline-delimited owner/repository identifiers for registered pak packages.
+      responses:
+        '200':
+          $ref: '#/components/responses/PackageList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /package_db/packages/{owner}/{repository}.json:
+    parameters:
+    - $ref: '#/components/parameters/Owner'
+    - $ref: '#/components/parameters/Repository'
+    get:
+      operationId: getPakPackage
+      summary: Pak package metadata and releases
+      description: Package metadata and registered releases, including tags, checksums, filenames and asset manifests.
+      responses:
+        '200':
+          description: Pak package JSON document.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PakPackage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /dll_db/plugin_list_index.txt:
+    get:
+      operationId: listPluginPackages
+      summary: Registered DLL repository identifiers
+      description: Newline-delimited owner/repository identifiers for registered DLL packages.
+      responses:
+        '200':
+          $ref: '#/components/responses/PackageList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /dll_db/packages/{owner}/{repository}.json:
+    parameters:
+    - $ref: '#/components/parameters/Owner'
+    - $ref: '#/components/parameters/Repository'
+    get:
+      operationId: getPluginPackage
+      summary: DLL package metadata and releases
+      description: Package metadata and registered releases, including tags, checksums, byte sizes and download URLs.
+      responses:
+        '200':
+          description: DLL package JSON document.
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/PluginPackage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /{owner}/{repository}/releases/download/{tag}/{asset}:
+    parameters:
+    - $ref: '#/components/parameters/Owner'
+    - $ref: '#/components/parameters/Repository'
+    - name: tag
+      in: path
+      required: true
+      description: Exact release tag, including any version prefix and prerelease suffix.
+      schema:
+        type: string
+      example: v1.0.0-RC3
+    - name: asset
+      in: path
+      required: true
+      description: Case-sensitive filename of the release asset.
+      schema:
+        type: string
+      example: UnchainedPlugin.dll
+    get:
+      operationId: downloadReleaseAsset
+      servers:
+      - url: https://github.com
+        description: GitHub release assets in the publisher's repository.
+      summary: Release asset content
+      description: Binary content of a publisher release asset, available through a GitHub redirect.
+      responses:
+        '200':
+          description: Release asset bytes.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '302':
+          $ref: '#/components/responses/AssetRedirect'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    head:
+      operationId: getReleaseAssetHeaders
+      servers:
+      - url: https://github.com
+        description: GitHub release assets in the publisher's repository.
+      summary: Release asset headers
+      description: HTTP headers for a publisher release asset, available through a GitHub redirect.
+      responses:
+        '200':
+          description: Release asset HTTP headers.
+          headers:
+            Content-Length:
+              description: Release asset size in bytes, when available.
+              schema:
+                type: integer
+                minimum: 0
+        '302':
+          $ref: '#/components/responses/AssetRedirect'
+        '404':
+          description: Repository, release or asset unavailable.
+components:
+  parameters:
+    Owner:
+      name: owner
+      in: path
+      required: true
+      description: GitHub account or organization that owns the package repository.
+      schema:
+        type: string
+      example: Chiv2-Community
+    Repository:
+      name: repository
+      in: path
+      required: true
+      description: Name of the package's GitHub repository.
+      schema:
+        type: string
+      example: UnchainedPlugin
+  responses:
+    PackageList:
+      description: Newline-delimited owner/repository identifiers.
+      content:
+        text/plain:
+          schema:
+            type: string
+          example: |
+            Chiv2-Community/UnchainedPlugin
+    NotFound:
+      description: Requested resource unavailable.
+    AssetRedirect:
+      description: Redirect to the release asset content URL.
+      headers:
+        Location:
+          description: Temporary URL of the release asset content.
+          schema:
+            type: string
+            format: uri
+  schemas:
+    PakPackage:
+      $ref: ./schemas/mod-metadata.schema.yaml#/$defs/mod
+    PluginPackage:
+      $ref: ./schemas/dll-metadata.schema.yaml#/$defs/pluginPackage

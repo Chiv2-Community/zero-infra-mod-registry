@@ -1,0 +1,142 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/main/schemas/mod-metadata.schema.yaml
+$ref: '#/$defs/modInfo'
+$defs:
+  dependency:
+    title: Dependency
+    description: Package dependency and its version requirement.
+    type: object
+    required:
+    - repo_url
+    - version
+    properties:
+      repo_url:
+        description: Repository URL of the dependency.
+        type: string
+      version:
+        description: Required version or version range of the dependency.
+        type: string
+  dependencies:
+    description: Package dependencies and their version requirements.
+    type: array
+    items:
+      $ref: '#/$defs/dependency'
+  modInfo:
+    title: ModInfo
+    description: Descriptive metadata and dependencies of a pak package.
+    type: object
+    required:
+    - repo_url
+    - name
+    - description
+    - authors
+    if:
+      not:
+        required:
+        - dependencies
+    then:
+      required:
+      - mod_dependencies
+    properties:
+      repo_url:
+        description: GitHub repository URL of the pak package.
+        type: string
+      name:
+        description: Display name of the pak package.
+        type: string
+      description:
+        description: Description of the pak package.
+        type: string
+      icon_url:
+        description: URL of the package icon.
+        type:
+        - string
+        - 'null'
+        default: null
+      image_urls:
+        description: URLs of package screenshots or other images.
+        type: array
+        items:
+          type: string
+        default: []
+      authors:
+        description: Names of the pak package's authors.
+        type: array
+        items:
+          type: string
+      mod_dependencies:
+        description: Pak packages required by this package, with version requirements.
+        $ref: '#/$defs/dependencies'
+        default: []
+      plugin_dependencies:
+        description: DLL plugins required by this package, with version requirements.
+        $ref: '#/$defs/dependencies'
+        default: []
+      dependencies:
+        description: Legacy pak dependency list, combined with mod_dependencies.
+        $ref: '#/$defs/dependencies'
+        default: []
+        deprecated: true
+        x-python-merge-into: mod_dependencies
+        x-python-unique-key:
+        - repo_url
+        - version
+        x-python-case-insensitive:
+        - repo_url
+        x-python-serialize-alias: true
+  modRelease:
+    title: Release
+    description: Registered pak release with metadata and an asset manifest.
+    type: object
+    required:
+    - tag
+    - hash
+    - pak_file_name
+    - release_date
+    - info
+    - release_notes_markdown
+    - manifest
+    x-python-error-context:
+      field: tag
+      label: release
+    properties:
+      tag:
+        description: Exact GitHub release tag.
+        type: string
+      hash:
+        description: SHA-512 checksum of the pak file.
+        type: string
+      pak_file_name:
+        description: Filename of the pak asset in the release.
+        type: string
+      release_date:
+        description: Pak asset update timestamp.
+        type: string
+        x-python-datetime: true
+      info:
+        description: Package metadata for this release.
+        $ref: '#/$defs/modInfo'
+      release_notes_markdown:
+        description: Release notes in Markdown.
+        type:
+        - string
+        - 'null'
+      manifest:
+        description: Asset inventory of the pak file.
+        $ref: pak-manifest.schema.yaml#/$defs/manifest
+  mod:
+    title: Mod
+    description: Pak package metadata and registered releases.
+    type: object
+    required:
+    - latest_release_info
+    - releases
+    properties:
+      latest_release_info:
+        description: Package metadata from the release with the latest pak asset update timestamp.
+        $ref: '#/$defs/modInfo'
+      releases:
+        description: Registered releases of the pak package.
+        type: array
+        items:
+          $ref: '#/$defs/modRelease'
