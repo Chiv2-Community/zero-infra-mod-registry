@@ -17,7 +17,7 @@ Registry indexes and package files use the raw GitHub metadata server. Publisher
 
 ## Evidence and options
 
-- The [draft spec](../openapi.json), [explanation](../docs/openapi.md), and [tests](../tests/test_openapi.py) show the uncommitted design. Launcher references in the explanation pin source to `5bd94fcdb33035e6eb624c71244e70c17b68a1a9`.
+- The draft spec `../openapi.json`, [explanation](../docs/openapi.md), and [tests](../tests/test_openapi.py) show the uncommitted design. Launcher references in the explanation pin source to `5bd94fcdb33035e6eb624c71244e70c17b68a1a9`.
 - The source transcript reports `text/plain` responses to two live GitHub HEAD requests and a pinned C2ModRegistry snapshot at `1d3c56e3cbc85e7406b5a361831e1da3ad8f2da0`. Tests cover 19 pak and one DLL package, offline schema resolution, and publisher GET/HEAD server selection.
 - The initial full suite reported 414 passed and four skipped before the final server clarification; after it, focused OpenAPI/type-contract tests reported seven passed and mypy passed. This review did not rerun those checks.
 - A path-level publisher server override was implemented first; operation-level overrides were chosen for clarity after the user's concern. A fabricated registry server, copied schemas, and using resolved DLL models as stored wire schemas would conflict with the stated contract; no evidence establishes a formal comparison of those alternatives.
@@ -33,3 +33,7 @@ The tests preserve OpenAPI components at their reference URI and embed full sche
 Before this worktree was created, the user authorized merging [PR #9](https://github.com/Chiv2-Community/zero-infra-mod-registry/pull/9) and publishing `v1.1` while moving `v1`. The source transcript records merge commit `6af239ad50ef20c4f4106b2e47ca2bf9341ec6f8`, reviewed PR head `64609a4908522a580a4085abac98f3a25d262a2a`, and remote verification that both annotated tags peeled to the merge. Local Git confirms both tags point there. Image publication was still running in the transcript; its final result is unknown here.
 
 No approval, commit, PR, or release of the OpenAPI proposal is established. Reconsider scope and server representation if launcher discovery changes, a registry HTTP service is introduced, or OpenAPI consumers cannot resolve the external schemas. The compacted conversation may omit earlier rationale and alternatives.
+
+## Subsequent developments (2026-11-04)
+
+The draft spec's `openapi.json` filename in Evidence is superseded by the uncommitted YAML conversion; the original draft is no longer present at that path. See [YAML schema and OpenAPI sources](2026-11-04-yaml-schema-sources.md). The routing proposal remains proposed.
