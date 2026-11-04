@@ -21,7 +21,8 @@ of `registryOwner` and `registryRepository`.
 4. For paks, construct
    `{release.info.repo_url}/releases/download/{release.tag}/{release.pak_file_name}`.
    For DLLs, follow the stored `download_url`.
-5. Follow GitHub redirects and verify final size and SHA-256 before using the file.
+5. Follow GitHub redirects and verify the downloaded file's checksum
+   (SHA-512 for paks, SHA-256 for DLLs). DLL metadata also provides the byte size.
    Encode tags and filenames as path components; preserve exact spelling.
 
 Defaults point to `Chiv2-Community/C2ModRegistry` at `refs/heads/main`. Use a full

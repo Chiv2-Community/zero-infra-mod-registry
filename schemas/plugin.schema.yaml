@@ -9,17 +9,20 @@ required:
 additionalProperties: false
 properties:
   $schema:
+    description: URI of the schema describing this metadata document.
     type: string
     format: uri
   repo_url:
     $ref: common.schema.yaml#/$defs/pluginRepository
-    description: Optional; the registry supplies the source repository URL. If provided, it must match
-      that repository.
+    description: GitHub repository URL of the DLL plugin package.
   name:
+    description: Display name of the DLL plugin.
     $ref: '#/$defs/text'
   description:
+    description: Description of the DLL plugin.
     $ref: '#/$defs/text'
   authors:
+    description: Names of the DLL plugin's authors.
     type: array
     minItems: 1
     items:
@@ -27,31 +30,28 @@ properties:
   target:
     $ref: dll-metadata.schema.yaml#/$defs/target
     default: shared
-    description: 'Execution side for this DLL plugin: server-only, client-only, or shared by both. Omitted
-      values default to shared. This is plugin metadata, not a pak manifest.'
+    description: Execution side of the DLL plugin, as server, client, or shared.
   icon_url:
     anyOf:
     - $ref: '#/$defs/mediaUrl'
     - type: 'null'
-    description: Optional icon URL.
+    description: URL of the plugin icon.
   image_urls:
     type: array
     items:
       $ref: '#/$defs/mediaUrl'
     default: []
-    description: Optional screenshot URLs.
+    description: URLs of plugin screenshots or other images.
   mod_dependencies:
     $ref: common.schema.yaml#/$defs/dependencies
     uniqueItems: true
     default: []
-    description: Required pak mods, validated against package_db. At most one dependency per repository;
-      registry validation checks case-insensitive uniqueness.
+    description: Pak packages required by this plugin, with version requirements.
   plugin_dependencies:
     $ref: common.schema.yaml#/$defs/pluginDependencies
     uniqueItems: true
     default: []
-    description: Required DLL plugins, validated against dll_db. At most one dependency per repository.
-      The launcher requires explicit enablement and loads dependencies first.
+    description: DLL plugins required by this plugin, with version requirements.
 $defs:
   text:
     $ref: common.schema.yaml#/$defs/text

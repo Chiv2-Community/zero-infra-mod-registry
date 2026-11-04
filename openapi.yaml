@@ -2,32 +2,28 @@ openapi: 3.1.0
 info:
   title: GitHub-backed mod registry
   version: '1.1'
-  description: Read-only contract implemented by committed GitHub files and publisher release assets.
-    There is no registry HTTP server. GitHub controls routing, caching, redirects, errors and availability.
-    Registration uses issues and workflows, not POST operations on these paths. JSON schemas describe
-    documents parsed from raw GitHub text responses.
+  description: Pak and DLL package metadata hosted in GitHub repositories, with publisher release assets.
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 servers:
 - url: https://raw.githubusercontent.com/{registryOwner}/{registryRepository}/{revision}
-  description: Registry metadata files only. Release download operations override this server and use
-    the publisher's repository on github.com. Pin a full commit SHA for consistent multi-file reads; branch
-    updates and GitHub caches are not transactional.
+  description: Registry metadata repository at a branch, tag or commit.
   variables:
     registryOwner:
       default: Chiv2-Community
+      description: GitHub owner of the registry repository.
     registryRepository:
       default: C2ModRegistry
+      description: Name of the registry repository.
     revision:
       default: refs/heads/main
-      description: refs/heads/<branch>, refs/tags/<tag>, or full commit SHA.
+      description: Registry revision as refs/heads/<branch>, refs/tags/<tag>, or a full commit SHA.
 security: []
 paths:
   /package_db/mod_list_index.txt:
     get:
       operationId: listPakPackages
-      summary: List registered pak repositories
-      description: Each nonempty line is owner/repository. Accept LF or CRLF and a missing final newline.
-        This is plain text, not a JSON array. Registries without pak registrations may lack this file.
+      summary: Registered pak repository identifiers
+      description: Newline-delimited owner/repository identifiers for registered pak packages.
       responses:
         '200':
           $ref: '#/components/responses/PackageList'
@@ -39,14 +35,11 @@ paths:
     - $ref: '#/components/parameters/Repository'
     get:
       operationId: getPakPackage
-      summary: Read a pak package and its registered releases
-      description: Use the indexed repository spelling. Releases embed scanned manifests, hashes, sizes,
-        exact tags and pak filenames. Construct downloads from release.info.repo_url, release.tag and
-        release.pak_file_name, not normalized versions. Parse the text/plain body as JSON. There is no
-        separate version or manifest route.
+      summary: Pak package metadata and releases
+      description: Package metadata and registered releases, including tags, checksums, filenames and asset manifests.
       responses:
         '200':
-          description: Stored pak package JSON, served as text by GitHub.
+          description: Pak package JSON document.
           content:
             text/plain:
               schema:
@@ -56,10 +49,8 @@ paths:
   /dll_db/plugin_list_index.txt:
     get:
       operationId: listPluginPackages
-      summary: List registered DLL plugin repositories
-      description: Each nonempty line is owner/repository. Accept LF or CRLF and a missing final newline.
-        Registries without DLL registrations may lack this file. The obsolete dll_db/index.json fallback
-        is not part of this contract.
+      summary: Registered DLL repository identifiers
+      description: Newline-delimited owner/repository identifiers for registered DLL packages.
       responses:
         '200':
           $ref: '#/components/responses/PackageList'
@@ -71,15 +62,11 @@ paths:
     - $ref: '#/components/parameters/Repository'
     get:
       operationId: getPluginPackage
-      summary: Read a DLL package and its registered releases
-      description: Use the indexed repository spelling. Stored releases provide tag, hash, size and download_url.
-        Follow download_url rather than assuming every URL matches the GitHub release template. Repository
-        identity comes from the indexed path; resolved organization, name, version and sha256 are not
-        added to this wire format. Parse the text/plain body as JSON. Verify downloaded size and SHA-256
-        before loading a DLL.
+      summary: DLL package metadata and releases
+      description: Package metadata and registered releases, including tags, checksums, byte sizes and download URLs.
       responses:
         '200':
-          description: Stored DLL package JSON, not the resolved DLL runtime model.
+          description: DLL package JSON document.
           content:
             text/plain:
               schema:
@@ -93,14 +80,14 @@ paths:
     - name: tag
       in: path
       required: true
-      description: Exact tag, including v prefix and prerelease suffix. Percent-encode as a path component.
+      description: Exact release tag, including any version prefix and prerelease suffix.
       schema:
         type: string
       example: v1.0.0-RC3
     - name: asset
       in: path
       required: true
-      description: Exact case-sensitive asset filename. Percent-encode as a path component.
+      description: Case-sensitive filename of the release asset.
       schema:
         type: string
       example: UnchainedPlugin.dll
@@ -108,14 +95,12 @@ paths:
       operationId: downloadReleaseAsset
       servers:
       - url: https://github.com
-        description: Publisher repository selected by owner/repository path parameters, not registryOwner/registryRepository.
-      summary: Download a registered pak or DLL from its publisher
-      description: Follow GitHub redirects to asset storage. Do not persist signed URLs or treat redirect
-        bodies as binary content. Verify final bytes against registered size and SHA-256 (pak hash or
-        DLL hash). GitHub controls media types and redirect status codes.
+        description: GitHub release assets in the publisher's repository.
+      summary: Release asset content
+      description: Binary content of a publisher release asset, available through a GitHub redirect.
       responses:
         '200':
-          description: Final binary bytes. Actual media type is controlled by GitHub and the publisher.
+          description: Release asset bytes.
           content:
             application/octet-stream:
               schema:
@@ -129,31 +114,29 @@ paths:
       operationId: getReleaseAssetHeaders
       servers:
       - url: https://github.com
-        description: Publisher repository selected by owner/repository path parameters, not registryOwner/registryRepository.
-      summary: Probe asset headers without downloading the file
-      description: Follow redirects to inspect final headers. Content-Length may be absent; use registered
-        size when needed. HEAD does not verify integrity.
+        description: GitHub release assets in the publisher's repository.
+      summary: Release asset headers
+      description: HTTP headers for a publisher release asset, available through a GitHub redirect.
       responses:
         '200':
-          description: Asset headers, no body.
+          description: Release asset HTTP headers.
           headers:
             Content-Length:
-              description: Size in bytes when supplied by the asset host.
+              description: Release asset size in bytes, when available.
               schema:
                 type: integer
                 minimum: 0
         '302':
           $ref: '#/components/responses/AssetRedirect'
         '404':
-          description: Repository, release or asset not found or inaccessible. No response body for HEAD.
+          description: Repository, release or asset unavailable.
 components:
   parameters:
     Owner:
       name: owner
       in: path
       required: true
-      description: Publisher GitHub owner, not necessarily the registry owner. Use indexed spelling for
-        raw file paths.
+      description: GitHub account or organization that owns the package repository.
       schema:
         type: string
       example: Chiv2-Community
@@ -161,15 +144,13 @@ components:
       name: repository
       in: path
       required: true
-      description: Publisher repository, not the registry repository. Use indexed spelling for raw file
-        paths.
+      description: Name of the package's GitHub repository.
       schema:
         type: string
       example: UnchainedPlugin
   responses:
     PackageList:
-      description: Newline-delimited repository identifiers. An existing empty index may have an empty
-        body.
+      description: Newline-delimited owner/repository identifiers.
       content:
         text/plain:
           schema:
@@ -177,14 +158,12 @@ components:
           example: |
             Chiv2-Community/UnchainedPlugin
     NotFound:
-      description: GitHub cannot find or expose this resource. Error media types and bodies depend on
-        the GitHub host; no registry-specific error envelope exists. Other GitHub errors, including throttling,
-        are possible.
+      description: Requested resource unavailable.
     AssetRedirect:
-      description: Redirect to asset storage; follow Location. Other redirect status codes may occur.
+      description: Redirect to the release asset content URL.
       headers:
         Location:
-          description: Temporary asset URL; do not persist it.
+          description: Temporary URL of the release asset content.
           schema:
             type: string
             format: uri

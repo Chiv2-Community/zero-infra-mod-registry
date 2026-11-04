@@ -4,6 +4,7 @@ $ref: '#/$defs/request'
 $defs:
   request:
     title: RegistrationRequest
+    description: Registration request for a pak or DLL release.
     type: object
     required:
     - action
@@ -12,16 +13,20 @@ $defs:
     x-python-omit-none: true
     properties:
       action:
+        description: Registration action identifying a pak release or DLL release.
         type: string
         enum:
         - add-package-release
         - add-dll-release
       repo_url:
+        description: GitHub repository URL of the release publisher.
         type: string
         pattern: \S
       release_tag:
+        description: Exact GitHub release tag.
         type: string
         pattern: \S
       dll_file:
+        description: Filename of the DLL asset in the release.
         type: string
         pattern: \S

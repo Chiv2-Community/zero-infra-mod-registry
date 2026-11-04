@@ -3,18 +3,21 @@ $id: https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/m
 title: Shared metadata definitions
 $defs:
   text:
+    description: Text containing at least one non-whitespace character.
     type: string
     pattern: \S
   mediaUrl:
     type: string
     format: uri
     pattern: ^https://(?:\[[0-9A-Fa-f:.]+\]|[^:/@?#\s\[\]]+)(?::[0-9]+)?(?:[/?#][^\s]*)?(?![\s\S])
-    description: HTTPS URL with a hostname and no embedded credentials.
+    description: HTTPS address of an image or other media resource.
   pakRepository:
+    description: GitHub repository URL of a pak package.
     type: string
     format: uri
     pattern: ^https://github\.com/[A-Za-z0-9_-]+/(?!\.{1,2}$)[A-Za-z0-9_.-]+(?![\s\S])
   pluginRepository:
+    description: GitHub repository URL of a DLL plugin package.
     type: string
     format: uri
     pattern: ^https://github\.com/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+(?![\s\S])
@@ -23,33 +26,39 @@ $defs:
     not:
       pattern: ^v?\^.*,
     pattern: ^(?:v?\^|v?(?:>=|<=|==|!=|>|<)?)[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?(?:,\s*(?:>=|<=|==|!=|>|<)?[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)*$
-    description: Semantic version, caret range, or comma-separated comparisons. Registry validation also
-      parses SemVer and checks matching registered releases. Caret ranges cannot be combined with comparisons.
+    description: Dependency version requirement as a semantic version, caret range, or comma-separated comparisons.
     examples:
     - 1.0.0
     - '>=1.0.0,<2.0.0'
     - ^1.0.0
   dependency:
+    description: Package dependency and its version requirement.
     type: object
     required:
     - repo_url
     - version
     properties:
       repo_url:
+        description: GitHub repository URL of the dependency.
         $ref: '#/$defs/pakRepository'
       version:
+        description: Required version or version range of the dependency.
         $ref: '#/$defs/versionRequirement'
   pluginDependency:
+    description: DLL plugin dependency and its version requirement.
     allOf:
     - $ref: '#/$defs/dependency'
     - properties:
         repo_url:
+          description: GitHub repository URL of the DLL plugin dependency.
           $ref: '#/$defs/pluginRepository'
   dependencies:
+    description: Pak package dependencies and their version requirements.
     type: array
     items:
       $ref: '#/$defs/dependency'
   pluginDependencies:
+    description: DLL plugin dependencies and their version requirements.
     type: array
     items:
       $ref: '#/$defs/pluginDependency'

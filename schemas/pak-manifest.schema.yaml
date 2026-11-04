@@ -4,129 +4,159 @@ $ref: '#/$defs/manifest'
 $defs:
   asset:
     title: BaseAsset
+    description: Pak asset with a content checksum and Unreal class information.
     type: object
     required:
     - path
     - hash
     properties:
       path:
+        description: Asset path within the pak file.
         type: string
       hash:
+        description: Content checksum of the asset.
         type: string
       object_class:
+        description: Unreal class name of the asset.
         type:
         - string
         - 'null'
         default: null
       class_path:
+        description: Unreal class path of the asset.
         type:
         - string
         - 'null'
         default: null
   blueprint:
     title: BlueprintModInfo
+    description: Blueprint mod metadata and loading flags.
     allOf:
     - $ref: '#/$defs/asset'
     properties:
       mod_name:
+        description: Display name declared by the blueprint mod.
         type:
         - string
         - 'null'
         default: null
       version:
+        description: Version declared by the blueprint mod.
         type:
         - string
         - 'null'
         default: null
       author:
+        description: Author declared by the blueprint mod.
         type:
         - string
         - 'null'
         default: null
       mod_description:
+        description: Description declared by the blueprint mod.
         type:
         - string
         - 'null'
         default: null
       mod_repo_url:
+        description: Repository URL declared by the blueprint mod.
         type:
         - string
         - 'null'
         default: null
       silent_load:
+        description: Whether the blueprint requests silent loading.
         type: boolean
         default: false
       show_in_gui:
+        description: Whether the blueprint requests visibility in the mod selection interface.
         type: boolean
         default: false
       enable_by_default:
+        description: Whether the blueprint is enabled by default.
         type: boolean
         default: false
       is_client_side:
+        description: Whether the blueprint is a client-side mod.
         type: boolean
         default: false
       online_only:
+        description: Whether the blueprint is restricted to online play.
         type: boolean
         default: false
       host_only:
+        description: Whether the blueprint is restricted to the game host.
         type: boolean
         default: false
       allow_on_frontend:
+        description: Whether the blueprint can load in the game's frontend menus.
         type: boolean
         default: false
       is_hidden:
+        description: Whether the blueprint is marked as hidden.
         type: boolean
         default: false
   map:
     title: GameMapInfo
+    description: Map asset and its game-mode metadata.
     allOf:
     - $ref: '#/$defs/asset'
     properties:
       game_mode:
+        description: Game-mode class associated with the map.
         type:
         - string
         - 'null'
         default: null
       map_name:
+        description: Display name of the map.
         type:
         - string
         - 'null'
         default: null
       defending_faction:
+        description: Defending faction assigned to the map.
         type:
         - string
         - 'null'
         default: null
       attacking_faction:
+        description: Attacking faction assigned to the map.
         type:
         - string
         - 'null'
         default: null
       game_mode_type:
+        description: Game-mode category of the map.
         type:
         - string
         - 'null'
         default: null
   replacement:
     title: AssetReplacementInfo
+    description: Replacement for an existing game asset.
     allOf:
     - $ref: '#/$defs/asset'
   arbitrary:
     title: ArbitraryAssetInfo
+    description: Additional pak asset with optional mod metadata.
     allOf:
     - $ref: '#/$defs/asset'
     properties:
       mod_name:
+        description: Mod name associated with the asset.
         type:
         - string
         - 'null'
         default: null
   marker:
     title: ModMarkerInfo
+    description: Marker asset grouping related blueprint mods.
     allOf:
     - $ref: '#/$defs/asset'
     properties:
       associated_blueprints:
+        description: Asset paths of blueprints associated with the marker.
         type:
         - array
         - 'null'
@@ -136,49 +166,60 @@ $defs:
         x-python-null-as-default: true
   manifest:
     title: Manifest
+    description: Pak asset inventory grouped by asset category.
     type: object
     properties:
       markers:
+        description: Marker assets grouping related blueprint mods.
         type: array
         items:
           $ref: '#/$defs/marker'
         default: []
       blueprints:
+        description: Blueprint mod assets and their metadata.
         type: array
         items:
           $ref: '#/$defs/blueprint'
         default: []
       maps:
+        description: Map assets and their game-mode metadata.
         type: array
         items:
           $ref: '#/$defs/map'
         default: []
       replacements:
+        description: Replacements for existing game assets.
         type: array
         items:
           $ref: '#/$defs/replacement'
         default: []
       arbitrary:
+        description: Additional pak assets with optional mod metadata.
         type: array
         items:
           $ref: '#/$defs/arbitrary'
         default: []
   inventory:
     title: PakInventory
+    description: Pak file identity, checksum and asset inventory.
     type: object
     required:
     - pak_name
     - pak_path
     properties:
       pak_name:
+        description: Name of the pak file.
         type: string
       pak_path:
+        description: Filesystem path of the pak file.
         type: string
       pak_hash:
+        description: SHA-512 checksum of the pak file.
         type:
         - string
         - 'null'
         default: null
       inventory:
+        description: Asset inventory of the pak file.
         $ref: '#/$defs/manifest'
         default: {}
