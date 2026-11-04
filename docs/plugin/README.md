@@ -1,6 +1,6 @@
 # Plugin integration
 
-1. Add [`plugin.json`](../../schemas/plugin.schema.json) at the repository root.
+1. Add [`plugin.json`](../../schemas/plugin.schema.yaml) at the repository root.
    Include `name`, `description`, `authors`, `plugin_dependencies` and
    `mod_dependencies`. Set `target` to `server`, `client`, or `shared` (default).
 2. Validate metadata before publishing.

@@ -25,7 +25,9 @@ def test_request_schema_is_bundled_from_the_root_source(workspace_wheels: Path) 
     assert not (root / "packages/generated-models/src/generated_models/schemas").exists()
     wheel, = workspace_wheels.glob("generated_models-*.whl")
     with ZipFile(wheel) as archive:
-        for schema in (root / "schemas").glob("*.schema.json"):
+        schemas = list((root / "schemas").glob("*.schema.yaml"))
+        assert len(schemas) == 8
+        for schema in schemas:
             assert archive.read(f"generated_models/schemas/{schema.name}") == schema.read_bytes()
 
 

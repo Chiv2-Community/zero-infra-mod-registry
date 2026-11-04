@@ -1,0 +1,18 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://raw.githubusercontent.com/Chiv2-Community/zero-infra-mod-registry/main/schemas/registry.schema.yaml
+title: Stored registry records
+$defs:
+  modInfo:
+    $ref: mod-metadata.schema.yaml#/$defs/modInfo
+  modRelease:
+    $ref: mod-metadata.schema.yaml#/$defs/modRelease
+  mod:
+    $ref: mod-metadata.schema.yaml#/$defs/mod
+  pluginInfo:
+    $ref: dll-metadata.schema.yaml#/$defs/pluginInfo
+  pluginRelease:
+    $ref: dll-metadata.schema.yaml#/$defs/pluginRelease
+  plugin:
+    $ref: dll-metadata.schema.yaml#/$defs/pluginPackage
+  manifest:
+    $ref: pak-manifest.schema.yaml#/$defs/manifest

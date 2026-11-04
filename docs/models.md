@@ -1,17 +1,19 @@
 # Metadata models
 
-Schemas are the source of truth. Dataclasses, schema bindings, and loading hooks
+YAML schemas are the source of truth; the dialect remains JSON Schema 2020-12.
+Metadata, registry records and issue payloads remain JSON.
+Dataclasses, schema bindings, and loading hooks
 are generated at development time and checked in. Do not edit generated Python.
 
 | Schema | Contract |
 |---|---|
-| `schemas/mod-metadata.schema.json` | Stored mod metadata, dependencies, and releases |
-| `schemas/dll-metadata.schema.json` | Stored DLL metadata, packages, and resolved releases |
-| `schemas/pak-manifest.schema.json` | Scanner inventories and pak assets |
-| `schemas/request.schema.json` | Fenced registration requests in registry issues |
-| `schemas/mod.schema.json` | Mod submission validation |
-| `schemas/plugin.schema.json` | Plugin submission validation |
-| `schemas/registry.schema.json` | References to stored-record contracts |
+| `schemas/mod-metadata.schema.yaml` | Stored mod metadata, dependencies, and releases |
+| `schemas/dll-metadata.schema.yaml` | Stored DLL metadata, packages, and resolved releases |
+| `schemas/pak-manifest.schema.yaml` | Scanner inventories and pak assets |
+| `schemas/request.schema.yaml` | Fenced registration requests in registry issues |
+| `schemas/mod.schema.yaml` | Mod submission validation |
+| `schemas/plugin.schema.yaml` | Plugin submission validation |
+| `schemas/registry.schema.yaml` | References to stored-record contracts |
 
 Run from the repository root after changing schemas or generator options:
 
@@ -27,12 +29,16 @@ formatters make generation reproducible. Runtime installs do not need the genera
 The independent `generated-models` workspace package contains `generated_models.metadata`,
 `generated_models.dependencies`, `generated_models.requests`, `generated_models.json_types`,
 and `generated_models.loading`.
-Runtime dependencies are `jsonschema` and `cattrs`. Consumers import its dataclasses and enums directly. Dependency contracts
+Runtime dependencies are `jsonschema`, `cattrs`, and `PyYAML`. Consumers import its dataclasses and enums directly. Dependency contracts
 share one value type; URL and version constraints remain in the applicable schemas.
 Both applications use the generated loader for issue requests.
 The generated-models build bundles root schemas automatically; consumers do not
 carry separate schema copies. No duplicate schema is checked in.
 Both image builds include the root schemas directory in their build inputs.
+Schemas now use `.schema.yaml` filenames and canonical IDs under `main/schemas/`.
+The earlier JSON schemas remain available at earlier Git tags; update direct
+schema links when adopting this version. Tooling must parse YAML before JSON
+Schema validation; this does not add YAML payload support to the model codec.
 
 Loading validates raw JSON with `jsonschema`, then structures it with `cattrs`.
 `generated_models.loading.load` validates before structuring; `serialize` applies

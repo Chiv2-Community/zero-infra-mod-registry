@@ -19,6 +19,7 @@ from jsonschema.protocols import Validator
 __MODEL_IMPORTS__
 
 from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object
+from generated_models.schema_documents import read_document
 T = TypeVar("T")
 
 __SCHEMA_BINDINGS__
@@ -36,7 +37,7 @@ def schema_validator(kind: str, definition: str | None = None) -> Validator:
     if not schemas.is_dir():
         schemas = Path(__file__).resolve().parents[4] / "schemas"
     documents: JsonObject = {
-        name: json_object(decode_json((schemas / f"{name}.schema.json").read_text()))
+        name: read_document(schemas / f"{name}.schema.yaml")
         for name in SCHEMA_FILES
     }
     reference = str(json_object(documents[kind])["$id"])

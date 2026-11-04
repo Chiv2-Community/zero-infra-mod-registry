@@ -39,6 +39,7 @@ from generated_models.metadata import (
 from generated_models.requests import RegistrationRequest
 
 from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object
+from generated_models.schema_documents import read_document
 
 T = TypeVar("T")
 
@@ -89,8 +90,7 @@ def schema_validator(kind: str, definition: str | None = None) -> Validator:
     if not schemas.is_dir():
         schemas = Path(__file__).resolve().parents[4] / "schemas"
     documents: JsonObject = {
-        name: json_object(decode_json((schemas / f"{name}.schema.json").read_text()))
-        for name in SCHEMA_FILES
+        name: read_document(schemas / f"{name}.schema.yaml") for name in SCHEMA_FILES
     }
     reference = str(json_object(documents[kind])["$id"])
     if definition is not None:

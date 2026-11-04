@@ -1,6 +1,6 @@
 # Mod integration
 
-1. Add [`mod.json`](../../schemas/mod.schema.json) at the repository root. Include
+1. Add [`mod.json`](../../schemas/mod.schema.yaml) at the repository root. Include
    name, description, authors and dependency declarations required by the schema.
 2. Validate metadata before publishing.
 3. Tag a semantic version release and upload the `.pak` asset. A release-asset
