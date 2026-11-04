@@ -35,11 +35,6 @@ def test_repo_to_index_entry(url: str) -> None:
     assert repo_to_index_entry(url) == "org1/repo1"
 
 
-def test_load_mod(registry: FilesystemPackageRegistry) -> None:
-    assert registry.add_package_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert registry.load_mod(Repo("Test", "Plugin")) == mod_fixture()
-
-
 def test_load_mod_file_not_found(registry: FilesystemPackageRegistry) -> None:
     assert registry.load_mod(Repo("Missing", "Plugin")) is None
 

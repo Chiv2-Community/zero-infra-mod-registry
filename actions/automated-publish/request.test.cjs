@@ -78,13 +78,27 @@ test('mod preflight rejects multiple paks even with an explicit selection or unf
   assert.equal(parseRequest(request.body).dll_file, '');
   await assert.rejects(prepareRequest(source({...data, assets: [{...data.assets[0], name: 'Client.PAK'}]}), repository, release.tag_name, {kind: 'mod'}));
 });
-test('direct recovery rejects conflicting or malformed fenced payloads rather than returning the wrong issue', async () => {
-  const request = await prepareRequest(source(release), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'});
-  for (const body of [request.body.replace('add-dll-release', 'add-package-release'), request.body.replace('v1.0.0-RC3"', 'v2.0.0"'), request.body.replace('https://github.com/Chiv2-Community/UnchainedPlugin', 'https://github.com/Other/Plugin'), request.body.replace('UnchainedPlugin.dll', 'Other.dll'), `${request.marker}\n\n\`\`\`json\n{bad}\n\`\`\``]) {
-    const github = {rest: {issues: {listForRepo: 'list', create: async () => {throw new Error('Unexpected duplicate');}}}, paginate: async () => [{body, html_url: 'wrong'}]};
-    await assert.rejects(submitRequest(github, registry, request));
+for (const style of ['modern', 'legacy']) {
+  for (const [scenario, mutate, error] of [
+    ['wrong action', body => body.replace('add-dll-release', 'add-package-release'), /already has a different request/],
+    ['wrong repository', body => body.replace('https://github.com/Chiv2-Community/UnchainedPlugin', 'https://github.com/Other/Plugin'), /already has a different request/],
+    ['wrong tag', body => body.replace('v1.0.0-RC3"', 'v2.0.0"'), /already has a different request/],
+    ['wrong DLL', body => body.replace('UnchainedPlugin.dll', 'Other.dll'), /already has a different request/],
+    ['malformed JSON', body => body.replace(/\{[\s\S]*\}/, '{bad}'), SyntaxError],
+  ]) {
+    test(`${style} recovery rejects ${scenario} without creating an issue`, async () => {
+      const request = await prepareRequest(source(release), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'});
+      const body = mutate(style === 'legacy' ? request.body.replace(request.marker, request.legacyMarker) : request.body);
+      let creates = 0;
+      const github = {rest: {issues: {listForRepo: 'list', create: async () => {
+        creates++;
+        return {data: {html_url: 'unexpected'}};
+      }}}, paginate: async () => [{body, html_url: 'wrong'}]};
+      await assert.rejects(submitRequest(github, registry, request), error);
+      assert.equal(creates, 0);
+    });
   }
-});
+}
 test('reruns reuse open and closed issues but never pull requests', async () => {
   const request = await prepare(release);
   for (const state of ['open', 'closed']) {
@@ -136,14 +150,5 @@ test('mixed DLL and single PAK release creates two independent requests in eithe
       assert.equal(parseRequest(issues.find(issue => parseRequest(issue.body).action === 'add-dll-release').body).dll_file, 'UnchainedPlugin.dll');
       assert.equal(parseRequest(issues.find(issue => parseRequest(issue.body).action === 'add-package-release').body).dll_file, '');
     }
-  }
-});
-
-test('legacy recovery still rejects malformed and conflicting identity and DLL selection', async () => {
-  const request = await prepareRequest(source(release), repository, release.tag_name, {kind: 'plugin', asset: 'UnchainedPlugin.dll'});
-  const legacy = request.body.replace(request.marker, request.legacyMarker);
-  for (const body of [legacy.replace('UnchainedPlugin.dll', 'Other.dll'), legacy.replace('v1.0.0-RC3"', 'v2.0.0"'), legacy.replace('https://github.com/Chiv2-Community/UnchainedPlugin', 'https://github.com/Other/Plugin'), legacy.replace('add-dll-release', 'add-package-release'), `${request.legacyMarker}\n\n\`\`\`json\n{bad}\n\`\`\``]) {
-    const github = {rest: {issues: {listForRepo: 'list'}}, paginate: async () => [{body, html_url: 'wrong'}]};
-    await assert.rejects(submitRequest(github, registry, request));
   }
 });
