@@ -69,7 +69,12 @@ def test_gateway_image_inputs_bundle_the_request_schema(tmp_path: Path) -> None:
     result = subprocess.run(["uv", "sync", "--frozen", "--no-dev", "--no-editable", "--package", "automated-registry-gateway"],
                             cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    script = "from mod_registry_core.registration import load_registration_request; assert load_registration_request({'action':'add-package-release','repo_url':'https://github.com/Test/Pak','release_tag':'v1.0.0'}).release_tag == 'v1.0.0'"
+    script = """
+import json
+from mod_registry_core.issue_requests import parse_registration_payload, registration_payload
+request = registration_payload('mod', 'Test/Pak', 'v1.0.0', 'Pak.pak')
+assert parse_registration_payload('```json\\n' + json.dumps(request) + '\\n```') == request
+"""
     result = subprocess.run([str(context / ".venv/bin/python"), "-I", "-c", script],
                             cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -102,8 +107,11 @@ assert find_spec(sys.argv[1]) is not None
 assert find_spec(sys.argv[2]) is None
 from generated_models.json_types import decode_json, json_object
 assert json_object(decode_json('{"name":"example"}')) == {'name': 'example'}
-from mod_registry_core.registration import load_registration_request
-assert load_registration_request({'action': 'add-package-release', 'repo_url': 'https://github.com/Test/Pak', 'release_tag': 'v1.0.0'}).release_tag == 'v1.0.0'
+from mod_registry_core.issue_requests import registration_payload
+from mod_registry_core.release_assets import selected_dll_name, single_pak_name
+assert registration_payload('mod', 'Test/Pak', 'v1.0.0', 'Pak.pak')['release_tag'] == 'v1.0.0'
+assert selected_dll_name(['Plugin.dll']) == 'Plugin.dll'
+assert single_pak_name(['Pak.pak'], 'v1.0.0') == 'Pak.pak'
 if sys.argv[1] == 'automated_registry_gateway':
     from automated_registry_gateway.server import main
 else:

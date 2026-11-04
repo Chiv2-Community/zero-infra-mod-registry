@@ -803,14 +803,10 @@ version = "1.0.0"
 source = { editable = "packages/mod-registry-core" }
 dependencies = [
     { name = "generated-models" },
-    { name = "jsonschema" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "generated-models", editable = "packages/generated-models" },
-    { name = "jsonschema", specifier = ">=4.26.0" },
-]
+requires-dist = [{ name = "generated-models", editable = "packages/generated-models" }]
 
 [[package]]
 name = "more-itertools"

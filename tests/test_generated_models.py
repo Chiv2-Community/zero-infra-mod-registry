@@ -7,7 +7,6 @@ import sys
 import pytest
 
 from generated_models.requests import Action, RegistrationRequest
-from mod_registry_core.registration import load_registration_request
 from generated_models.json_types import JsonObject, JsonValue
 from generated_models.metadata import Mod
 from generated_models.loading import JsonCodec, dumps, loads, load as load_generated, serialize as serialize_generated
@@ -32,7 +31,7 @@ def test_invalid_timestamp_keeps_release_context(loader: Callable[[JsonValue, ty
 
 
 def test_issue_request_structures_the_action_enum() -> None:
-    request = load_registration_request({"action": "add-dll-release", "repo_url": "https://github.com/Test/Plugin", "release_tag": "v1.0.0"})
+    request = load_generated({"action": "add-dll-release", "repo_url": "https://github.com/Test/Plugin", "release_tag": "v1.0.0"}, RegistrationRequest)
     assert request.action is Action.ADD_DLL_RELEASE
     assert request.dll_file is None
 

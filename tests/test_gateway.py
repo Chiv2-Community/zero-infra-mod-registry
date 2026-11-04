@@ -22,7 +22,7 @@ from automated_registry_gateway.oidc import ISSUER, JWKS_URL, Verifier, base64ur
 from automated_registry_gateway.server import GatewayServer
 from automated_registry_gateway.service import Service
 from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object
-from mod_registry_core.registration import parse_registration_payload
+from mod_registry_core.issue_requests import parse_registration_payload
 
 NOW = 1800000000
 REPO = "Publisher/Plugin"
@@ -484,7 +484,6 @@ def test_gateway_rejects_ambiguous_paks_before_issue_creation(harness: Harness, 
 def test_gateway_preserves_single_pak_wire_contract(harness: Harness, asset: str) -> None:
     harness.transport.release["assets"] = [{"name": "Client.pak", "state": "uploaded", "size": 123}]
     harness.service.register(harness.token(), {"kind": "mod", "release_tag": TAG, "asset_name": asset})
-    from mod_registry_core.registration import parse_registration_payload
     assert parse_registration_payload(str(harness.transport.issues[0]["body"])) == {
         "action": "add-package-release", "repo_url": f"https://github.com/{REPO}", "release_tag": TAG,
     }
@@ -567,7 +566,6 @@ def test_http_registration_and_health(harness: Harness) -> None:
 @pytest.mark.parametrize("first_kind", ["plugin", "mod"])
 @pytest.mark.parametrize("legacy", [False, True])
 def test_mixed_release_dual_registration_restart_and_recovery(harness: Harness, first_kind: str, legacy: bool) -> None:
-    from mod_registry_core.registration import parse_registration_payload
     harness.transport.release["assets"] = [
         {"name": name, "state": "uploaded", "size": 123} for name in ("Plugin.dll", "Other.dll", "Mod.pak")
     ]

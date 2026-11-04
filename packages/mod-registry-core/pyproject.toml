@@ -1,9 +1,9 @@
 [project]
 name = "mod-registry-core"
 version = "1.0.0"
-description = "Shared typed JSON utilities"
+description = "Shared registration issue transport and release-asset policy"
 requires-python = ">=3.12"
-dependencies = ["jsonschema>=4.26.0", "generated-models==1.0.0"]
+dependencies = ["generated-models==1.0.0"]
 
 [tool.uv.sources]
 generated-models = { workspace = true }
