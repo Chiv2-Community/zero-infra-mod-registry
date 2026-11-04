@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import override
 
-from mod_registry_core.json_types import JsonObject, json_array
+from generated_models.json_types import JsonObject, json_array
 from generated_models.dependencies import Dependency
 from generated_models.loading import merge_modinfo_dependencies
 

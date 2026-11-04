@@ -7,7 +7,7 @@ import tarfile
 
 import pytest
 
-from mod_registry_core.json_types import decode_json
+from generated_models.json_types import decode_json
 from zero_infra_mod_registry.main import main
 from generated_models.metadata import Mod, Plugin
 from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict

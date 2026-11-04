@@ -4,13 +4,15 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import TypeAlias, TypeVar, cast
+from typing import TypeVar, cast
 
 from cattrs import Converter
+from cattrs.gen import make_dict_structure_fn, make_dict_unstructure_fn
 from jsonschema import Draft202012Validator, FormatChecker
 from jsonschema.exceptions import ValidationError
 from jsonschema.protocols import Validator
@@ -36,10 +38,8 @@ from generated_models.metadata import (
 )
 from generated_models.requests import RegistrationRequest
 
-JsonValue: TypeAlias = (
-    str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
-)
-JsonObject: TypeAlias = dict[str, JsonValue]
+from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object
+
 T = TypeVar("T")
 
 SCHEMAS: dict[type[object], tuple[str, str]] = {
@@ -62,6 +62,9 @@ SCHEMAS: dict[type[object], tuple[str, str]] = {
     PakInventory: ("pak-manifest", "inventory"),
     RegistrationRequest: ("request", "request"),
 }
+CONTEXTS: dict[type[object], tuple[str, str]] = {
+    Release: ("release", "tag"),
+}
 SCHEMA_FILES = (
     "common",
     "dll-metadata",
@@ -76,12 +79,6 @@ SCHEMA_FILES = (
 _VALIDATORS: dict[tuple[str, str | None], Validator] = {}
 
 
-def _object(value: JsonValue) -> JsonObject:
-    if not isinstance(value, dict):
-        raise ValueError("Expected a JSON object")
-    return value
-
-
 def schema_validator(kind: str, definition: str | None = None) -> Validator:
     if kind not in SCHEMA_FILES:
         raise ValueError("Unknown metadata schema")
@@ -92,12 +89,10 @@ def schema_validator(kind: str, definition: str | None = None) -> Validator:
     if not schemas.is_dir():
         schemas = Path(__file__).resolve().parents[4] / "schemas"
     documents: JsonObject = {
-        name: _object(
-            cast(JsonValue, json.loads((schemas / f"{name}.schema.json").read_text()))
-        )
+        name: json_object(decode_json((schemas / f"{name}.schema.json").read_text()))
         for name in SCHEMA_FILES
     }
-    reference = str(_object(documents[kind])["$id"])
+    reference = str(json_object(documents[kind])["$id"])
     if definition is not None:
         reference += f"#/$defs/{definition}"
     # Embedded resources resolve references without network retrieval.
@@ -179,105 +174,282 @@ def merge_modinfo_dependencies(
     return list(merged.values())
 
 
-def make_converter() -> Converter:
+@contextmanager
+def _validation_context(source: str | None) -> Iterator[None]:
+    try:
+        yield
+    except (ValueError, KeyError) as error:
+        if source is None:
+            raise
+        raise ValueError(f"{source}: {error}") from error
+
+
+def _is_type(expected: type[object]) -> Callable[[object], bool]:
+    return lambda cls: cls is expected
+
+
+def _is_model(cls: object) -> bool:
+    return any(cls is model for model in SCHEMAS)
+
+
+def make_converter(
+    *,
+    validators: Mapping[type[object], Callable[[object], None]] | None = None,
+    serializers: Mapping[type[object], Callable[[object], JsonObject]] | None = None,
+) -> Converter:
+    validators = {} if validators is None else validators
+    serializers = {} if serializers is None else serializers
     converter = Converter(detailed_validation=False)
     converter.register_structure_hook(datetime, _datetime)
     converter.register_unstructure_hook(datetime, _datetime_string)
-    raw_plugininfo = cast(
-        Callable[[JsonValue, type[PluginInfo]], PluginInfo],
-        converter.get_structure_hook(PluginInfo),
-    )
-    raw_unstructure_plugininfo = cast(
-        Callable[[PluginInfo], JsonObject], converter.get_unstructure_hook(PluginInfo)
-    )
 
-    def structure_plugininfo(value: JsonValue, _: type[PluginInfo]) -> PluginInfo:
-        data = dict(_object(value))
-        if "$schema" in data:
-            data["field_schema"] = data.pop("$schema")
-        result = raw_plugininfo(data, PluginInfo)
-        return result
+    def wrap_structure(
+        cls: type[T], raw: Callable[[JsonValue, type[T]], T]
+    ) -> Callable[[JsonValue, type[T]], T]:
+        def structure(value: JsonValue, _: type[T]) -> T:
+            context = CONTEXTS.get(cls)
+            source = (
+                f"{context[0]} {json_object(value)[context[1]]}" if context else None
+            )
+            with _validation_context(source):
+                result = raw(value, cls)
+                if validator := validators.get(cls):
+                    validator(result)
+                return result
 
-    def unstructure_plugininfo(value: PluginInfo) -> JsonObject:
-        data = raw_unstructure_plugininfo(value)
-        data["$schema"] = data.pop("field_schema")
-        data = {name: item for name, item in data.items() if item is not None}
-        if not data.get("image_urls"):
-            data.pop("image_urls", None)
-        return data
+        return structure
 
-    converter.register_structure_hook(PluginInfo, structure_plugininfo)
-    converter.register_unstructure_hook(PluginInfo, unstructure_plugininfo)
-    raw_modinfo = cast(
-        Callable[[JsonValue, type[ModInfo]], ModInfo],
-        converter.get_structure_hook(ModInfo),
-    )
-    raw_unstructure_modinfo = cast(
-        Callable[[ModInfo], JsonObject], converter.get_unstructure_hook(ModInfo)
-    )
+    def wrap_unstructure(
+        cls: type[T], raw: Callable[[T], JsonObject]
+    ) -> Callable[[T], JsonObject]:
+        def unstructure(value: T) -> JsonObject:
+            if serializer := serializers.get(cls):
+                return serializer(value)
+            return raw(value)
 
-    def structure_modinfo(value: JsonValue, _: type[ModInfo]) -> ModInfo:
-        data = dict(_object(value))
-        result = raw_modinfo(data, ModInfo)
-        result = replace(
-            result,
-            mod_dependencies=merge_modinfo_dependencies(
-                result.mod_dependencies, result.dependencies
-            ),
-            dependencies=[],
+        return unstructure
+
+    def structure_factory(cls: type[T]) -> Callable[[JsonValue, type[T]], T]:
+        raw = cast(
+            Callable[[JsonValue, type[T]], T], make_dict_structure_fn(cls, converter)
         )
-        return result
+        return wrap_structure(cls, raw)
 
-    def unstructure_modinfo(value: ModInfo) -> JsonObject:
-        value = replace(
-            value,
-            mod_dependencies=merge_modinfo_dependencies(
-                value.mod_dependencies, value.dependencies
-            ),
-            dependencies=[],
+    def unstructure_factory(cls: type[T]) -> Callable[[T], JsonObject]:
+        raw = cast(Callable[[T], JsonObject], make_dict_unstructure_fn(cls, converter))
+        return wrap_unstructure(cls, raw)
+
+    converter.register_structure_hook_factory(_is_model, structure_factory)
+    converter.register_unstructure_hook_factory(_is_model, unstructure_factory)
+
+    def structure_factory_plugininfo(
+        cls: type[PluginInfo],
+    ) -> Callable[[JsonValue, type[PluginInfo]], PluginInfo]:
+        raw = cast(
+            Callable[[JsonValue, type[PluginInfo]], PluginInfo],
+            make_dict_structure_fn(cls, converter),
         )
-        data = raw_unstructure_modinfo(
-            replace(value, dependencies=value.mod_dependencies)
+
+        def structure(value: JsonValue, _: type[PluginInfo]) -> PluginInfo:
+            data = dict(json_object(value))
+            if "$schema" in data:
+                data["field_schema"] = data.pop("$schema")
+            result = raw(data, PluginInfo)
+            return result
+
+        return wrap_structure(cls, structure)
+
+    converter.register_structure_hook_factory(
+        _is_type(PluginInfo), structure_factory_plugininfo
+    )
+
+    def unstructure_factory_plugininfo(
+        cls: type[PluginInfo],
+    ) -> Callable[[PluginInfo], JsonObject]:
+        raw = cast(
+            Callable[[PluginInfo], JsonObject], make_dict_unstructure_fn(cls, converter)
         )
-        return data
 
-    converter.register_structure_hook(ModInfo, structure_modinfo)
-    converter.register_unstructure_hook(ModInfo, unstructure_modinfo)
-    raw_modmarkerinfo = cast(
-        Callable[[JsonValue, type[ModMarkerInfo]], ModMarkerInfo],
-        converter.get_structure_hook(ModMarkerInfo),
+        def unstructure(value: PluginInfo) -> JsonObject:
+            data = raw(value)
+            data["$schema"] = data.pop("field_schema")
+            data = {name: item for name, item in data.items() if item is not None}
+            if not data.get("image_urls"):
+                data.pop("image_urls", None)
+            return data
+
+        return wrap_unstructure(cls, unstructure)
+
+    converter.register_unstructure_hook_factory(
+        _is_type(PluginInfo), unstructure_factory_plugininfo
     )
-    raw_unstructure_modmarkerinfo = cast(
-        Callable[[ModMarkerInfo], JsonObject],
-        converter.get_unstructure_hook(ModMarkerInfo),
+
+    def structure_factory_modinfo(
+        cls: type[ModInfo],
+    ) -> Callable[[JsonValue, type[ModInfo]], ModInfo]:
+        raw = cast(
+            Callable[[JsonValue, type[ModInfo]], ModInfo],
+            make_dict_structure_fn(cls, converter),
+        )
+
+        def structure(value: JsonValue, _: type[ModInfo]) -> ModInfo:
+            data = dict(json_object(value))
+            result = raw(data, ModInfo)
+            result = replace(
+                result,
+                mod_dependencies=merge_modinfo_dependencies(
+                    result.mod_dependencies, result.dependencies
+                ),
+                dependencies=[],
+            )
+            return result
+
+        return wrap_structure(cls, structure)
+
+    converter.register_structure_hook_factory(
+        _is_type(ModInfo), structure_factory_modinfo
     )
 
-    def structure_modmarkerinfo(
-        value: JsonValue, _: type[ModMarkerInfo]
-    ) -> ModMarkerInfo:
-        data = dict(_object(value))
-        if data.get("associated_blueprints") is None:
-            data["associated_blueprints"] = []
-        result = raw_modmarkerinfo(data, ModMarkerInfo)
-        return result
+    def unstructure_factory_modinfo(
+        cls: type[ModInfo],
+    ) -> Callable[[ModInfo], JsonObject]:
+        raw = cast(
+            Callable[[ModInfo], JsonObject], make_dict_unstructure_fn(cls, converter)
+        )
 
-    def unstructure_modmarkerinfo(value: ModMarkerInfo) -> JsonObject:
-        data = raw_unstructure_modmarkerinfo(value)
-        return data
+        def unstructure(value: ModInfo) -> JsonObject:
+            value = replace(
+                value,
+                mod_dependencies=merge_modinfo_dependencies(
+                    value.mod_dependencies, value.dependencies
+                ),
+                dependencies=[],
+            )
+            data = raw(replace(value, dependencies=value.mod_dependencies))
+            return data
 
-    converter.register_structure_hook(ModMarkerInfo, structure_modmarkerinfo)
-    converter.register_unstructure_hook(ModMarkerInfo, unstructure_modmarkerinfo)
+        return wrap_unstructure(cls, unstructure)
+
+    converter.register_unstructure_hook_factory(
+        _is_type(ModInfo), unstructure_factory_modinfo
+    )
+
+    def structure_factory_modmarkerinfo(
+        cls: type[ModMarkerInfo],
+    ) -> Callable[[JsonValue, type[ModMarkerInfo]], ModMarkerInfo]:
+        raw = cast(
+            Callable[[JsonValue, type[ModMarkerInfo]], ModMarkerInfo],
+            make_dict_structure_fn(cls, converter),
+        )
+
+        def structure(value: JsonValue, _: type[ModMarkerInfo]) -> ModMarkerInfo:
+            data = dict(json_object(value))
+            if data.get("associated_blueprints") is None:
+                data["associated_blueprints"] = []
+            result = raw(data, ModMarkerInfo)
+            return result
+
+        return wrap_structure(cls, structure)
+
+    converter.register_structure_hook_factory(
+        _is_type(ModMarkerInfo), structure_factory_modmarkerinfo
+    )
+
+    def unstructure_factory_modmarkerinfo(
+        cls: type[ModMarkerInfo],
+    ) -> Callable[[ModMarkerInfo], JsonObject]:
+        raw = cast(
+            Callable[[ModMarkerInfo], JsonObject],
+            make_dict_unstructure_fn(cls, converter),
+        )
+
+        def unstructure(value: ModMarkerInfo) -> JsonObject:
+            data = raw(value)
+            return data
+
+        return wrap_unstructure(cls, unstructure)
+
+    converter.register_unstructure_hook_factory(
+        _is_type(ModMarkerInfo), unstructure_factory_modmarkerinfo
+    )
+
+    def structure_factory_registrationrequest(
+        cls: type[RegistrationRequest],
+    ) -> Callable[[JsonValue, type[RegistrationRequest]], RegistrationRequest]:
+        raw = cast(
+            Callable[[JsonValue, type[RegistrationRequest]], RegistrationRequest],
+            make_dict_structure_fn(cls, converter),
+        )
+
+        def structure(
+            value: JsonValue, _: type[RegistrationRequest]
+        ) -> RegistrationRequest:
+            data = dict(json_object(value))
+            result = raw(data, RegistrationRequest)
+            return result
+
+        return wrap_structure(cls, structure)
+
+    converter.register_structure_hook_factory(
+        _is_type(RegistrationRequest), structure_factory_registrationrequest
+    )
+
+    def unstructure_factory_registrationrequest(
+        cls: type[RegistrationRequest],
+    ) -> Callable[[RegistrationRequest], JsonObject]:
+        raw = cast(
+            Callable[[RegistrationRequest], JsonObject],
+            make_dict_unstructure_fn(cls, converter),
+        )
+
+        def unstructure(value: RegistrationRequest) -> JsonObject:
+            data = raw(value)
+            data = {name: item for name, item in data.items() if item is not None}
+            return data
+
+        return wrap_unstructure(cls, unstructure)
+
+    converter.register_unstructure_hook_factory(
+        _is_type(RegistrationRequest), unstructure_factory_registrationrequest
+    )
     return converter
 
 
-CONVERTER = make_converter()
+class JsonCodec:
+    """Schema-bound JSON codec with optional consumer-owned semantic checks and adapters."""
+
+    def __init__(self) -> None:
+        self._validators: dict[type[object], Callable[[object], None]] = {}
+        self._serializers: dict[type[object], Callable[[object], JsonObject]] = {}
+        self.converter = make_converter(
+            validators=self._validators, serializers=self._serializers
+        )
+
+    def register_validator(self, cls: type[T], validator: Callable[[T], None]) -> None:
+        self._validators[cls] = cast(Callable[[object], None], validator)
+
+    def register_serializer(
+        self, cls: type[T], serializer: Callable[[T], JsonObject]
+    ) -> None:
+        self._serializers[cls] = cast(Callable[[object], JsonObject], serializer)
+
+    def load(self, value: JsonValue, cls: type[T]) -> T:
+        kind, definition = SCHEMAS[cls]
+        validate_schema(value, kind, definition)
+        return self.converter.structure(value, cls)
+
+    def serialize(self, value: T) -> JsonObject:
+        return json_object(cast(JsonValue, self.converter.unstructure(value)))
+
+    def loads(self, text: str, cls: type[T]) -> T:
+        return self.load(decode_json(text), cls)
+
+    def dumps(self, value: T, *, indent: int | None = None) -> str:
+        return json.dumps(self.serialize(value), indent=indent, allow_nan=False)
 
 
-def load(value: JsonValue, cls: type[T], *, converter: Converter = CONVERTER) -> T:
-    kind, definition = SCHEMAS[cls]
-    validate_schema(value, kind, definition)
-    return converter.structure(value, cls)
-
-
-def serialize(value: T, *, converter: Converter = CONVERTER) -> JsonObject:
-    return _object(cast(JsonValue, converter.unstructure(value)))
+CODEC = JsonCodec()
+load = CODEC.load
+serialize = CODEC.serialize
+loads = CODEC.loads
+dumps = CODEC.dumps

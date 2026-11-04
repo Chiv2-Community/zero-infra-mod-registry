@@ -18,7 +18,6 @@ dependencies = [
     "jsonschema[format-nongpl]>=4.26.0",
     "mod-registry-core==1.0.0",
     "generated-models==1.0.0",
-    "cattrs>=26.2.1",
 ]
 [project.scripts]
 zero-infra-mod-registry = "zero_infra_mod_registry.main:main"

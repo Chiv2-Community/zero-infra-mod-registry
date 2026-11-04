@@ -14,7 +14,7 @@ import time
 from automated_registry_gateway.github import GithubApp
 from automated_registry_gateway.models import Config, GatewayError, Identity, Issue, Registration
 from automated_registry_gateway.oidc import Verifier
-from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_int, json_object, json_string
+from generated_models.json_types import JsonObject, decode_json, json_array, json_int, json_object, json_string
 
 
 def atomic_write(path: Path, data: JsonObject) -> None:

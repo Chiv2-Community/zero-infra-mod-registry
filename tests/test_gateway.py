@@ -21,7 +21,7 @@ from automated_registry_gateway.models import Config, GatewayError, Identity, Re
 from automated_registry_gateway.oidc import ISSUER, JWKS_URL, Verifier, base64url, unbase64
 from automated_registry_gateway.server import GatewayServer
 from automated_registry_gateway.service import Service
-from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, json_object
+from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object
 from mod_registry_core.registration import parse_registration_payload
 
 NOW = 1800000000

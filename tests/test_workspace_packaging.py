@@ -46,6 +46,7 @@ def test_codegen_wheel_includes_loading_template(workspace_wheels: Path) -> None
     wheel, = workspace_wheels.glob("code_gen-*.whl")
     with ZipFile(wheel) as archive:
         assert b"__SCHEMA_BINDINGS__" in archive.read("code_gen/loading.py.tmpl")
+        assert b"def decode_json" in archive.read("code_gen/json_types.py.tmpl")
 
 
 def test_gateway_image_inputs_bundle_the_request_schema(tmp_path: Path) -> None:
@@ -99,7 +100,7 @@ from importlib.util import find_spec
 import sys
 assert find_spec(sys.argv[1]) is not None
 assert find_spec(sys.argv[2]) is None
-from mod_registry_core.json_types import decode_json, json_object
+from generated_models.json_types import decode_json, json_object
 assert json_object(decode_json('{"name":"example"}')) == {'name': 'example'}
 from mod_registry_core.registration import load_registration_request
 assert load_registration_request({'action': 'add-package-release', 'repo_url': 'https://github.com/Test/Pak', 'release_tag': 'v1.0.0'}).release_tag == 'v1.0.0'
@@ -131,7 +132,8 @@ from dataclasses import is_dataclass
 from generated_models.dependencies import Dependency
 from generated_models.metadata import ModInfo
 from generated_models.requests import Action, RegistrationRequest
-from generated_models.loading import load, serialize
+from generated_models.loading import JsonCodec, dumps, loads, load, serialize
+from generated_models.json_types import decode_json, json_object
 assert is_dataclass(ModInfo) and is_dataclass(RegistrationRequest)
 assert ModInfo('https://github.com/Test/Pak', 'Pak', 'Description', ['Author']).mod_dependencies == []
 assert RegistrationRequest(Action.ADD_DLL_RELEASE, 'https://github.com/Test/Plugin', 'v1.0.0').dll_file is None
@@ -139,6 +141,13 @@ assert Dependency('https://github.com/Test/Pak', '^1.0.0').version == '^1.0.0'
 request = load({'action':'add-dll-release', 'repo_url':'https://github.com/Test/Plugin', 'release_tag':'v1.0.0'}, RegistrationRequest)
 assert request.action is Action.ADD_DLL_RELEASE
 assert serialize(request)['release_tag'] == 'v1.0.0'
+assert loads(dumps(request), RegistrationRequest) == request
+assert json_object(decode_json(dumps(request))) == serialize(request)
+codec = JsonCodec()
+checked = []
+codec.register_validator(RegistrationRequest, checked.append)
+assert codec.loads(codec.dumps(request), RegistrationRequest) == request
+assert checked == [request]
 try:
     load({'action':'bogus'}, RegistrationRequest)
 except ValueError as error:

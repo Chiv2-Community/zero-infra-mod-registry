@@ -5,6 +5,7 @@
   "$defs": {
     "request": {
       "title": "RegistrationRequest", "type": "object", "required": ["action", "repo_url", "release_tag"],
+      "x-python-omit-none": true,
       "properties": {
         "action": {"type": "string", "enum": ["add-package-release", "add-dll-release"]},
         "repo_url": {"type": "string", "pattern": "\\S"},

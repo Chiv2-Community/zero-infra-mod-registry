@@ -23,7 +23,7 @@ from zero_infra_mod_registry.models.loading import load
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.schema_validation import validate_schema
-from mod_registry_core.json_types import JsonObject, decode_json, json_array, json_object
+from generated_models.json_types import JsonObject, decode_json, json_array, json_object
 from mod_registry_core.registration import selected_dll_name, single_pak_name
 from zero_infra_mod_registry.retriever.mod_metadata_retriever import ModMetadataRetriever
 

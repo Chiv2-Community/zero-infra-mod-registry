@@ -12,7 +12,7 @@ from generated_models.metadata import PluginInfo
 from zero_infra_mod_registry.models.loading import load
 from zero_infra_mod_registry.models.mod_metadata import dependencies_from_dict, mod_dependencies_from_dict
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
-from mod_registry_core.json_types import decode_json, json_object
+from generated_models.json_types import decode_json, json_object
 from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.schema_validation import schema_validator, validate_schema

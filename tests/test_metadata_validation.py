@@ -12,7 +12,7 @@ from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.loading import serialize
 from generated_models.metadata import DllRelease, PluginInfo, PluginTarget
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
-from mod_registry_core.json_types import JsonObject
+from generated_models.json_types import JsonObject
 from tests.fakes import FakeRetriever, mod_fixture
 
 

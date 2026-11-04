@@ -12,7 +12,7 @@ from zero_infra_mod_registry.models.loading import load, serialize
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
-from mod_registry_core.json_types import JsonObject, decode_json, json_object
+from generated_models.json_types import JsonObject, decode_json, json_object
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, FakeRetriever, response_fixture
 
 INFO = PluginInfo("Display name", "Description", ["Author"], [])

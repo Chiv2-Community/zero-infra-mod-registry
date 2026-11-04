@@ -1,7 +1,7 @@
 """Handwritten manifest compatibility beyond generated field handling."""
 from generated_models.metadata import ModMarkerInfo
 from zero_infra_mod_registry.models.loading import load
-from mod_registry_core.json_types import JsonObject
+from generated_models.json_types import JsonObject
 
 
 def test_marker_defaults_are_independent_and_null_compatible() -> None:

@@ -13,7 +13,7 @@ from automated_registry_gateway.models import Config, GatewayError
 from automated_registry_gateway.oidc import Verifier
 from automated_registry_gateway.service import Service
 from automated_registry_gateway.transport import GithubTransport
-from mod_registry_core.json_types import JsonObject, decode_json, json_object
+from generated_models.json_types import JsonObject, decode_json, json_object
 
 
 class GatewayServer(ThreadingHTTPServer):

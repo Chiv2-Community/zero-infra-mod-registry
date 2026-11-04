@@ -25,7 +25,8 @@ CI checks regeneration, strict typing, and tests. The pinned generator and locke
 formatters make generation reproducible. Runtime installs do not need the generator.
 
 The independent `generated-models` workspace package contains `generated_models.metadata`,
-`generated_models.dependencies`, `generated_models.requests`, and `generated_models.loading`.
+`generated_models.dependencies`, `generated_models.requests`, `generated_models.json_types`,
+and `generated_models.loading`.
 Runtime dependencies are `jsonschema` and `cattrs`. Consumers import its dataclasses and enums directly. Dependency contracts
 share one value type; URL and version constraints remain in the applicable schemas.
 Both applications use the generated loader for issue requests.
@@ -36,11 +37,41 @@ Both image builds include the root schemas directory in their build inputs.
 Loading validates raw JSON with `jsonschema`, then structures it with `cattrs`.
 `generated_models.loading.load` validates before structuring; `serialize` applies
 the generated wire transformations, including inside nested models.
-The registry wrapper adds semantic checks and diagnostic context, not structural
-validation rules. Package adapters retain runtime repository identity and release selection.
+The generated codec also owns JSON text decoding/encoding and schema-annotated
+diagnostic context. The registry only configures semantic callbacks and package
+adapters; adapters retain runtime repository identity and release selection.
 The development-only `code-gen` package calls
 the generator's Python API in-process and bundles local references for offline generation.
 Repository identity (`Repo`) is an internal helper, not a metadata document.
+
+## Consumer API
+
+Install `generated-models` without either application or the generator. It owns
+the shared `JsonValue`/`JsonObject` types and strict JSON boundary helpers; Python's
+`json` module does not provide those recursive types or typed narrowing helpers.
+
+```python
+from generated_models.loading import dumps, loads
+from generated_models.requests import RegistrationRequest
+
+request = loads('{"action":"add-dll-release","repo_url":"https://github.com/Test/Plugin","release_tag":"v1.0.0"}', RegistrationRequest)
+text = dumps(request, indent=2)
+```
+
+Use `load`/`serialize` for decoded JSON objects and `loads`/`dumps` for JSON text.
+Text decoding rejects non-JSON constants (`NaN`, `Infinity`); encoding also rejects
+non-finite numbers. Both APIs apply the same model transformations.
+
+Consumers can create a `JsonCodec` and call `register_validator(Model, callback)`
+for semantic checks or `register_serializer(Model, callback)` for domain adapters.
+Callbacks apply to nested models, including after the codec's first use. They do
+not affect other codec instances or the default module-level codec. Structural
+schema validation runs before semantic callbacks. Generated code never imports
+consumer modules.
+
+`PluginPackage`/`PluginRelease` model stored DLL JSON. `Plugin`/`DllRelease` model
+resolved releases with repository identity. The registry's domain adapters select
+latest metadata and project resolved releases into the stored package shape.
 
 Plugin schemas enforce enums, nonblank text, authors, HTTPS media URLs, and
 dependency URL patterns. Python checks case-insensitive repository uniqueness,
@@ -67,6 +98,7 @@ in historical releases. These hooks are derived from schema annotations.
 | `x-python-serialize-alias` | Emit the merged list under the deprecated spelling too |
 | `x-python-omit-none` | Omit null fields when serializing this model |
 | `x-python-omit-empty` | Omit an empty field when serializing |
+| `x-python-error-context` | Add a label and identifying field to model-structuring errors |
 
 Annotations describe transformations, not additional validation constraints.
 Raw input is always validated before normalization. SemVer interpretation,

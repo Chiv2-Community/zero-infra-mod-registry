@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from automated_registry_gateway.models import Config, GatewayError, Identity, Issue, Registration
 from automated_registry_gateway.oidc import base64url
 from automated_registry_gateway.transport import Transport
-from mod_registry_core.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
+from generated_models.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
 from mod_registry_core.registration import parse_registration_payload, registration_payload, selected_dll_name, single_pak_name
 
 API = "https://api.github.com"

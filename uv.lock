@@ -74,6 +74,7 @@ version = "1.0.0"
 source = { editable = "packages/automated-registry-gateway" }
 dependencies = [
     { name = "cryptography" },
+    { name = "generated-models" },
     { name = "mod-registry-core" },
     { name = "requests" },
     { name = "semver" },
@@ -82,6 +83,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cryptography", specifier = ">=46.0.0" },
+    { name = "generated-models", editable = "packages/generated-models" },
     { name = "mod-registry-core", editable = "packages/mod-registry-core" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "semver", specifier = ">=3.0.4" },
@@ -270,13 +272,13 @@ version = "1.0.0"
 source = { editable = "packages/code-gen" }
 dependencies = [
     { name = "datamodel-code-generator", extra = ["black", "isort"] },
-    { name = "mod-registry-core" },
+    { name = "generated-models" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "datamodel-code-generator", extras = ["black", "isort"], specifier = "==0.88.0" },
-    { name = "mod-registry-core", editable = "packages/mod-registry-core" },
+    { name = "generated-models", editable = "packages/generated-models" },
 ]
 
 [[package]]
@@ -1532,7 +1534,6 @@ version = "1.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "argparse" },
-    { name = "cattrs" },
     { name = "generated-models" },
     { name = "jsonschema", extra = ["format-nongpl"] },
     { name = "mod-registry-core" },
@@ -1558,7 +1559,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
-    { name = "cattrs", specifier = ">=26.2.1" },
     { name = "generated-models", editable = "packages/generated-models" },
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26.0" },
     { name = "mod-registry-core", editable = "packages/mod-registry-core" },

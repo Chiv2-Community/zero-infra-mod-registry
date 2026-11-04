@@ -38,11 +38,12 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
         assert not any("gateway" in name for name in archive.namelist())
         archive.extractall(installed)
     with ZipFile(models_wheel) as archive:
+        assert "generated_models/json_types.py" in archive.namelist()
         for kind in ("common", "mod", "plugin", "request"):
             assert f"generated_models/schemas/{kind}.schema.json" in archive.namelist()
         archive.extractall(installed)
     with ZipFile(core_wheel) as archive:
-        assert "mod_registry_core/json_types.py" in archive.namelist()
+        assert "mod_registry_core/json_types.py" not in archive.namelist()
         archive.extractall(installed)
     # -I prevents cwd/PYTHONPATH from providing source-tree schemas. Dependencies
     # come from the test environment, but production modules come only from the wheel.

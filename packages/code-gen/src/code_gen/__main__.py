@@ -14,7 +14,7 @@ from datamodel_code_generator import InputFileType, PythonVersion, generate
 from datamodel_code_generator.enums import DataModelType, DefaultValueType
 from datamodel_code_generator.format import DatetimeClassType, Formatter
 
-from mod_registry_core.json_types import JsonObject, JsonValue, decode_json, json_object, json_string
+from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object, json_string
 
 ROOT = Path.cwd()
 OUTPUT = ROOT / "packages/generated-models/src/generated_models"
@@ -92,6 +92,7 @@ def render_loading(outputs: dict[Path, str]) -> str:
     }
     imports: dict[str, list[str]] = {}
     bindings = []
+    contexts = []
     hooks: list[str] = []
     helpers: list[str] = []
     filenames = sorted((ROOT / "schemas").glob("*.schema.json"))
@@ -105,6 +106,9 @@ def render_loading(outputs: dict[Path, str]) -> str:
             module = models[title]
             imports.setdefault(module, []).append(title)
             bindings.append(f"    {title}: ({path.name.removesuffix('.schema.json')!r}, {name!r}),")
+            if context := definition.get("x-python-error-context"):
+                context = json_object(context)
+                contexts.append(f"    {title}: ({json_string(context['label'])!r}, {json_string(context['field'])!r}),")
             model_helpers, model_converters = model_hooks(title, definition, model_fields[title])
             helpers.extend(model_helpers)
             hooks.extend(model_converters)
@@ -113,7 +117,8 @@ def render_loading(outputs: dict[Path, str]) -> str:
                   f"from generated_models.{module} import {', '.join(sorted(set(names)))}"
                   for module, names in sorted(imports.items())))
               .replace("__SCHEMA_BINDINGS__", "SCHEMAS: dict[type[object], tuple[str, str]] = {\n"
-                       + "\n".join(bindings) + "\n}\nSCHEMA_FILES = "
+                        + "\n".join(bindings) + "\n}\nCONTEXTS: dict[type[object], tuple[str, str]] = {\n"
+                        + "\n".join(contexts) + "\n}\nSCHEMA_FILES = "
                        + repr(tuple(path.name.removesuffix(".schema.json") for path in filenames)))
               .replace("__MODEL_HELPERS__", "\n".join(helpers))
               .replace("__CONVERTER_HOOKS__", "\n".join(hooks)))
@@ -138,36 +143,42 @@ def model_hooks(title: str, definition: JsonObject, fields: dict[str, str]) -> t
         helpers += [f"def merge_{key}_{field}(primary: {fields[target]}, deprecated: {fields[field]}) -> {fields[target]}:",
                     f"    merged = {{({', '.join(keys)},): dependency for dependency in primary + deprecated}}",
                     "    return list(merged.values())\n"]
-    lines = [f"    raw_{key} = cast(Callable[[JsonValue, type[{title}]], {title}], converter.get_structure_hook({title}))",
-             f"    raw_unstructure_{key} = cast(Callable[[{title}], JsonObject], converter.get_unstructure_hook({title}))",
-             f"    def structure_{key}(value: JsonValue, _: type[{title}]) -> {title}:",
-             "        data = dict(_object(value))"]
+    lines = [f"    def structure_factory_{key}(cls: type[{title}]) -> Callable[[JsonValue, type[{title}]], {title}]:",
+             f"        raw = cast(Callable[[JsonValue, type[{title}]], {title}], make_dict_structure_fn(cls, converter))",
+             f"        def structure(value: JsonValue, _: type[{title}]) -> {title}:",
+             "            data = dict(json_object(value))"]
+    structure = []
     for wire, field in aliases.items():
-        lines += [f"        if {wire!r} in data:", f"            data[{field!r}] = data.pop({wire!r})"]
+        structure += [f"if {wire!r} in data:", f"    data[{field!r}] = data.pop({wire!r})"]
     for field, default in null_defaults.items():
-        lines += [f"        if data.get({field!r}) is None:", f"            data[{field!r}] = {default!r}"]
-    lines.append(f"        result = raw_{key}(data, {title})")
+        structure += [f"if data.get({field!r}) is None:", f"    data[{field!r}] = {default!r}"]
+    structure.append(f"result = raw(data, {title})")
 
     for field, prop in merges.items():
         target = json_string(prop["x-python-merge-into"])
-        lines.append(f"        result = replace(result, {target}=merge_{key}_{field}(result.{target}, result.{field}), {field}=[]) ")
-    lines.append("        return result")
-    lines += [f"    def unstructure_{key}(value: {title}) -> JsonObject:"]
+        structure.append(f"result = replace(result, {target}=merge_{key}_{field}(result.{target}, result.{field}), {field}=[]) ")
+    structure.append("return result")
+    lines.extend("            " + line for line in structure)
+    lines += ["        return wrap_structure(cls, structure)",
+              f"    converter.register_structure_hook_factory(_is_type({title}), structure_factory_{key})",
+              f"    def unstructure_factory_{key}(cls: type[{title}]) -> Callable[[{title}], JsonObject]:",
+              f"        raw = cast(Callable[[{title}], JsonObject], make_dict_unstructure_fn(cls, converter))",
+              f"        def unstructure(value: {title}) -> JsonObject:"]
     for field, prop in merges.items():
         target = json_string(prop["x-python-merge-into"])
-        lines.append(f"        value = replace(value, {target}=merge_{key}_{field}(value.{target}, value.{field}), {field}=[]) ")
+        lines.append(f"            value = replace(value, {target}=merge_{key}_{field}(value.{target}, value.{field}), {field}=[]) ")
     updates = [f"{field}=value.{json_string(prop['x-python-merge-into'])}" for field, prop in merges.items()
                if prop.get("x-python-serialize-alias")]
     argument = f"replace(value, {', '.join(updates)})" if updates else "value"
-    lines.append(f"        data = raw_unstructure_{key}({argument})")
+    lines.append(f"            data = raw({argument})")
     for wire, field in aliases.items():
-        lines.append(f"        data[{wire!r}] = data.pop({field!r})")
+        lines.append(f"            data[{wire!r}] = data.pop({field!r})")
     if definition.get("x-python-omit-none"):
-        lines.append("        data = {name: item for name, item in data.items() if item is not None}")
+        lines.append("            data = {name: item for name, item in data.items() if item is not None}")
     for field in omit_empty:
-        lines += [f"        if not data.get({field!r}):", f"            data.pop({field!r}, None)"]
-    lines += ["        return data", f"    converter.register_structure_hook({title}, structure_{key})",
-              f"    converter.register_unstructure_hook({title}, unstructure_{key})"]
+        lines += [f"            if not data.get({field!r}):", f"                data.pop({field!r}, None)"]
+    lines += ["            return data", "        return wrap_unstructure(cls, unstructure)",
+              f"    converter.register_unstructure_hook_factory(_is_type({title}), unstructure_factory_{key})"]
     return helpers, lines
 
 
@@ -184,6 +195,9 @@ def main() -> None:
         OUTPUT / "dependencies.py": render(("mod-metadata.schema.json",), dependency=True),
     }
     outputs[OUTPUT / "loading.py"] = render_loading(outputs)
+    outputs[OUTPUT / "json_types.py"] = black.format_str(
+        Path(__file__).with_name("json_types.py.tmpl").read_text(),
+        mode=black.Mode(target_versions={TargetVersion.PY312}))
     for path, generated in outputs.items():
         if cast(bool, args.check):
             if not path.exists() or path.read_text() != generated:

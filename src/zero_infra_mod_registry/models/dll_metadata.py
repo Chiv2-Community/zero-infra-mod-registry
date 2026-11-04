@@ -2,19 +2,18 @@
 from urllib.parse import urlparse
 
 from semver import Version
-from mod_registry_core.json_types import JsonObject, JsonValue, json_array, json_object
+from generated_models.json_types import JsonObject, JsonValue, json_array, json_object
 from generated_models.metadata import (
     DllRelease, Plugin, PluginInfo,
 )
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches as dependency_matches, parse_version_requirement
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.schema_validation import validate_schema
-from zero_infra_mod_registry.models.loading import load, serialize
 from generated_models.loading import serialize as serialize_model
 
 
 def validate_plugin_info(info: PluginInfo) -> None:
-    validate_schema(serialize(info), "dll-metadata", "pluginInfo")
+    validate_schema(serialize_model(info), "dll-metadata", "pluginInfo")
     validate_plugin_dependencies(info)
 
 
@@ -51,12 +50,13 @@ def dll_package_dict(release: DllRelease) -> JsonObject:
     return {"tag": release.tag or release.version, "hash": release.sha256, "dll_file_name": release.dll_file_name,
             "download_url": release.download_url, "size": release.size,
             "release_date": release.release_date.isoformat() if release.release_date is not None else None,
-            "info": serialize(release.info) if release.info is not None else None,
+            "info": serialize_model(release.info) if release.info is not None else None,
             "release_notes_markdown": release.release_notes_markdown}
 
 
 def dll_from_package_dict(org: str, name: str, value: JsonValue) -> DllRelease:
     from generated_models.metadata import PluginRelease
+    from zero_infra_mod_registry.models.loading import load
 
     wire = load(value, PluginRelease)
     release = DllRelease(org, name, str(Version.parse(wire.tag.removeprefix("v"))), wire.download_url,
@@ -83,11 +83,13 @@ def plugin_dict(plugin: Plugin) -> JsonObject:
     releases = sorted_plugin_releases(plugin)
     if not releases or releases[0].info is None:
         raise ValueError("Plugin package has no metadata")
-    return {"latest_release_info": serialize(releases[0].info),
+    return {"latest_release_info": serialize_model(releases[0].info),
             "releases": [dll_package_dict(release) for release in releases]}
 
 
 def plugin_from_dict(org: str, name: str, value: JsonValue) -> Plugin:
+    from zero_infra_mod_registry.models.loading import load
+
     with validation_context(f"{org}/{name}"):
         validate_schema(value, "registry", "plugin")
     data = json_object(value)
@@ -101,7 +103,7 @@ def plugin_from_dict(org: str, name: str, value: JsonValue) -> Plugin:
     plugin = Plugin(releases)
     expected = latest_plugin_info(plugin)
     if latest != expected:
-        actual_fields, expected_fields = serialize(latest), serialize(expected)
+        actual_fields, expected_fields = serialize_model(latest), serialize_model(expected)
         differences = sorted(key for key in actual_fields.keys() | expected_fields.keys()
                              if actual_fields.get(key) != expected_fields.get(key))
         latest_release = sorted_plugin_releases(plugin)[0]

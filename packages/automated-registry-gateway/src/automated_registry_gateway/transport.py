@@ -6,7 +6,7 @@ from typing import Protocol
 import requests
 
 from automated_registry_gateway.models import GatewayError
-from mod_registry_core.json_types import JsonObject, JsonValue, decode_json
+from generated_models.json_types import JsonObject, JsonValue, decode_json
 
 
 class Transport(Protocol):

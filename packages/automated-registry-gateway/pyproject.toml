@@ -5,6 +5,7 @@ description = "Optional OIDC registration gateway"
 requires-python = ">=3.12"
 dependencies = [
     "mod-registry-core==1.0.0",
+    "generated-models==1.0.0",
     "cryptography>=46.0.0",
     "requests>=2.32.5",
     "semver>=3.0.4",
@@ -15,6 +16,7 @@ automated-registry-gateway = "automated_registry_gateway.server:main"
 
 [tool.uv.sources]
 mod-registry-core = { workspace = true }
+generated-models = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

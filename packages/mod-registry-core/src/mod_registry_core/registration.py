@@ -6,7 +6,7 @@ from jsonschema.protocols import Validator
 from generated_models.loading import load, schema_validator
 from generated_models.requests import RegistrationRequest
 
-from mod_registry_core.json_types import JsonObject, decode_json, json_object, json_string
+from generated_models.json_types import JsonObject, decode_json, json_object, json_string
 
 
 def request_validator() -> Validator:

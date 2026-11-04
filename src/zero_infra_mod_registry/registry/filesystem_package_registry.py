@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
@@ -15,23 +14,16 @@ from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.dll_metadata import (
     dll_release_key, plugin_from_dict, validate_dll_release, validate_dll_releases,
 )
-from zero_infra_mod_registry.models.loading import load, serialize
+from zero_infra_mod_registry.models.loading import dumps, loads
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.version_requirements import dependency_matches
-from mod_registry_core.json_types import JsonValue, decode_json
+from generated_models.json_types import decode_json
 from zero_infra_mod_registry.registry.package_registry import PackageRegistry
 from zero_infra_mod_registry.retriever import (
     ModMetadataRetriever,
 )
 from zero_infra_mod_registry.utils.path_utils import repo_to_index_entry
 from zero_infra_mod_registry.utils.redirect_manager import SimpleRedirectManager
-
-
-class PackageManagerJsonEncoder:
-    """Encode model-produced JSON values; dates are serialized by Release."""
-
-    def encode(self, value: JsonValue) -> str:
-        return json.dumps(value, indent=4)
 
 
 class FilesystemPackageRegistry(PackageRegistry):
@@ -70,9 +62,6 @@ class FilesystemPackageRegistry(PackageRegistry):
         # Create packages directory if it doesn't exist
         if mod_retriever is not None and not os.path.exists(self.packages_dir):
             os.makedirs(self.packages_dir, exist_ok=True)
-
-        # Setup JSON encoder
-        self.json_encoder = PackageManagerJsonEncoder()
 
         self.mod_retriever = mod_retriever
 
@@ -137,7 +126,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             package = next((value for value in packages if value.lower() == str(repo).lower()), str(repo))
             org, name = package.split("/")
             releases = [entry] + [old for old in entries if old.organization.lower() == repo.org.lower() and old.name.lower() == repo.name.lower()]
-            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): json.dumps(serialize(Plugin(releases)), indent=2) + "\n",
+            paths = {os.path.join(self.plugin_packages_dir, org, name + ".json"): dumps(Plugin(releases), indent=2) + "\n",
                      self.plugin_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n"}
             self._write_registry_files(paths)
             return True
@@ -262,7 +251,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             if not any(repo_to_index_entry(value).lower() == package.lower() for value in urls if not value.startswith("#")):
                 urls.append(url)
             paths = {
-                os.path.join(self.packages_dir, org, name + ".json"): self.json_encoder.encode(serialize(updated_mod)) + "\n",
+                os.path.join(self.packages_dir, org, name + ".json"): dumps(updated_mod, indent=4) + "\n",
                 self.mod_list_index_path: "\n".join(packages if package in packages else packages + [package]) + "\n",
                 org_index_path: "\n".join(urls) + "\n",
             }
@@ -340,8 +329,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             org_dir = os.path.join(self.packages_dir, repo.org)
             mod_file_path = os.path.join(org_dir, f"{repo.name}.json")
             with validation_context(f"{repo} ({mod_file_path})"), open(mod_file_path, "r") as file:
-                mod_dict = decode_json(file.read())
-                return load(mod_dict, Mod)
+                return loads(file.read(), Mod)
         except FileNotFoundError:
             return None
 
@@ -375,8 +363,7 @@ class FilesystemPackageRegistry(PackageRegistry):
             if mod_path_filter(package_path):
                 try:
                     with validation_context(f"{package} ({package_path})"), open(package_path, "r") as file:
-                        mod_dict = decode_json(file.read())
-                        mod = load(mod_dict, Mod)
+                        mod = loads(file.read(), Mod)
 
                         mods.append(mod)
 
