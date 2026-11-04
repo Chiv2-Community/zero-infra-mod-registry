@@ -37,3 +37,7 @@ No approval, commit, PR, or release of the OpenAPI proposal is established. Reco
 ## Subsequent developments (2026-11-04)
 
 The draft spec's `openapi.json` filename in Evidence is superseded by the uncommitted YAML conversion; the original draft is no longer present at that path. See [YAML schema and OpenAPI sources](2026-11-04-yaml-schema-sources.md). The routing proposal remains proposed.
+
+### Implementation update (2026-11-04)
+
+The statements that the routing implementation was uncommitted and no commit or PR was established are historical. It was implemented on the PR branch in `f2d306002558c07905dfe8e61f942eb9a6698ecb`; [subsequent record](2026-11-04-openapi-yaml-pr-implementation.md). Merge is not established.

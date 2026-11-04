@@ -25,3 +25,7 @@ The previous committed schemas were JSON. The chosen conversion changes schema f
 ## Consequences and reconsideration
 
 Consumers of schema documents need YAML parsing, and generated-models gains a PyYAML runtime dependency. JSON wire compatibility is intended to remain unchanged. Reconsider if consumers cannot load YAML or external references, or if schema equivalence or packaging validation fails. No merge, release, or implementation commit is established; the transcript does not record other options considered or a more specific rationale.
+
+## Subsequent developments (2026-11-04)
+
+The uncommitted status and statement that no implementation commit was established are historical. Commit `f2d306002558c07905dfe8e61f942eb9a6698ecb` implements the conversion on an open PR branch; see the [implementation record](2026-11-04-openapi-yaml-pr-implementation.md). Merge is not established.
