@@ -16,7 +16,7 @@ from importlib.metadata import version
 from importlib.util import find_spec
 import sys
 assert version("automated-registry-gateway")
-assert version("mod-registry-core")
+assert version("mod-registry-registration-core")
 assert find_spec("zero_infra_mod_registry") is None
 key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 sys.stdout.buffer.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))

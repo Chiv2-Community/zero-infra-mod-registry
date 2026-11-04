@@ -15,8 +15,8 @@ from automated_registry_gateway.models import Config, GatewayError, Identity, Is
 from automated_registry_gateway.oidc import base64url
 from automated_registry_gateway.transport import Transport
 from generated_models.json_types import JsonObject, json_array, json_bool, json_int, json_object, json_string
-from mod_registry_core.issue_requests import parse_registration_payload, registration_payload
-from mod_registry_core.release_assets import selected_dll_name, single_pak_name
+from mod_registry_registration_core.issue_requests import parse_registration_payload, registration_payload
+from mod_registry_registration_core.release_assets import selected_dll_name, single_pak_name
 
 API = "https://api.github.com"
 

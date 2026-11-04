@@ -15,7 +15,7 @@ members = [
     "automated-registry-gateway",
     "code-gen",
     "generated-models",
-    "mod-registry-core",
+    "mod-registry-registration-core",
     "zero-infra-mod-registry",
 ]
 
@@ -75,7 +75,7 @@ source = { editable = "packages/automated-registry-gateway" }
 dependencies = [
     { name = "cryptography" },
     { name = "generated-models" },
-    { name = "mod-registry-core" },
+    { name = "mod-registry-registration-core" },
     { name = "requests" },
     { name = "semver" },
 ]
@@ -84,7 +84,7 @@ dependencies = [
 requires-dist = [
     { name = "cryptography", specifier = ">=46.0.0" },
     { name = "generated-models", editable = "packages/generated-models" },
-    { name = "mod-registry-core", editable = "packages/mod-registry-core" },
+    { name = "mod-registry-registration-core", editable = "packages/mod-registry-registration-core" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "semver", specifier = ">=3.0.4" },
 ]
@@ -798,9 +798,9 @@ wheels = [
 ]
 
 [[package]]
-name = "mod-registry-core"
+name = "mod-registry-registration-core"
 version = "1.0.0"
-source = { editable = "packages/mod-registry-core" }
+source = { editable = "packages/mod-registry-registration-core" }
 dependencies = [
     { name = "generated-models" },
 ]
@@ -1532,7 +1532,7 @@ dependencies = [
     { name = "argparse" },
     { name = "generated-models" },
     { name = "jsonschema", extra = ["format-nongpl"] },
-    { name = "mod-registry-core" },
+    { name = "mod-registry-registration-core" },
     { name = "pygithub" },
     { name = "requests" },
     { name = "semver" },
@@ -1557,7 +1557,7 @@ requires-dist = [
     { name = "argparse", specifier = ">=1.4.0" },
     { name = "generated-models", editable = "packages/generated-models" },
     { name = "jsonschema", extras = ["format-nongpl"], specifier = ">=4.26.0" },
-    { name = "mod-registry-core", editable = "packages/mod-registry-core" },
+    { name = "mod-registry-registration-core", editable = "packages/mod-registry-registration-core" },
     { name = "pygithub", specifier = ">=2.8.1" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "semver", specifier = ">=3.0.4" },

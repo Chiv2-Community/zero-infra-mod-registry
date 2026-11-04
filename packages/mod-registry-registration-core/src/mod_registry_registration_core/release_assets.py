@@ -1,4 +1,4 @@
-"""Shared DLL and PAK release-asset selection policy."""
+"""Registration policy for DLL and PAK release-asset selection."""
 from collections.abc import Iterable
 
 

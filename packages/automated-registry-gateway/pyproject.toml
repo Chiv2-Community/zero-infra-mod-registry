@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Optional OIDC registration gateway"
 requires-python = ">=3.12"
 dependencies = [
-    "mod-registry-core==1.0.0",
+    "mod-registry-registration-core==1.0.0",
     "generated-models==1.0.0",
     "cryptography>=46.0.0",
     "requests>=2.32.5",
@@ -15,7 +15,7 @@ dependencies = [
 automated-registry-gateway = "automated_registry_gateway.server:main"
 
 [tool.uv.sources]
-mod-registry-core = { workspace = true }
+mod-registry-registration-core = { workspace = true }
 generated-models = { workspace = true }
 
 [build-system]

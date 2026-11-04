@@ -22,7 +22,7 @@ from automated_registry_gateway.oidc import ISSUER, JWKS_URL, Verifier, base64ur
 from automated_registry_gateway.server import GatewayServer
 from automated_registry_gateway.service import Service
 from generated_models.json_types import JsonObject, JsonValue, decode_json, json_object
-from mod_registry_core.issue_requests import parse_registration_payload
+from mod_registry_registration_core.issue_requests import parse_registration_payload
 
 NOW = 1800000000
 REPO = "Publisher/Plugin"

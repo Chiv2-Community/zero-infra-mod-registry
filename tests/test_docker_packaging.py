@@ -26,13 +26,13 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
                 shutil.copy2(original, target / original.name)
     result = subprocess.run(["uv", "build", "--wheel", "--package", "zero-infra-mod-registry"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    result = subprocess.run(["uv", "build", "--wheel", "--package", "mod-registry-core"], cwd=context, capture_output=True, text=True)
+    result = subprocess.run(["uv", "build", "--wheel", "--package", "mod-registry-registration-core"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     wheel, = (context / "dist").glob("zero_infra_mod_registry-*.whl")
     result = subprocess.run(["uv", "build", "--wheel", "--package", "generated-models"], cwd=context, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     models_wheel, = (context / "dist").glob("generated_models-*.whl")
-    core_wheel, = (context / "dist").glob("mod_registry_core-*.whl")
+    core_wheel, = (context / "dist").glob("mod_registry_registration_core-*.whl")
     installed = tmp_path / "installed"
     with ZipFile(wheel) as archive:
         assert not any("gateway" in name for name in archive.namelist())
@@ -43,7 +43,7 @@ def test_docker_builder_inputs_produce_wheel_with_usable_schemas(tmp_path: Path)
             assert f"generated_models/schemas/{kind}.schema.json" in archive.namelist()
         archive.extractall(installed)
     with ZipFile(core_wheel) as archive:
-        assert "mod_registry_core/json_types.py" not in archive.namelist()
+        assert "mod_registry_registration_core/json_types.py" not in archive.namelist()
         archive.extractall(installed)
     # -I prevents cwd/PYTHONPATH from providing source-tree schemas. Dependencies
     # come from the test environment, but production modules come only from the wheel.

@@ -20,7 +20,7 @@ COPY schemas/ ./schemas/
 
 # Build wheel package
 RUN uv build --wheel --package zero-infra-mod-registry
-RUN uv build --wheel --package mod-registry-core
+RUN uv build --wheel --package mod-registry-registration-core
 RUN uv build --wheel --package generated-models
 
 # Runtime stage

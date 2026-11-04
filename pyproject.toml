@@ -16,7 +16,7 @@ dependencies = [
     "urllib3>=2.0.5",
     "semver>=3.0.4",
     "jsonschema[format-nongpl]>=4.26.0",
-    "mod-registry-core==1.0.0",
+    "mod-registry-registration-core==1.0.0",
     "generated-models==1.0.0",
 ]
 [project.scripts]
@@ -34,10 +34,10 @@ dev = [
 ]
 
 [tool.uv.workspace]
-members = ["packages/mod-registry-core", "packages/automated-registry-gateway", "packages/generated-models", "packages/code-gen"]
+members = ["packages/mod-registry-registration-core", "packages/automated-registry-gateway", "packages/generated-models", "packages/code-gen"]
 
 [tool.uv.sources]
-mod-registry-core = { workspace = true }
+mod-registry-registration-core = { workspace = true }
 automated-registry-gateway = { workspace = true }
 generated-models = { workspace = true }
 code-gen = { workspace = true }
@@ -50,7 +50,7 @@ python_functions = "test_*"
 pythonpath = ["src"]
 
 [tool.coverage.run]
-source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_core", "generated_models"]
+source = ["zero_infra_mod_registry", "automated_registry_gateway", "mod_registry_registration_core", "generated_models"]
 omit = ["tests/*"]
 
 [build-system]

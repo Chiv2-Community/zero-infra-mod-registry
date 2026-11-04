@@ -1,4 +1,4 @@
-"""Registration payloads and fenced JSON transport for registry issues."""
+"""Issue registration payloads and fenced JSON transport."""
 import re
 
 from generated_models.json_types import JsonObject

@@ -71,7 +71,7 @@ def test_gateway_image_inputs_bundle_the_request_schema(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     script = """
 import json
-from mod_registry_core.issue_requests import parse_registration_payload, registration_payload
+from mod_registry_registration_core.issue_requests import parse_registration_payload, registration_payload
 request = registration_payload('mod', 'Test/Pak', 'v1.0.0', 'Pak.pak')
 assert parse_registration_payload('```json\\n' + json.dumps(request) + '\\n```') == request
 """
@@ -88,7 +88,7 @@ def test_component_installs_without_other_component(
     workspace_wheels: Path, tmp_path: Path, package: str, module: str, other: str,
 ) -> None:
     wheel, = workspace_wheels.glob(f"{package}-*.whl")
-    core_wheel, = workspace_wheels.glob("mod_registry_core-*.whl")
+    core_wheel, = workspace_wheels.glob("mod_registry_registration_core-*.whl")
     models_wheel, = workspace_wheels.glob("generated_models-*.whl")
     with ZipFile(wheel) as archive:
         assert any(name.startswith(f"{module}/") for name in archive.namelist())
@@ -107,8 +107,8 @@ assert find_spec(sys.argv[1]) is not None
 assert find_spec(sys.argv[2]) is None
 from generated_models.json_types import decode_json, json_object
 assert json_object(decode_json('{"name":"example"}')) == {'name': 'example'}
-from mod_registry_core.issue_requests import registration_payload
-from mod_registry_core.release_assets import selected_dll_name, single_pak_name
+from mod_registry_registration_core.issue_requests import registration_payload
+from mod_registry_registration_core.release_assets import selected_dll_name, single_pak_name
 assert registration_payload('mod', 'Test/Pak', 'v1.0.0', 'Pak.pak')['release_tag'] == 'v1.0.0'
 assert selected_dll_name(['Plugin.dll']) == 'Plugin.dll'
 assert single_pak_name(['Pak.pak'], 'v1.0.0') == 'Pak.pak'
@@ -162,7 +162,7 @@ except ValueError as error:
     assert '$.action' in str(error)
 else:
     raise AssertionError('Structural validation was skipped')
-for module in ('zero_infra_mod_registry', 'mod_registry_core', 'automated_registry_gateway', 'datamodel_code_generator'):
+for module in ('zero_infra_mod_registry', 'mod_registry_registration_core', 'automated_registry_gateway', 'datamodel_code_generator'):
     assert find_spec(module) is None
 """
     result = subprocess.run([str(python), "-I", "-c", script], cwd=tmp_path, capture_output=True, text=True)

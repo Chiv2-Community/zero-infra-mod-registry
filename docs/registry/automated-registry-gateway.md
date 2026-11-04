@@ -8,7 +8,7 @@ Use it with optional `actions/automated-publish` for automatic release requests.
 Publishers need no registry token. Manual registration issues work without either.
 
 Its Python package is a separate [uv workspace member](../development.md).
-The image installs only gateway dependencies and shared core.
+The image installs only gateway dependencies and registration core.
 
 ```mermaid
 sequenceDiagram

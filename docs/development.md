@@ -9,7 +9,7 @@ and the generator depend on the independent generated-models package.
 |---|---|---|
 | `zero-infra-mod-registry` | `src/zero_infra_mod_registry/` | Registry CLI and metadata validation |
 | `automated-registry-gateway` | `packages/automated-registry-gateway/src/automated_registry_gateway/` | Optional OIDC HTTP service |
-| `mod-registry-core` | `packages/mod-registry-core/src/mod_registry_core/` | Issue transport (`issue_requests`) and release-asset policy (`release_assets`) |
+| `mod-registry-registration-core` | `packages/mod-registry-registration-core/src/mod_registry_registration_core/` | Issue transport (`issue_requests`) and release-asset policy (`release_assets`) |
 | `generated-models` | `packages/generated-models/src/generated_models/` | Generated models, JSON types, validation, loading, and serialization |
 | `code-gen` | `packages/code-gen/src/code_gen/` | Development-only model generator (`python -m code_gen`) |
 

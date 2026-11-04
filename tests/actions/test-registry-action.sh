@@ -5,7 +5,7 @@ docker run --rm --entrypoint python "$image" -c '
 from importlib.metadata import version
 from importlib.util import find_spec
 assert version("zero-infra-mod-registry")
-assert version("mod-registry-core")
+assert version("mod-registry-registration-core")
 assert find_spec("automated_registry_gateway") is None
 '
 temp=$(mktemp -d)
