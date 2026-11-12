@@ -20,7 +20,7 @@ from generated_models.metadata import DllRelease, Manifest, ModInfo, Mod, PakInv
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.dll_metadata import validate_dll_release
 from zero_infra_mod_registry.models.loading import load
-from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
+from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement, validate_metadata_version
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.schema_validation import validate_schema
 from generated_models.json_types import JsonObject, decode_json, json_array, json_object
@@ -106,6 +106,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             data = self._fetch_release_json(repo, release, "plugin.json")
             validate_schema(data, "plugin")
             info = load(data, PluginInfo)
+            with validation_context("version"):
+                validate_metadata_version(info.version, release.tag_name)
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return replace(info, repo_url=repo.github_url())
@@ -179,6 +181,10 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             validate_schema(response_json, "mod")
             response_json["repo_url"] = repo.github_url()
             mod_info = load(response_json, ModInfo)
+            with validation_context("version"):
+                validate_metadata_version(mod_info.version, release.tag_name)
+                if mod_info.version is None:
+                    mod_info = replace(mod_info, version=str(Version.parse(release.tag_name.removeprefix("v"))))
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None

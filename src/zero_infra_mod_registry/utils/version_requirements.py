@@ -4,6 +4,16 @@ import re
 from semver import Version
 
 
+def validate_metadata_version(version: str | None, release_tag: str) -> None:
+    """Match declared metadata versions to tags without changing stored spelling."""
+    if version is None:
+        return
+    declared = str(Version.parse(version.removeprefix("v")))
+    released = str(Version.parse(release_tag.removeprefix("v")))
+    if declared != released:
+        raise ValueError(f"version {version!r} does not match release tag {release_tag!r}")
+
+
 def parse_version_requirement(requirement: str) -> tuple[str, ...]:
     requirement = requirement.removeprefix("v")
     if requirement.startswith("^"):

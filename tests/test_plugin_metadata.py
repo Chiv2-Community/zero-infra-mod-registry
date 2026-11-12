@@ -98,12 +98,15 @@ def test_legacy_plugin_metadata_without_target_defaults_to_shared() -> None:
 
 
 @pytest.mark.parametrize("uploaded", [False, True])
+@pytest.mark.parametrize("version", [None, "1.0.0", "v1.0.0"])
 def test_retrieval_and_registration_preserve_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, version: str | None,
 ) -> None:
     binary = b"DLL bytes"
     data = serialize(INFO)
     data["target"] = PluginTarget.CLIENT.value
+    if version is not None:
+        data["version"] = version
     metadata_url = "https://example.com/plugin.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/plugin.json"
     calls: list[str] = []
 
@@ -130,6 +133,7 @@ def test_retrieval_and_registration_preserve_target(
     restored = plugin_from_dict("Test", "Plugin", package)
     assert restored.releases[0].info is not None
     assert restored.releases[0].info.target is expected
+    assert restored.releases[0].info.version == version
     assert "manifest" not in serialize(restored.releases[0])
     assert registry.validate_dll_db(verify_downloads=True)
     assert calls == [metadata_url, ENTRY.download_url, ENTRY.download_url]

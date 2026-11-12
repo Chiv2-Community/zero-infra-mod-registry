@@ -8,6 +8,18 @@
    assets to generate manifests.
 4. Request registration after publishing. Each release requires approval.
 
+## Version
+
+`mod.json` accepts an optional `version` string, for example `"version": "1.2.3"`.
+The registry preserves it in release metadata and `latest_release_info`. During
+ingestion, omitted versions are inferred from the release tag without its leading
+`v`. Existing stored metadata without a version remains readable. When provided,
+it must be a semantic version matching
+the release tag, ignoring a leading `v` on either value. Prerelease and build
+identifiers must match too. Mismatches fail before pak download or scanning.
+Release tags still determine version ordering and dependency resolution.
+The metadata validation action has no release tag to compare against.
+
 ## Dependencies and backward compatibility
 
 Use `mod_dependencies` for pak mods and `plugin_dependencies` for DLL plugins.

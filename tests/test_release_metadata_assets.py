@@ -10,6 +10,31 @@ from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 
 @pytest.mark.parametrize("filename", ["mod.json", "plugin.json"])
+@pytest.mark.parametrize("version", ["2.0.0", "1.0.0-RC1", "1.0.0+other", "invalid"])
+def test_metadata_version_failure_precedes_binary_download(
+    filename: str, version: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    metadata: JsonObject = {"name": "Mod", "description": "Description", "authors": ["Author"],
+                            "mod_dependencies": [], "version": version}
+    calls: list[str] = []
+
+    def get(url: str, *, timeout: int) -> requests.Response:
+        calls.append(url)
+        assert url.endswith(f"/v1.0.0/{filename}")
+        return response_fixture(json.dumps(metadata).encode(), url)
+
+    monkeypatch.setattr(requests, "get", get)
+    release = FakeRelease(assets=[FakeAsset(name="test.pak"), FakeAsset()])
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+    with pytest.raises(ValueError, match=rf"Test/Plugin v1.0.0 {filename}.*version"):
+        if filename == "mod.json":
+            retriever.process_release(Repo("Test", "Plugin"), release.as_release())
+        else:
+            retriever.fetch_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("filename", ["mod.json", "plugin.json"])
 def test_uploaded_metadata_takes_precedence(filename: str, monkeypatch: pytest.MonkeyPatch) -> None:
     uploaded_url = f"https://example.com/releases/{filename}"
     release = FakeRelease(assets=[FakeAsset(name=filename, browser_download_url=uploaded_url)])

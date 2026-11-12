@@ -10,6 +10,14 @@
    The automated action and gateway are optional. Each version requires registry
    maintainer approval. Publish a new version when DLL contents change.
 
+## Version
+
+`plugin.json` accepts an optional `version` string, preserved in registry metadata.
+When provided, it must match the release tag as a semantic version, ignoring a
+leading `v` on either value. Prerelease and build identifiers must match too.
+Mismatches fail during ingestion before DLL download. Omitted versions remain
+supported. The metadata validation action has no release tag to compare against.
+
 ## Metadata workflow
 
 The action checks metadata schemas and dependency versions against the registry.
