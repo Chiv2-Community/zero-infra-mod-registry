@@ -23,3 +23,7 @@ The build agent inspected UnchainedLauncher tags `v1.0.0` (`b6171aa0a8dbf0695d87
 ## Reconsideration and gaps
 
 Reconsider if metadata prefix policy changes, compatibility testing finds a regression, or strict consumers add support. The user's reason for preferring unprefixed metadata is not recorded. The supplied conversation may omit earlier history; no launcher runtime compatibility test was supplied or rerun.
+
+## Subsequent developments (2026-11-12)
+
+The strict-consumer risk was confirmed in launcher `origin/main`, not only the modified local checkout. This narrows the uncertainty in the compatibility evidence above; see [launcher main plugin compatibility](2026-11-12-launcher-main-plugin-compatibility.md) for the pinned source and rollout constraint.
