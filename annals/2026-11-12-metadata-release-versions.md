@@ -30,3 +30,7 @@ The source transcript reports 427 tests passed and four skipped, mypy passed on 
 ## Subsequent developments (2026-11-12)
 
 The ingestion parsing described above was strengthened to reject incomplete SemVer input before metadata downloads. The decision itself remains in force. See [complete SemVer release tags](2026-11-12-complete-semver-release-tags.md).
+
+### Subsequent developments (2026-11-12): metadata prefix
+
+The allowance in the decision for a leading `v` on supplied metadata versions is superseded; release tags may retain it. See [unprefixed metadata versions and launcher compatibility](2026-11-12-unprefixed-metadata-versions.md). The rest of this decision remains in force.
