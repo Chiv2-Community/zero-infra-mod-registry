@@ -26,3 +26,7 @@ The input schemas describe strings; semantic validation and tag comparison occur
 Commit `f630b712ecccb859392b86bf799504de2c9d1977` changes the schemas, generated models, retriever, version helper, docs and tests. See [matching helper](../src/zero_infra_mod_registry/utils/version_requirements.py), [retriever](../src/zero_infra_mod_registry/retriever/github_mod_metadata_retriever.py), and [ingestion tests](../tests/test_release_metadata_assets.py). Tests cover mismatches before download, both metadata sources, round trips, and inferred mod versions.
 
 The source transcript reports 427 tests passed and four skipped, mypy passed on 65 files, and generation check passed. These are transcripted tool results, not rerun during this review. It also shows PR #11 open at the implementation commit; subsequent PR state was not checked. The supplied transcript is the available history; earlier discussions and any later changes are unknown.
+
+## Subsequent developments (2026-11-12)
+
+The ingestion parsing described above was strengthened to reject incomplete SemVer input before metadata downloads. The decision itself remains in force. See [complete SemVer release tags](2026-11-12-complete-semver-release-tags.md).
