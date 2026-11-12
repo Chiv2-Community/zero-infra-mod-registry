@@ -122,6 +122,10 @@ indentation for mods and two spaces for plugins, with schema defaults and
 dependency compatibility aliases normalized in the usual way. Release contents
 are preserved; indexes are unchanged. No downloads occur.
 
+The shared serializer sorts object keys alphabetically at every nesting level;
+array order is preserved. Older records receive a one-time ordering normalization
+when rewritten, after which key order is independent of model field order.
+
 All packages are checked before writing. Invalid tags, conflicting versions, or
 inconsistent latest metadata abort the migration. Writes use the registry's
 atomic file replacement and rollback on write errors; this is not a crash-safe

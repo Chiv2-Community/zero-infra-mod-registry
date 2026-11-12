@@ -187,7 +187,8 @@ class JsonCodec:
         return self.load(decode_json(text), cls)
 
     def dumps(self, value: T, *, indent: int | None = None) -> str:
-        return json.dumps(self.serialize(value), indent=indent, allow_nan=False)
+        """Sort object keys recursively without reordering arrays."""
+        return json.dumps(self.serialize(value), indent=indent, allow_nan=False, sort_keys=True)
 
 
 CODEC = JsonCodec()

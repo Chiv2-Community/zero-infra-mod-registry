@@ -69,6 +69,33 @@ def test_generated_json_text_api_round_trips_nested_models() -> None:
         loads('{"ignored": {"value": NaN}}', Mod)
 
 
+def reverse_object_keys(value: JsonValue) -> JsonValue:
+    if isinstance(value, dict):
+        return {key: reverse_object_keys(item) for key, item in reversed(value.items())}
+    if isinstance(value, list):
+        return [reverse_object_keys(item) for item in value]
+    return value
+
+
+@pytest.mark.parametrize("indent", [None, 2, 4])
+def test_codec_text_key_order_is_independent_of_model_and_dictionary_order(indent: int | None) -> None:
+    model = mod_fixture()
+    data = serialize_generated(model)
+    assert dumps(model, indent=indent) == dumps(data, indent=indent)
+    assert dumps(data, indent=indent) == dumps(reverse_object_keys(data), indent=indent)
+
+
+def test_codec_sorts_adapter_keys_and_preserves_array_order() -> None:
+    codec = JsonCodec()
+
+    def adapter(info: ModInfo) -> JsonObject:
+        return {"z": [{"z": 1, "a": 2}, {"z": 3, "a": 4}], "a": info.name}
+
+    codec.register_serializer(ModInfo, adapter)
+    info = ModInfo("https://github.com/Test/Mod", "Consumer", "Description", ["Author"])
+    assert codec.dumps(info) == '{"a": "Consumer", "z": [{"a": 2, "z": 1}, {"a": 4, "z": 3}]}'
+
+
 def test_codec_keeps_json_and_schema_checks_at_the_boundary() -> None:
     codec = JsonCodec()
     checked: list[RegistrationRequest] = []
