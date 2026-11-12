@@ -1,5 +1,6 @@
 __pycache__
 dist
+annals/
 .idea
 docker/automated-registry-gateway/gateway.env
 docker/automated-registry-gateway/github-app.pem
