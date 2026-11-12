@@ -11,13 +11,15 @@ import tarfile
 import pytest
 
 from generated_models.json_types import decode_json, json_array, json_object
+from generated_models.metadata import Mod, Plugin
 from zero_infra_mod_registry.migrate_versions import main, migrate_package, migrate_registry
-from zero_infra_mod_registry.models.loading import serialize
+from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict
+from zero_infra_mod_registry.models.loading import dumps, load, serialize
 from tests.fakes import mod_fixture
 from tests.test_registry_reference import ARCHIVE, COMMIT, SHA256
 
 
-def test_reference_migration_is_offline_preserves_data_and_is_idempotent(
+def test_reference_migration_uses_registration_codec_offline_and_is_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert hashlib.sha256(ARCHIVE.read_bytes()).hexdigest() == SHA256
@@ -41,13 +43,27 @@ def test_reference_migration_is_offline_preserves_data_and_is_idempotent(
             assert path.read_bytes() == original
             continue
         data = json_object(decode_json(path.read_text()))
+        model: Mod | Plugin
+        original_model: Mod | Plugin
+        if path.is_relative_to(root / "dll_db"):
+            model = plugin_from_dict(path.parent.name, path.stem, data)
+            original_model = plugin_from_dict(path.parent.name, path.stem, decode_json(original.decode()))
+            assert path.read_text() == dumps(model, indent=2) + "\n"
+        else:
+            model = load(data, Mod)
+            original_model = load(decode_json(original.decode()), Mod)
+            assert path.read_text() == dumps(model, indent=4) + "\n"
         releases = [json_object(value) for value in json_array(data["releases"])]
         for release in releases:
             info = json_object(release["info"])
             assert info.pop("version") == str(release["tag"]).removeprefix("v")
         latest = json_object(data["latest_release_info"])
         assert latest.pop("version") == str(releases[0]["tag"]).removeprefix("v")
-        assert data == decode_json(original.decode())
+        expected = serialize(original_model)
+        json_object(expected["latest_release_info"]).pop("version", None)
+        for value in json_array(expected["releases"]):
+            json_object(json_object(value)["info"]).pop("version", None)
+        assert data == expected
     assert migrate_registry(root, write=True) == {}
     assert {path: path.read_bytes() for path in before} == migrated
 

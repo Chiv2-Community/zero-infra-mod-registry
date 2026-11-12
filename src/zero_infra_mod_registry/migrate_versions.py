@@ -4,12 +4,12 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 from datetime import UTC, datetime
-import json
 from pathlib import Path
 
 from generated_models.json_types import JsonObject, decode_json, json_array, json_object, json_string
 from generated_models.metadata import Mod, ModInfo, PluginInfo, PluginPackage
-from zero_infra_mod_registry.models.loading import load
+from zero_infra_mod_registry.models.dll_metadata import plugin_from_dict
+from zero_infra_mod_registry.models.loading import dumps, load
 from zero_infra_mod_registry.registry import FilesystemPackageRegistry
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.version_requirements import parse_release_version, validate_metadata_version
@@ -83,7 +83,10 @@ def migrate_registry(root: Path, *, write: bool = False) -> dict[Path, int]:
                 data = json_object(decode_json(path.read_text()))
                 changed = migrate_package(data, plugin=plugin)
                 if changed:
-                    updates[str(path)] = json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+                    if plugin:
+                        updates[str(path)] = dumps(plugin_from_dict(path.parent.name, path.stem, data), indent=2) + "\n"
+                    else:
+                        updates[str(path)] = dumps(load(data, Mod), indent=4) + "\n"
                     counts[path] = changed
     if not any((root / directory / "packages").is_dir() for directory in ("package_db", "dll_db")):
         raise ValueError("Expected package_db/packages or dll_db/packages")
