@@ -6,20 +6,27 @@ import pytest
 import requests
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.retriever import GithubModMetadataRetriever
+from generated_models.metadata import Mod
+from zero_infra_mod_registry.models.loading import load, serialize
 from generated_models.json_types import JsonObject
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 
 @pytest.mark.parametrize("uploaded", [False, True])
-def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool) -> None:
+@pytest.mark.parametrize("tag", ["v1.0.0", "1.0.0", "v1.0.0-rc.1", "v1.0.0+build.42", "v1.0.0-rc.1+build.42"])
+@pytest.mark.parametrize("version_prefix", [None, ""])
+def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, tag: str, version_prefix: str | None) -> None:
     repo = Repo("Test", "Plugin")
-    release = FakeRelease(assets=[FakeAsset(name="test.pak")])
-    metadata_url = "https://example.com/mod.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/mod.json"
+    release = FakeRelease(tag_name=tag, assets=[FakeAsset(name="test.pak")])
+    version = None if version_prefix is None else version_prefix + tag.removeprefix("v")
+    metadata_url = "https://example.com/mod.json" if uploaded else f"https://raw.githubusercontent.com/Test/Plugin/{tag}/mod.json"
     if uploaded:
         release.assets.append(FakeAsset(name="mod.json", browser_download_url=metadata_url))
     retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
     calls: list[str] = []
     metadata: JsonObject = {"name": "Test Mod", "description": "Description", "authors": ["Author"], "dependencies": []}
+    if version is not None:
+        metadata["version"] = version
 
     def get(url: str, *, stream: bool = False, timeout: int = 60) -> requests.Response:
         calls.append(url)
@@ -42,8 +49,15 @@ def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(requests, "get", get)
     monkeypatch.setattr(subprocess, "run", scan)
     result = retriever.process_release(repo, release.as_release())
-    assert result.tag == "v1.0.0" and result.hash == "abc123hash"
+    assert result.tag == tag and result.hash == "abc123hash"
     assert result.info.name == "Test Mod" and result.info.repo_url == repo.github_url()
+    expected_version = version if version is not None else tag.removeprefix("v")
+    assert result.info.version == expected_version
+    package = Mod(result.info, [result])
+    wire = serialize(package)
+    assert wire["latest_release_info"] == serialize(result.info)
+    assert serialize(result.info)["version"] == expected_version
+    assert load(wire, Mod) == package
     assert result.release_notes_markdown == "Release notes"
     assert len(calls) == 2
     assert calls[0] == metadata_url

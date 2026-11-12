@@ -28,6 +28,7 @@ class ModInfo:
     mod_dependencies: list[Dependency] = field(default_factory=list)
     plugin_dependencies: list[Dependency] = field(default_factory=list)
     dependencies: list[Dependency] = field(default_factory=list)
+    version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -152,6 +153,7 @@ class PluginInfo:
     repo_url: str | None = None
     target: PluginTarget = PluginTarget.SHARED
     field_schema: str | None = None
+    version: str | None = None
 
 
 @dataclass(frozen=True)

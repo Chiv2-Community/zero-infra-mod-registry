@@ -21,7 +21,9 @@
         "plugin_dependencies": {"$ref": "#/$defs/dependencies", "default": []},
         "dependencies": {"$ref": "#/$defs/dependencies", "default": [], "deprecated": true,
           "x-python-merge-into": "mod_dependencies", "x-python-unique-key": ["repo_url", "version"],
-          "x-python-case-insensitive": ["repo_url"], "x-python-serialize-alias": true}
+          "x-python-case-insensitive": ["repo_url"], "x-python-serialize-alias": true},
+        "version": {"type": ["string", "null"], "default": null,
+          "description": "Optional mod metadata version; must match the release tag at ingestion."}
       }
     },
     "modRelease": {

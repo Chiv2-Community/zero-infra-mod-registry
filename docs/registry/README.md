@@ -102,6 +102,35 @@ Clients can read `main` directly. To maintain a separate consumer branch, use
 [the publishing workflow](publishing.md). See [action inputs and CLI](actions.md)
 for manual registry operations.
 
+## Migrate metadata versions
+
+Backfill versions in an existing registry from its stored release tags. Run from
+the tooling checkout, passing the registry checkout root:
+
+```sh
+uv run python -m zero_infra_mod_registry.migrate_versions --registry-directory /path/to/C2ModRegistry
+uv run python -m zero_infra_mod_registry.migrate_versions --registry-directory /path/to/C2ModRegistry --write
+```
+
+The first command previews changes. `--write` updates
+`package_db/packages/<owner>/<repo>.json` and `dll_db/packages/<owner>/<repo>.json`.
+Each release's `info.version` is inferred from its tag, stripping a leading `v`;
+`latest_release_info.version` comes from the newest metadata-bearing release by
+publication date. Missing or null versions are filled; matching versions are
+preserved. Tags, dependencies,
+hashes, manifests, indexes, and other fields are unchanged. No downloads occur.
+
+All packages are checked before writing. Invalid tags, conflicting versions, or
+inconsistent latest metadata abort the migration. Writes use the registry's
+atomic file replacement and rollback on write errors; this is not a crash-safe
+multi-file transaction. Stop registry writers and run on a clean branch or backup.
+Review the diff and run normal registry validation before publishing. Repeating
+the migration leaves already migrated files unchanged.
+
+Published launcher releases are unaffected by the added fields. Unreleased launcher
+code needs [a compatibility update](https://github.com/Chiv2-Community/UnchainedLauncher/issues/183);
+this does not block migration or publishing.
+
 ## Optional automated publishing
 
 The registry works with manually opened registration issues. To automate them,

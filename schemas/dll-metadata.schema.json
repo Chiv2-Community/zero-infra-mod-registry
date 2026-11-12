@@ -16,7 +16,9 @@
         "mod_dependencies": {"$ref": "common.schema.json#/$defs/dependencies", "default": []},
         "repo_url": {"type": ["string", "null"], "default": null},
         "target": {"$ref": "#/$defs/target", "default": "shared"},
-        "$schema": {"type": "string", "x-python-name": "field_schema"}
+        "$schema": {"type": "string", "x-python-name": "field_schema"},
+        "version": {"type": ["string", "null"], "default": null,
+          "description": "Optional plugin metadata version; must match the release tag at ingestion."}
       }
     },
     "pluginRelease": {

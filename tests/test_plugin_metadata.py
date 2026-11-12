@@ -98,13 +98,18 @@ def test_legacy_plugin_metadata_without_target_defaults_to_shared() -> None:
 
 
 @pytest.mark.parametrize("uploaded", [False, True])
+@pytest.mark.parametrize("tag", ["v1.0.0", "1.0.0", "v1.0.0-rc.1", "v1.0.0+build.42", "v1.0.0-rc.1+build.42"])
+@pytest.mark.parametrize("version_prefix", [None, ""])
 def test_retrieval_and_registration_preserve_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, tag: str, version_prefix: str | None,
 ) -> None:
     binary = b"DLL bytes"
     data = serialize(INFO)
     data["target"] = PluginTarget.CLIENT.value
-    metadata_url = "https://example.com/plugin.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/plugin.json"
+    version = None if version_prefix is None else version_prefix + tag.removeprefix("v")
+    if version is not None:
+        data["version"] = version
+    metadata_url = "https://example.com/plugin.json" if uploaded else f"https://raw.githubusercontent.com/Test/Plugin/{tag}/plugin.json"
     calls: list[str] = []
 
     def get(url: str, *, timeout: int, stream: bool = False) -> requests.Response:
@@ -120,16 +125,19 @@ def test_retrieval_and_registration_preserve_target(
     assets = [FakeAsset(size=len(binary))]
     if uploaded:
         assets.append(FakeAsset(name="plugin.json", browser_download_url=metadata_url))
-    client = FakeGithub([FakeRelease(assets=assets)])
+    client = FakeGithub([FakeRelease(tag_name=tag, assets=assets)])
     retriever = GithubModMetadataRetriever(client.as_github())
     registry = FilesystemPackageRegistry(retriever, str(tmp_path / "registry"), str(tmp_path / "packages"), str(tmp_path / "dlls"))
-    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
+    assert registry.add_dll_release(Repo("Test", "Plugin"), tag)
     package = json_object(decode_json((Path(registry.plugin_packages_dir) / "Test/Plugin.json").read_text()))
     expected = PluginTarget.CLIENT
     assert json_object(package["latest_release_info"])["target"] == expected.value
     restored = plugin_from_dict("Test", "Plugin", package)
     assert restored.releases[0].info is not None
     assert restored.releases[0].info.target is expected
+    assert restored.releases[0].info.version == version
+    assert restored.releases[0].tag == tag
+    assert restored.releases[0].version == tag.removeprefix("v")
     assert "manifest" not in serialize(restored.releases[0])
     assert registry.validate_dll_db(verify_downloads=True)
     assert calls == [metadata_url, ENTRY.download_url, ENTRY.download_url]

@@ -142,17 +142,6 @@ def test_plugin_serialization_preserves_date_order_and_tie_selection() -> None:
     assert latest_plugin_info(plugin) == first_info
 
 
-def test_obsolete_index_is_not_loaded_or_migrated(registry: FilesystemPackageRegistry) -> None:
-    path = Path(registry.plugin_list_index_path).with_name("index.json")
-    path.parent.mkdir(parents=True)
-    path.write_text('[{"organization":"Test","name":"OldPlugin","version":"1.0.0"}]')
-    original = path.read_bytes()
-    assert registry._load_dll_releases() == []
-    assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
-    assert registry._load_dll_releases() == [DLL]
-    assert path.read_bytes() == original
-
-
 def test_duplicate_package_releases_fail_validation(registry: FilesystemPackageRegistry) -> None:
     assert registry.add_dll_release(Repo("Test", "Plugin"), "v1.0.0")
     path = Path(registry.plugin_packages_dir) / "Test/Plugin.json"

@@ -13,14 +13,13 @@ from typing import List, Optional, Tuple, cast, override
 import requests
 from github import Auth, Github, GitReleaseAsset
 from github.GitRelease import GitRelease
-from semver import Version
 
 from generated_models.dependencies import Dependency
 from generated_models.metadata import DllRelease, Manifest, ModInfo, Mod, PakInventory, PluginInfo, Release
 from zero_infra_mod_registry.models import Repo
 from zero_infra_mod_registry.models.dll_metadata import validate_dll_release
 from zero_infra_mod_registry.models.loading import load
-from zero_infra_mod_registry.utils.version_requirements import parse_version_requirement
+from zero_infra_mod_registry.utils.version_requirements import parse_release_version, parse_version_requirement, validate_metadata_version
 from zero_infra_mod_registry.utils.validation_errors import validation_context
 from zero_infra_mod_registry.utils.schema_validation import validate_schema
 from generated_models.json_types import JsonObject, decode_json, json_array, json_object
@@ -65,7 +64,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         release = self.github_client.get_repo(str(repo)).get_release(release_tag)
         if release.draft:
             raise ValueError("Draft DLL releases cannot be registered")
-        version = str(Version.parse(release.tag_name.removeprefix("v")))
+        with validation_context(f"{repo} release tag {release.tag_name!r}"):
+            version = str(parse_release_version(release.tag_name))
         release_assets = list(release.get_assets())
         name = selected_dll_name((asset.name for asset in release_assets), dll_file)
         assets = [asset for asset in release_assets if asset.name == name]
@@ -106,6 +106,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
             data = self._fetch_release_json(repo, release, "plugin.json")
             validate_schema(data, "plugin")
             info = load(data, PluginInfo)
+            with validation_context("version"):
+                validate_metadata_version(info.version, release.tag_name)
         if info.repo_url is not None and info.repo_url.lower() != repo.github_url().lower():
             raise ValueError("plugin.json repository mismatch")
         return replace(info, repo_url=repo.github_url())
@@ -174,24 +176,28 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         """
         if release.draft:
             raise ValueError("Draft pak releases cannot be registered")
+        with validation_context(f"{repo} release tag {release.tag_name!r}"):
+            version = str(parse_release_version(release.tag_name))
         with validation_context(f"{repo} {release.tag_name} mod.json"):
             response_json = self._fetch_release_json(repo, release, "mod.json")
             validate_schema(response_json, "mod")
             response_json["repo_url"] = repo.github_url()
             mod_info = load(response_json, ModInfo)
+            with validation_context("version"):
+                validate_metadata_version(mod_info.version, release.tag_name)
+                if mod_info.version is None:
+                    mod_info = replace(mod_info, version=version)
         pak = self.find_pak_file(release)
 
         pak_error = pak if isinstance(pak, str) else None
         dependency_errors = self.validate_dependency_versions(mod_info.mod_dependencies + mod_info.plugin_dependencies)
-        tag_name_error = self.validate_version_tag_name(release.tag_name)
 
         if (
             pak_error
             or dependency_errors
-            or tag_name_error
         ):
             # Collect all errors and filter out None values
-            error_list: List[Optional[str]] = [pak_error, tag_name_error]
+            error_list: List[Optional[str]] = [pak_error]
             all_errors: List[str] = [x for x in error_list if x is not None]
             all_errors.extend(dependency_errors)
             error_string = "\n\t" + "\n\t".join(all_errors)
@@ -299,11 +305,8 @@ class GithubModMetadataRetriever(ModMetadataRetriever):
         Returns:
             Error message if invalid, None if valid
         """
-        if tag_name.startswith("v"):
-            tag_name = tag_name[1:]
-
         try:
-            Version.parse(tag_name)
+            parse_release_version(tag_name)
             return None
         except ValueError as e:
             return f"Version Tag '{tag_name}' Does not conform to the semver spec: {e}"
