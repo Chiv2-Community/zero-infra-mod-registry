@@ -3,7 +3,7 @@
 Run builds from the repository root:
 
 ```sh
-docker build -f docker/zero-infra-mod-registry/Dockerfile -t registry-tool .
+docker build -t registry-tool .
 docker build -f docker/automated-registry-gateway/Dockerfile -t automated-registry-gateway:local .
 ```
 

@@ -1,3 +1,4 @@
+# Keep this Dockerfile at the action root: GitHub uses its directory as build context.
 # Build stage
 FROM python:3.14-alpine AS builder
 

@@ -62,7 +62,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/zero-infra-mod-registry/Dockerfile
+          file: Dockerfile
           push: false
           tags: zero-infra-mod-registry:${{ github.run_number }}
           load: true
