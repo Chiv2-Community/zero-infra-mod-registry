@@ -28,7 +28,7 @@ def test_invalid_release_tags_fail_before_metadata_download(
 
 
 @pytest.mark.parametrize("filename", ["mod.json", "plugin.json"])
-@pytest.mark.parametrize("version", ["2.0.0", "1.0.0-RC1", "1.0.0+other", "invalid", "1.0.0\n"])
+@pytest.mark.parametrize("version", ["2.0.0", "1.0.0-RC1", "1.0.0+other", "invalid", "1.0.0\n", "v1.0.0"])
 def test_metadata_version_failure_precedes_binary_download(
     filename: str, version: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

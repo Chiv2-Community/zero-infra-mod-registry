@@ -14,7 +14,7 @@ from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 @pytest.mark.parametrize("uploaded", [False, True])
 @pytest.mark.parametrize("tag", ["v1.0.0", "1.0.0", "v1.0.0-rc.1", "v1.0.0+build.42", "v1.0.0-rc.1+build.42"])
-@pytest.mark.parametrize("version_prefix", [None, "", "v"])
+@pytest.mark.parametrize("version_prefix", [None, ""])
 def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, tag: str, version_prefix: str | None) -> None:
     repo = Repo("Test", "Plugin")
     release = FakeRelease(tag_name=tag, assets=[FakeAsset(name="test.pak")])

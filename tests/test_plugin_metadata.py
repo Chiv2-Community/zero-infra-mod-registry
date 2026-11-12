@@ -99,7 +99,7 @@ def test_legacy_plugin_metadata_without_target_defaults_to_shared() -> None:
 
 @pytest.mark.parametrize("uploaded", [False, True])
 @pytest.mark.parametrize("tag", ["v1.0.0", "1.0.0", "v1.0.0-rc.1", "v1.0.0+build.42", "v1.0.0-rc.1+build.42"])
-@pytest.mark.parametrize("version_prefix", [None, "", "v"])
+@pytest.mark.parametrize("version_prefix", [None, ""])
 def test_retrieval_and_registration_preserve_target(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, tag: str, version_prefix: str | None,
 ) -> None:
