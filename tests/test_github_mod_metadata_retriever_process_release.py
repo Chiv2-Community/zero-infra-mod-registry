@@ -13,11 +13,13 @@ from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 
 @pytest.mark.parametrize("uploaded", [False, True])
-@pytest.mark.parametrize("version", [None, "1.0.0", "v1.0.0"])
-def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, version: str | None) -> None:
+@pytest.mark.parametrize("tag", ["v1.0.0", "1.0.0", "v1.0.0-rc.1", "v1.0.0+build.42", "v1.0.0-rc.1+build.42"])
+@pytest.mark.parametrize("version_prefix", [None, "", "v"])
+def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, uploaded: bool, tag: str, version_prefix: str | None) -> None:
     repo = Repo("Test", "Plugin")
-    release = FakeRelease(assets=[FakeAsset(name="test.pak")])
-    metadata_url = "https://example.com/mod.json" if uploaded else "https://raw.githubusercontent.com/Test/Plugin/v1.0.0/mod.json"
+    release = FakeRelease(tag_name=tag, assets=[FakeAsset(name="test.pak")])
+    version = None if version_prefix is None else version_prefix + tag.removeprefix("v")
+    metadata_url = "https://example.com/mod.json" if uploaded else f"https://raw.githubusercontent.com/Test/Plugin/{tag}/mod.json"
     if uploaded:
         release.assets.append(FakeAsset(name="mod.json", browser_download_url=metadata_url))
     retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
@@ -47,9 +49,9 @@ def test_process_release_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(requests, "get", get)
     monkeypatch.setattr(subprocess, "run", scan)
     result = retriever.process_release(repo, release.as_release())
-    assert result.tag == "v1.0.0" and result.hash == "abc123hash"
+    assert result.tag == tag and result.hash == "abc123hash"
     assert result.info.name == "Test Mod" and result.info.repo_url == repo.github_url()
-    expected_version = version if version is not None else "1.0.0"
+    expected_version = version if version is not None else tag.removeprefix("v")
     assert result.info.version == expected_version
     package = Mod(result.info, [result])
     wire = serialize(package)

@@ -9,8 +9,26 @@ from generated_models.json_types import JsonObject
 from tests.fakes import FakeAsset, FakeGithub, FakeRelease, response_fixture
 
 
+@pytest.mark.parametrize("kind", ["mod", "plugin"])
+@pytest.mark.parametrize("tag", ["latest", "v1.2", "v01.2.3", "v1.2.3-01", "v1.2.3+", "v1.2.3-rc..1", "v1.2.3\n"])
+def test_invalid_release_tags_fail_before_metadata_download(
+    kind: str, tag: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def get(url: str, *, timeout: int) -> requests.Response:
+        raise AssertionError("Invalid release tags must fail before downloads")
+
+    monkeypatch.setattr(requests, "get", get)
+    release = FakeRelease(tag_name=tag)
+    retriever = GithubModMetadataRetriever(FakeGithub([release]).as_github())
+    with pytest.raises(ValueError, match="Test/Plugin release tag"):
+        if kind == "mod":
+            retriever.process_release(Repo("Test", "Plugin"), release.as_release())
+        else:
+            retriever.fetch_dll_release(Repo("Test", "Plugin"), tag)
+
+
 @pytest.mark.parametrize("filename", ["mod.json", "plugin.json"])
-@pytest.mark.parametrize("version", ["2.0.0", "1.0.0-RC1", "1.0.0+other", "invalid"])
+@pytest.mark.parametrize("version", ["2.0.0", "1.0.0-RC1", "1.0.0+other", "invalid", "1.0.0\n"])
 def test_metadata_version_failure_precedes_binary_download(
     filename: str, version: str, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

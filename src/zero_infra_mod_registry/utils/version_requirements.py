@@ -4,12 +4,21 @@ import re
 from semver import Version
 
 
+def parse_release_version(tag: str) -> Version:
+    """Parse a complete SemVer tag with an optional leading v."""
+    value = tag.removeprefix("v")
+    version = Version.parse(value)
+    if str(version) != value:
+        raise ValueError(f"Invalid semantic version: {tag!r}")
+    return version
+
+
 def validate_metadata_version(version: str | None, release_tag: str) -> None:
     """Match declared metadata versions to tags without changing stored spelling."""
     if version is None:
         return
-    declared = str(Version.parse(version.removeprefix("v")))
-    released = str(Version.parse(release_tag.removeprefix("v")))
+    declared = str(parse_release_version(version))
+    released = str(parse_release_version(release_tag))
     if declared != released:
         raise ValueError(f"version {version!r} does not match release tag {release_tag!r}")
 

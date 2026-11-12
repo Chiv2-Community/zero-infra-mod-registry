@@ -12,6 +12,9 @@
 
 ## Version
 
+Release tags must be SemVer, optionally prefixed with `v`. Prerelease and build
+metadata are supported, for example `v1.2.3-rc.1+build.42`.
+
 `plugin.json` accepts an optional `version` string, preserved in registry metadata.
 When provided, it must match the release tag as a semantic version, ignoring a
 leading `v` on either value. Prerelease and build identifiers must match too.

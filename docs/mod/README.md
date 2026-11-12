@@ -10,6 +10,9 @@
 
 ## Version
 
+Release tags must be SemVer, optionally prefixed with `v`. Prerelease and build
+metadata are supported, for example `v1.2.3-rc.1+build.42`.
+
 `mod.json` accepts an optional `version` string, for example `"version": "1.2.3"`.
 The registry preserves it in release metadata and `latest_release_info`. During
 ingestion, omitted versions are inferred from the release tag without its leading
