@@ -21,3 +21,7 @@ The registry implementation adds an optional plugin version to stored plugin inf
 ## Alternatives, follow-up and uncertainty
 
 The source response calls for updating launcher main before publishing plugin versions; it does not record a comparison of alternative mitigations or an agreed release sequence. Confirm the fix in the actual launcher version and test deserialization against representative registry output before publishing. Reconsider this constraint when strict consumers support the field or a separately verified compatibility strategy is adopted. The transcript may omit earlier history; current PR and launcher deployment status were not independently checked.
+
+## Subsequent developments (2026-11-12)
+
+The earlier absence of a documented release sequence is now qualified by a proposed parallel implementation and rollout gate in launcher issue #183; implementation and deployment remain unverified. See [launcher plugin version compatibility follow-up](2026-11-12-launcher-version-follow-up.md).
