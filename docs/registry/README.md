@@ -117,8 +117,10 @@ The first command previews changes. `--write` updates
 Each release's `info.version` is inferred from its tag, stripping a leading `v`;
 `latest_release_info.version` comes from the newest metadata-bearing release by
 publication date. Missing or null versions are filled; matching versions are
-preserved. Tags, dependencies,
-hashes, manifests, indexes, and other fields are unchanged. No downloads occur.
+preserved. Packages use the same model serializer as registration: four-space
+indentation for mods and two spaces for plugins, with schema defaults and
+dependency compatibility aliases normalized in the usual way. Release contents
+are preserved; indexes are unchanged. No downloads occur.
 
 All packages are checked before writing. Invalid tags, conflicting versions, or
 inconsistent latest metadata abort the migration. Writes use the registry's
