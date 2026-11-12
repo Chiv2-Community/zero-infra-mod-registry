@@ -58,7 +58,7 @@ outputs:
 
 runs:
   using: 'docker'
-  image: 'docker/zero-infra-mod-registry/Dockerfile'
+  image: 'Dockerfile'
   args:
     - ${{ inputs.command }}
     - ${{ inputs.repo_url }}

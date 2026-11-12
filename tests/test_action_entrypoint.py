@@ -1,9 +1,23 @@
 """Keep Docker-generated registry paths writable by subsequent runner steps."""
 import os
 from pathlib import Path
+import re
 import subprocess
 
 import pytest
+
+
+def test_action_docker_build_context_contains_repository_sources() -> None:
+    root = Path(__file__).resolve().parents[1]
+    image = re.search(r"^  image: ['\"]?([^'\"\s]+)", (root / "action.yml").read_text(), re.MULTILINE)
+    assert image is not None
+    dockerfile = root / image.group(1)
+    assert dockerfile.parent == root
+    assert dockerfile.is_file()
+    for line in dockerfile.read_text().splitlines():
+        if line.startswith("COPY ") and not line.startswith("COPY --from="):
+            for source in line.split()[1:-1]:
+                assert (dockerfile.parent / source).exists(), source
 
 
 @pytest.mark.parametrize("exit_code", [0, 7])
