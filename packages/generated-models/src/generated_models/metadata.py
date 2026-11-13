@@ -47,13 +47,12 @@ class BlueprintModInfo(BaseAsset):
     mod_description: str | None = None
     mod_repo_url: str | None = None
     silent_load: bool = False
-    show_in_gui: bool = False
+    show_in_gui: bool | None = None
     enable_by_default: bool = False
     is_client_side: bool = False
     online_only: bool = False
     host_only: bool = False
     allow_on_frontend: bool = False
-    is_hidden: bool = False
 
 
 @dataclass(frozen=True)
