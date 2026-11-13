@@ -85,6 +85,11 @@ only explicit false hides the actor. Preserve this distinction when loading and
 serializing inventories. Historical `is_hidden` fields are ignored and are not
 written; they were synthetic scanner metadata, not an asset flag.
 
+The bundled scanner sorts each manifest asset collection and marker blueprint
+reference list by ordinal asset path. Pak entries are sorted by pak path, then
+name. Registry loading and serialization preserve those arrays. The scanner's
+`generated_at` envelope timestamp remains per-run and is not stored in releases.
+
 Both `dependencies` and `mod_dependencies` are modeled. `dependencies` is
 deprecated; `mod_dependencies` is required when `dependencies` is absent.
 Declare an empty list when there are no pak dependencies.
