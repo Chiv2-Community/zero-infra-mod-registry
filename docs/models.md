@@ -80,6 +80,11 @@ dependencies.
 
 ## Compatibility
 
+Scanner blueprint `show_in_gui` is nullable: missing/null means no GUI opt-out;
+only explicit false hides the actor. Preserve this distinction when loading and
+serializing inventories. Historical `is_hidden` fields are ignored and are not
+written; they were synthetic scanner metadata, not an asset flag.
+
 Both `dependencies` and `mod_dependencies` are modeled. `dependencies` is
 deprecated; `mod_dependencies` is required when `dependencies` is absent.
 Declare an empty list when there are no pak dependencies.

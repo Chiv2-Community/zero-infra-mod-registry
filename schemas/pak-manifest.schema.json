@@ -20,13 +20,12 @@
         "mod_description": {"type": ["string", "null"], "default": null},
         "mod_repo_url": {"type": ["string", "null"], "default": null},
         "silent_load": {"type": "boolean", "default": false},
-        "show_in_gui": {"type": "boolean", "default": false},
+        "show_in_gui": {"type": ["boolean", "null"], "default": null},
         "enable_by_default": {"type": "boolean", "default": false},
         "is_client_side": {"type": "boolean", "default": false},
         "online_only": {"type": "boolean", "default": false},
         "host_only": {"type": "boolean", "default": false},
-        "allow_on_frontend": {"type": "boolean", "default": false},
-        "is_hidden": {"type": "boolean", "default": false}
+        "allow_on_frontend": {"type": "boolean", "default": false}
       }
     },
     "map": {
